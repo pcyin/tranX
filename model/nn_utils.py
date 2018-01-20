@@ -1,0 +1,94 @@
+# coding=utf-8
+
+import torch
+import torch.nn.functional as F
+import numpy as np
+
+import torch
+from torch.autograd import Variable
+import numpy as np
+
+
+def dot_prod_attention(h_t, src_encoding, src_encoding_att_linear, mask=None):
+    """
+    :param h_t: (batch_size, hidden_size)
+    :param src_encoding: (batch_size, src_sent_len, hidden_size * 2)
+    :param src_encoding_att_linear: (batch_size, src_sent_len, hidden_size)
+    :param mask: (batch_size, src_sent_len)
+    """
+    # (batch_size, src_sent_len)
+    att_weight = torch.bmm(src_encoding_att_linear, h_t.unsqueeze(2)).squeeze(2)
+    if mask is not None:
+        att_weight.data.masked_fill_(mask, -float('inf'))
+    att_weight = F.softmax(att_weight, dim=-1)
+
+    att_view = (att_weight.size(0), 1, att_weight.size(1))
+    # (batch_size, hidden_size)
+    ctx_vec = torch.bmm(att_weight.view(*att_view), src_encoding).squeeze(1)
+
+    return ctx_vec, att_weight
+
+
+def length_array_to_mask_tensor(length_array, cuda=False):
+    max_len = length_array[0]
+    batch_size = len(length_array)
+
+    mask = np.ones((batch_size, max_len), dtype=np.uint8)
+    for i, seq_len in enumerate(length_array):
+        mask[i][:seq_len] = 0
+
+    mask = torch.ByteTensor(mask)
+    return mask.cuda() if cuda else mask
+
+
+def input_transpose(sents, pad_token):
+    """
+    transform the input List[sequence] of size (batch_size, max_sent_len)
+    into a list of size (max_sent_len, batch_size), with proper padding
+    """
+    max_len = max(len(s) for s in sents)
+    batch_size = len(sents)
+
+    sents_t = []
+    masks = []
+    for i in xrange(max_len):
+        sents_t.append([sents[k][i] if len(sents[k]) > i else pad_token for k in xrange(batch_size)])
+        masks.append([1 if len(sents[k]) > i else 0 for k in xrange(batch_size)])
+
+    return sents_t, masks
+
+
+def word2id(sents, vocab):
+    if type(sents[0]) == list:
+        return [[vocab[w] for w in s] for s in sents]
+    else:
+        return [vocab[w] for w in sents]
+
+
+def id2word(sents, vocab):
+    if type(sents[0]) == list:
+        return [[vocab.id2word[w] for w in s] for s in sents]
+    else:
+        return [vocab.id2word[w] for w in sents]
+
+
+def to_input_variable(sequences, vocab, cuda=False, training=True, append_boundary_sym=False):
+    """
+    given a list of sequences,
+    return a tensor of shape (max_sent_len, batch_size)
+    """
+    if append_boundary_sym:
+        sequences = [['<s>'] + seq + ['</s>'] for seq in sequences]
+
+    word_ids = word2id(sequences, vocab)
+    sents_t, masks = input_transpose(word_ids, vocab['<pad>'])
+
+    sents_var = Variable(torch.LongTensor(sents_t), volatile=(not training), requires_grad=False)
+    if cuda:
+        sents_var = sents_var.cuda()
+
+    return sents_var
+
+
+def variable_constr(x, v, cuda=False):
+    return Variable(torch.cuda.x(v)) if cuda else Variable(torch.x(v))
