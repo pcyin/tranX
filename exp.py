@@ -212,8 +212,8 @@ def test(args):
     if args.cuda: parser = parser.cuda()
     parser.eval()
 
-    eval_results = evaluation.evaluate([e for e in test_set.examples if e.idx == 16182], parser, args, verbose=True)
-    print(eval_results)
+    eval_results = evaluation.evaluate(test_set.examples, parser, args, verbose=True)
+    print(eval_results, file=sys.stderr)
 
 
 if __name__ == '__main__':
