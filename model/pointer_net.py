@@ -12,7 +12,7 @@ class PointerNet(nn.Module):
     def __init__(self, args):
         super(PointerNet, self).__init__()
 
-        self.src_encoding_linear = nn.Linear(args.hidden_size * 2, args.ptrnet_hidden_dim)
+        self.src_encoding_linear = nn.Linear(args.hidden_size, args.ptrnet_hidden_dim)
         self.query_vec_linear = nn.Linear(args.hidden_size, args.ptrnet_hidden_dim)
         self.layer2 = nn.Linear(args.ptrnet_hidden_dim, 1)
 

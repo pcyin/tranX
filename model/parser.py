@@ -41,7 +41,7 @@ class Parser(nn.Module):
         nn.init.xavier_normal(self.type_embed.weight.data)
 
         # LSTMs
-        self.encoder_lstm = nn.LSTM(args.embed_size, args.hidden_size, bidirectional=True)
+        self.encoder_lstm = nn.LSTM(args.embed_size, args.hidden_size / 2, bidirectional=True)
         self.decoder_lstm = nn.LSTMCell(args.action_embed_size +   # previous action
                                         args.action_embed_size + args.field_embed_size + args.type_embed_size +  # frontier info
                                         args.hidden_size,   # parent hidden state
@@ -53,15 +53,15 @@ class Parser(nn.Module):
         self.primitive_predictor = nn.Linear(args.hidden_size, 2)
 
         # initialize the decoder's state and cells with encoder hidden states
-        self.decoder_cell_init = nn.Linear(args.hidden_size * 2, args.hidden_size)
+        self.decoder_cell_init = nn.Linear(args.hidden_size, args.hidden_size)
 
         # attention: dot product attention
         # project source encoding to decoder rnn's h space
-        self.att_src_linear = nn.Linear(args.hidden_size * 2, args.hidden_size, bias=False)
+        self.att_src_linear = nn.Linear(args.hidden_size, args.hidden_size, bias=False)
 
         # transformation of decoder hidden states and context vectors before reading out target words
         # this produces the `attentional vector` in (Luong et al., 2015)
-        self.att_vec_linear = nn.Linear(args.hidden_size * 2 + args.hidden_size, args.hidden_size, bias=False)
+        self.att_vec_linear = nn.Linear(args.hidden_size + args.hidden_size, args.hidden_size, bias=False)
 
         # embedding layers
         self.production_readout = nn.Linear(args.hidden_size, len(transition_system.grammar) + 1)
@@ -102,10 +102,10 @@ class Parser(nn.Module):
         return src_encodings, (last_state, last_cell)
 
     def init_decoder_state(self, enc_last_state, enc_last_cell):
-        dec_init_cell = self.decoder_cell_init(enc_last_cell)
-        dec_init_state = F.tanh(dec_init_cell)
+        h_0 = self.decoder_cell_init(enc_last_cell)
+        h_0 = F.tanh(h_0)
 
-        return dec_init_state, dec_init_cell
+        return h_0, Variable(self.new_tensor(h_0.size()))
 
     def score(self, examples):
         """

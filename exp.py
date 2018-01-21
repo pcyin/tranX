@@ -110,7 +110,7 @@ def train(args):
         epoch_begin = time.time()
 
         for batch_examples in train_set.batch_iter(batch_size=args.batch_size, shuffle=True):
-            batch_examples = [e for e in batch_examples if len(e.tgt_actions) <= 100]
+            batch_examples = [e for e in batch_examples if len(e.tgt_actions) <= args.decode_max_time_step]
 
             train_iter += 1
             optimizer.zero_grad()
@@ -141,12 +141,13 @@ def train(args):
         model_file = args.save_to + '.iter%d.bin' % train_iter
         print('save model to [%s]' % model_file, file=sys.stderr)
         model.save(model_file)
+
         # perform validation
         print('[Epoch %d] begin validation' % epoch, file=sys.stderr)
+        eval_start = time.time()
         eval_results = evaluation.evaluate(dev_set.examples, model, args, verbose=True)
         dev_acc = eval_results['accuracy']
-
-        print('[Epoch %d] code generation accuracy=%.5f' % (epoch, dev_acc), file=sys.stderr)
+        print('[Epoch %d] code generation accuracy=%.5f took %ds' % (epoch, dev_acc, time.time() - eval_start), file=sys.stderr)
         is_better = history_dev_scores == [] or dev_acc > max(history_dev_scores)
         history_dev_scores.append(dev_acc)
 
