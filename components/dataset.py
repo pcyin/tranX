@@ -44,6 +44,9 @@ class Dataset(object):
     def __len__(self):
         return len(self.examples)
 
+    def __iter__(self):
+        return iter(self.examples)
+
 
 class Example(object):
     def __init__(self, src_sent, tgt_actions, tgt_code, tgt_ast, idx=0, meta=None):

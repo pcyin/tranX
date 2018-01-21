@@ -99,6 +99,8 @@ def train(args):
     if args.cuda: model.cuda()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
+    print('begin training, %d training examples, %d dev examples' % (len(train_set), len(dev_set)))
+
     epoch = train_iter = 0
     report_loss = report_examples = 0.
     history_dev_scores = []
@@ -216,6 +218,7 @@ def test(args):
 
 if __name__ == '__main__':
     args = init_config()
+    print(args, file=sys.stderr)
     if args.mode == 'train':
         train(args)
     elif args.mode == 'test':

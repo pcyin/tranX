@@ -372,7 +372,7 @@ class Parser(nn.Module):
 
                         # second, add the probability of copying the most probable unk word
                         if src_unk_pos_list:
-                            unk_pos = primitive_copy_prob[hyp_id][src_unk_pos_list].data.numpy().argmax()
+                            unk_pos = primitive_copy_prob[hyp_id][src_unk_pos_list].data.cpu().numpy().argmax()
                             unk_pos = src_unk_pos_list[unk_pos]
                             token = src_sent[unk_pos]
                             gentoken_new_hyp_unks.append(token)
@@ -395,7 +395,7 @@ class Parser(nn.Module):
 
             live_hyp_ids = []
             new_hypotheses = []
-            for new_hyp_score, new_hyp_pos in zip(top_new_hyp_scores.data, top_new_hyp_pos.data):
+            for new_hyp_score, new_hyp_pos in zip(top_new_hyp_scores.data.cpu(), top_new_hyp_pos.data.cpu()):
                 if new_hyp_pos < len(applyrule_new_hyp_scores):
                     # it's an ApplyRule or Reduce action
                     prev_hyp_id = applyrule_prev_hyp_ids[new_hyp_pos]
