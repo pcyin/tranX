@@ -95,6 +95,26 @@ class Hypothesis(object):
         if frontier_info:
             self.frontier_node, self.frontier_field = frontier_info
 
+    def clone_and_apply_action(self, action):
+        new_hyp = self.copy()
+        new_hyp.apply_action(action)
+
+        return new_hyp
+
+    def copy(self):
+        new_hyp = Hypothesis()
+        if self.tree:
+            new_hyp.tree = self.tree.copy()
+
+        new_hyp.actions = list(self.actions)
+        new_hyp.score = self.score
+        new_hyp._value_buffer = list(self._value_buffer)
+        new_hyp.t = self.t
+
+        new_hyp.update_frontier_info()
+
+        return new_hyp
+
     @property
     def completed(self):
         return self.tree and self.frontier_field is None

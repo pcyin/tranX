@@ -170,8 +170,8 @@ class Django(object):
             for action in tgt_actions:
                 assert action.__class__ in transition_system.get_valid_continuation_types(hyp)
                 if isinstance(action, ApplyRuleAction):
-                    assert action in transition_system.get_valid_continuating_productions(hyp)
-                hyp.apply_action(action)
+                    assert action.production in transition_system.get_valid_continuating_productions(hyp)
+                hyp = hyp.clone_and_apply_action(action)
 
             src_from_hyp = astor.to_source(asdl_ast_to_python_ast(hyp.tree, grammar))
             assert src_from_hyp == gold_source
@@ -295,19 +295,20 @@ class Django(object):
                 assert action.__class__ in transition_system.get_valid_continuation_types(hyp)
                 if isinstance(action, ApplyRuleAction):
                     assert action.production in transition_system.get_valid_continuating_productions(hyp)
-                hyp.apply_action(action)
+                hyp = hyp.clone_and_apply_action(action)
 
             src_from_hyp = astor.to_source(asdl_ast_to_python_ast(hyp.tree, grammar))
             assert src_from_hyp == gold_source
 
+            print(idx)
 
 
 if __name__ == '__main__':
-    Django.run()
+    # Django.run()
     # f1 = Field('hahah', ASDLPrimitiveType('123'), 'single')
     # rf1 = RealizedField(f1, value=123)
     #
     # # print(f1 == rf1)
     # a = {f1: 1}
     # print(a[rf1])
-    # Django.generate_django_dataset()
+    Django.generate_django_dataset()

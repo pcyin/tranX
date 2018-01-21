@@ -46,6 +46,7 @@ class AbstractSyntaxTree(object):
         new_tree.created_time = self.created_time
         for i, old_field in enumerate(self.fields):
             new_field = new_tree.fields[i]
+            new_field._not_single_cardinality_finished = old_field._not_single_cardinality_finished
             if isinstance(old_field.type, ASDLCompositeType):
                 for value in old_field.as_value_list:
                     new_field.add_value(value.copy())

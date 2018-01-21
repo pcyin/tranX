@@ -1,4 +1,7 @@
 # coding=utf-8
+import os
+
+import path
 
 import torch
 import torch.nn as nn
@@ -78,7 +81,7 @@ class Parser(nn.Module):
         """
         encode the source sequence
         :return:
-            src_encodings: Variable(src_sent_len, batch_size, hidden_size * 2)
+            src_encodings: Variable(batch_size, src_sent_len, hidden_size * 2)
             last_state, last_cell: Variable(batch_size, hidden_size)
         """
 
@@ -89,6 +92,8 @@ class Parser(nn.Module):
         # src_encodings: (tgt_query_len, batch_size, hidden_size)
         src_encodings, (last_state, last_cell) = self.encoder_lstm(packed_src_token_embed)
         src_encodings, _ = pad_packed_sequence(src_encodings)
+        # src_encodings: (batch_size, tgt_query_len, hidden_size)
+        src_encodings = src_encodings.permute(1, 0, 2)
 
         # (batch_size, hidden_size * 2)
         last_state = torch.cat([last_state[0], last_state[1]], 1)
@@ -164,8 +169,6 @@ class Parser(nn.Module):
         args = self.args
 
         h_tm1 = dec_init_vec
-        # (batch_size, query_len, hidden_size * 2)
-        src_encodings = src_encodings.permute(1, 0, 2)
         # (batch_size, query_len, hidden_size)
         src_encodings_att_linear = self.att_src_linear(src_encodings)
 
@@ -231,23 +234,31 @@ class Parser(nn.Module):
 
         # Variable(1, src_sent_len, hidden_size * 2)
         src_encodings, (last_state, last_cell) = self.encode(src_sent_var, [len(src_sent)])
-        src_encodings = src_encodings.permute(1, 0, 2)
         # (1, src_sent_len, hidden_size)
         src_encodings_att_linear = self.att_src_linear(src_encodings)
 
         h_tm1 = self.init_decoder_state(last_state, last_cell)
         zero_action_embed = Variable(self.new_tensor(args.action_embed_size).zero_())
 
-        hyp_scores = Variable(torch.zeros(1), volatile=True)
-        if self.cuda:
-            hyp_scores = hyp_scores.cuda()
+        hyp_scores = Variable(self.new_tensor([0.]), volatile=True)
+
+        src_token_vocab_ids = [primitive_vocab[token] for token in src_sent]
+        src_unk_pos_list = [pos for pos, token_id in enumerate(src_token_vocab_ids) if token_id == primitive_vocab.unk_id]
+        # sometimes a word may appear multi-times in the source, in this case,
+        # we just copy its first appearing position. Therefore we mask the words
+        # appearing second and onwards to -1
+        token_set = set()
+        for i, tid in enumerate(src_token_vocab_ids):
+            if tid in token_set:
+                src_token_vocab_ids[i] = -1
+            else: token_set.add(tid)
 
         t = 0
         hypotheses = [Hypothesis()]
         hyp_states = [[]]
         completed_hypotheses = []
 
-        while len(completed_hypotheses) < beam_size and t > args.decode_max_time_step:
+        while len(completed_hypotheses) < beam_size and t < args.decode_max_time_step:
             hyp_num = len(hypotheses)
 
             # (hyp_num, src_sent_len, hidden_size * 2)
@@ -256,7 +267,7 @@ class Parser(nn.Module):
             exp_src_encodings_att_linear = src_encodings_att_linear.expand(hyp_num, src_encodings_att_linear.size(1), src_encodings_att_linear.size(2))
 
             if t == 0:
-                x = Variable(self.new_tensor(1, self.decoder_lstm.input_size).zero_(), voliate=True)
+                x = Variable(self.new_tensor(1, self.decoder_lstm.input_size).zero_(), volatile=True)
                 offset = args.action_embed_size * 2 + args.field_embed_size
                 x[0, offset: offset + args.type_embed_size] = self.type_embed.weight[self.grammar.type2id[self.grammar.root_type]]
             else:
@@ -265,12 +276,12 @@ class Parser(nn.Module):
                 a_tm1_embeds = []
                 for a_tm1 in actions_tm1:
                     if a_tm1:
-                        if isinstance(a_tm1.action, ApplyRuleAction):
-                            a_tm1_embed = self.production_embed.weight[self.grammar.prod2id[a_tm1.action.production]]
-                        elif isinstance(a_tm1.action, ReduceAction):
+                        if isinstance(a_tm1, ApplyRuleAction):
+                            a_tm1_embed = self.production_embed.weight[self.grammar.prod2id[a_tm1.production]]
+                        elif isinstance(a_tm1, ReduceAction):
                             a_tm1_embed = self.production_embed.weight[len(self.grammar)]
                         else:
-                            a_tm1_embed = self.primitive_embed.weight[self.vocab.primitive[a_tm1.action.token]]
+                            a_tm1_embed = self.primitive_embed.weight[self.vocab.primitive[a_tm1.token]]
 
                         a_tm1_embeds.append(a_tm1_embed)
                     else:
@@ -293,17 +304,17 @@ class Parser(nn.Module):
                     self.grammar.type2id[type] for type in frontier_field_types])))
 
                 # parent states
-                p_t = [hyp.frontier_node.created_time for hyp in hypotheses]
-                parent_states = torch.stack([hyp_states[hyp_id][t] for hyp_id, t in enumerate(p_t)])
+                p_ts = [hyp.frontier_node.created_time for hyp in hypotheses]
+                hist_states = torch.stack([hyp_states[hyp_id][p_t] for hyp_id, p_t in enumerate(p_ts)])
 
                 x = torch.cat([a_tm1_embeds,
                                frontier_prod_embeds,
                                frontier_field_embeds,
                                frontier_field_type_embeds,
-                               parent_states], dim=-1)
+                               hist_states], dim=-1)
 
-            (h_t, cell_t), att_t = self.step(x, h_tm1, src_encodings,
-                                             src_encodings_att_linear,
+            (h_t, cell_t), att_t = self.step(x, h_tm1, exp_src_encodings,
+                                             exp_src_encodings_att_linear,
                                              src_token_mask=None)
 
             # Variable(batch_size, grammar_size)
@@ -319,12 +330,14 @@ class Parser(nn.Module):
             primitive_predictor_prob = F.softmax(self.primitive_predictor(att_t), dim=-1)
 
             # Variable(batch_size, primitive_vocab_size)
-            primitive_prob = primitive_predictor_prob[:, 1] * gen_from_vocab_prob
+            primitive_prob = primitive_predictor_prob[:, 0].unsqueeze(1) * gen_from_vocab_prob
+            primitive_prob[:, primitive_vocab.unk_id] = 0.
 
-            gen_token_hyp_ids = []
+            gentoken_prev_hyp_ids = []
+            gentoken_new_hyp_unks = []
             applyrule_new_hyp_scores = []
             applyrule_new_hyp_prod_ids = []
-            applyrule_new_hyp_parents = []
+            applyrule_prev_hyp_ids = []
 
             for hyp_id, hyp in enumerate(hypotheses):
                 # generate new continuations
@@ -334,59 +347,67 @@ class Parser(nn.Module):
                     if action_type == ApplyRuleAction:
                         productions = self.transition_system.get_valid_continuating_productions(hyp)
                         for production in productions:
-                            prod_id = self.grammar.prod2id(production)
-                            prod_score = apply_rule_log_prob[hyp_id, prod_id]
+                            prod_id = self.grammar.prod2id[production]
+                            prod_score = apply_rule_log_prob[hyp_id, prod_id].data[0]
                             new_hyp_score = hyp.score + prod_score
 
                             applyrule_new_hyp_scores.append(new_hyp_score)
                             applyrule_new_hyp_prod_ids.append(prod_id)
-                            applyrule_new_hyp_parents.append(hyp_id)
+                            applyrule_prev_hyp_ids.append(hyp_id)
                     elif action_type == ReduceAction:
-                        action_score = apply_rule_log_prob[hyp_id, len(self.grammar)]
+                        action_score = apply_rule_log_prob[hyp_id, len(self.grammar)].data[0]
                         new_hyp_score = hyp.score + action_score
 
                         applyrule_new_hyp_scores.append(new_hyp_score)
                         applyrule_new_hyp_prod_ids.append(len(self.grammar))
-                        applyrule_new_hyp_parents.append(hyp_id)
+                        applyrule_prev_hyp_ids.append(hyp_id)
                     else:
-                        # GenToken actions
-                        gen_token_hyp_ids.append(hyp_id)
+                        # GenToken action
+                        gentoken_prev_hyp_ids.append(hyp_id)
                         # first, we compute copy probabilities for tokens in the source sentence
                         for token_pos, token_vocab_id in enumerate(src_token_vocab_ids):
-                            if token_vocab_id != self.vocab.primitive.unk_id:
-                                primitive_prob[hyp_id, token_vocab_id] += primitive_predictor_prob[hyp_id, 1] * \
-                                                                          primitive_copy_prob[hyp_id, token_pos]
+                            if token_vocab_id != -1:
+                                primitive_prob[hyp_id, token_vocab_id] = primitive_prob[hyp_id, token_vocab_id] + \
+                                                                         primitive_predictor_prob[hyp_id, 1] * primitive_copy_prob[hyp_id, token_pos]
 
-                        # second, add the probability of copying the most probable unk
+                        # second, add the probability of copying the most probable unk word
                         if src_unk_pos_list:
-                            unk_pos = primitive_copy_prob[hyp_id][src_unk_pos_list].numpy().argmax()
+                            unk_pos = primitive_copy_prob[hyp_id][src_unk_pos_list].data.numpy().argmax()
                             unk_pos = src_unk_pos_list[unk_pos]
+                            token = src_sent[unk_pos]
+                            gentoken_new_hyp_unks.append(token)
 
                             unk_copy_score = primitive_predictor_prob[hyp_id, 1] * primitive_copy_prob[hyp_id, unk_pos]
                             primitive_prob[hyp_id, primitive_vocab.unk_id] = unk_copy_score
 
-            new_hyp_scores = Variable(self.new_tensor(applyrule_new_hyp_scores))
-            if gen_token_hyp_ids:
+            new_hyp_scores = None
+            if applyrule_new_hyp_scores:
+                new_hyp_scores = Variable(self.new_tensor(applyrule_new_hyp_scores))
+            if gentoken_prev_hyp_ids:
                 primitive_log_prob = torch.log(primitive_prob)
-                gen_token_new_hyp_scores = (hyp_scores.unsqueeze(1) + primitive_log_prob[gen_token_hyp_ids, :]).view(-1)
-                new_hyp_scores = torch.cat([new_hyp_scores, gen_token_new_hyp_scores])
+                gen_token_new_hyp_scores = (hyp_scores[gentoken_prev_hyp_ids].unsqueeze(1) + primitive_log_prob[gentoken_prev_hyp_ids, :]).view(-1)
 
-            top_new_hyp_scores, top_new_hyp_pos = torch.topk(new_hyp_scores, k=beam_size - len(completed_hypotheses))
+                if new_hyp_scores is None: new_hyp_scores = gen_token_new_hyp_scores
+                else: new_hyp_scores = torch.cat([new_hyp_scores, gen_token_new_hyp_scores])
+
+            top_new_hyp_scores, top_new_hyp_pos = torch.topk(new_hyp_scores,
+                                                             k=min(new_hyp_scores.size(0), beam_size - len(completed_hypotheses)))
 
             live_hyp_ids = []
+            new_hypotheses = []
             for new_hyp_score, new_hyp_pos in zip(top_new_hyp_scores.data, top_new_hyp_pos.data):
                 if new_hyp_pos < len(applyrule_new_hyp_scores):
                     # it's an ApplyRule or Reduce action
-                    prev_hyp_id = applyrule_new_hyp_parents[new_hyp_pos]
+                    prev_hyp_id = applyrule_prev_hyp_ids[new_hyp_pos]
                     prev_hyp = hypotheses[prev_hyp_id]
-                    live_hyp_ids.append(prev_hyp_id)
 
                     prod_id = applyrule_new_hyp_prod_ids[new_hyp_pos]
                     # ApplyRule action
                     if prod_id < len(self.grammar):
                         production = self.grammar.id2prod[prod_id]
                         action = ApplyRuleAction(production)
-                    else: # Reduce action
+                    # Reduce action
+                    else:
                         action = ReduceAction()
 
                     new_hyp = prev_hyp.clone_and_apply_action(action)
@@ -396,14 +417,46 @@ class Parser(nn.Module):
                     token_id = (new_hyp_pos - len(applyrule_new_hyp_scores)) % primitive_prob.size(1)
 
                     k = (new_hyp_pos - len(applyrule_new_hyp_scores)) / primitive_prob.size(1)
-                    prev_hyp_id = gen_token_hyp_ids[k]
+                    prev_hyp_id = gentoken_prev_hyp_ids[k]
                     prev_hyp = hypotheses[prev_hyp_id]
 
                     if token_id == primitive_vocab.unk_id:
-                        token = gen_token_new_hyp_unks[k]
+                        token = gentoken_new_hyp_unks[k]
                     else:
-                        token = primitive_prob.id2word[token_id]
+                        token = primitive_vocab.id2word[token_id]
 
                     action = GenTokenAction(token)
                     new_hyp = prev_hyp.clone_and_apply_action(action)
                     new_hyp.score = new_hyp_score
+
+                if new_hyp.completed:
+                    completed_hypotheses.append(new_hyp)
+                else:
+                    new_hypotheses.append(new_hyp)
+                    live_hyp_ids.append(prev_hyp_id)
+
+            if live_hyp_ids:
+                hyp_states = [hyp_states[i] + [h_t[i]] for i in live_hyp_ids]
+                h_tm1 = (h_t[live_hyp_ids], cell_t[live_hyp_ids])
+                hypotheses = new_hypotheses
+                hyp_scores = Variable(self.new_tensor([hyp.score for hyp in hypotheses]))
+                t += 1
+            else:
+                break
+
+        completed_hypotheses.sort(key=lambda hyp: -hyp.score)
+
+        return completed_hypotheses
+
+    def save(self, path):
+        dir_name = os.path.dirname(path)
+        if not os.path.exists(dir_name):
+            os.makedirs(dir_name)
+
+        params = {
+            'args': self.args,
+            'transition_system': self.transition_system,
+            'vocab': self.vocab,
+            'state_dict': self.state_dict()
+        }
+        torch.save(params, path)

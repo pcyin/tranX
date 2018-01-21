@@ -10,6 +10,7 @@ import math
 import sys
 import torch
 
+import evaluation
 from asdl.asdl import ASDLGrammar
 from asdl.lang.py.py_transition_system import PythonTransitionSystem
 from components.dataset import Dataset
@@ -51,7 +52,7 @@ def init_config():
     parser.add_argument('--begin_semisup_after_dev_acc', type=float, default=0., help='begin semi-supervised learning after'
                                                                                     'we have reached certain dev performance')
 
-    parser.add_argument('--decode_max_time_step', default=80, type=int, help='maximum number of time steps used '
+    parser.add_argument('--decode_max_time_step', default=100, type=int, help='maximum number of time steps used '
                                                                               'in decoding and sampling')
     parser.add_argument('--unsup_loss_weight', default=1., type=float, help='loss of unsupervised learning weight')
 
@@ -85,31 +86,34 @@ def init_config():
 
     return args
 
-if __name__ == '__main__':
-    args = init_config()
 
+def train(args):
     grammar = ASDLGrammar.from_text(open(args.asdl_file).read())
     transition_system = PythonTransitionSystem(grammar)
     train_set = Dataset.from_bin_file(args.train_file)
+    dev_set = Dataset.from_bin_file(args.dev_file)
     vocab = pickle.load(open(args.vocab))
 
-    parser = Parser(args, vocab, transition_system)
-    parser.train()
-    if args.cuda: parser.cuda()
-    optimizer = torch.optim.Adam(parser.parameters(), lr=args.lr)
+    model = Parser(args, vocab, transition_system)
+    model.train()
+    if args.cuda: model.cuda()
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     epoch = train_iter = 0
     report_loss = report_examples = 0.
+    history_dev_scores = []
+    num_trial = patience = 0
     while True:
         epoch += 1
         epoch_begin = time.time()
 
         for batch_examples in train_set.batch_iter(batch_size=args.batch_size, shuffle=True):
             batch_examples = [e for e in batch_examples if len(e.tgt_actions) <= 100]
+
             train_iter += 1
             optimizer.zero_grad()
 
-            loss = -parser.score(batch_examples)
+            loss = -model.score(batch_examples)
             # print(loss.data)
             loss_val = torch.sum(loss).data[0]
             report_loss += loss_val
@@ -119,7 +123,7 @@ if __name__ == '__main__':
             loss.backward()
 
             # clip gradient
-            grad_norm = torch.nn.utils.clip_grad_norm(parser.parameters(), args.clip_grad)
+            grad_norm = torch.nn.utils.clip_grad_norm(model.parameters(), args.clip_grad)
 
             optimizer.step()
 
@@ -132,5 +136,89 @@ if __name__ == '__main__':
                 report_loss = report_examples = 0.
 
         print('[Epoch %d] epoch elapsed %ds' % (epoch, time.time() - epoch_begin), file=sys.stderr)
+        model_file = args.save_to + '.iter%d.bin' % train_iter
+        print('save model to [%s]' % model_file, file=sys.stderr)
+        model.save(model_file)
         # perform validation
         print('[Epoch %d] begin validation' % epoch, file=sys.stderr)
+        eval_results = evaluation.evaluate(dev_set.examples, model, args, verbose=True)
+        dev_acc = eval_results['accuracy']
+
+        print('[Epoch %d] code generation accuracy=%.5f' % (epoch, dev_acc), file=sys.stderr)
+        is_better = history_dev_scores == [] or dev_acc > max(history_dev_scores)
+        history_dev_scores.append(dev_acc)
+
+        if is_better:
+            patience = 0
+            model_file = args.save_to + '.bin'
+            print('save currently the best model ..', file=sys.stderr)
+            print('save model to [%s]' % model_file, file=sys.stderr)
+            model.save(model_file)
+            # also save the optimizers' state
+            torch.save(optimizer.state_dict(), args.save_to + '.optim.bin')
+        elif patience < args.patience:
+            patience += 1
+            print('hit patience %d' % patience, file=sys.stderr)
+
+        if patience == args.patience:
+            num_trial += 1
+            print('hit #%d trial' % num_trial, file=sys.stderr)
+            if num_trial == args.max_num_trial:
+                print('early stop!', file=sys.stderr)
+                exit(0)
+
+            # decay lr, and restore from previously best checkpoint
+            lr = optimizer.param_groups[0]['lr'] * args.lr_decay
+            print('load previously best model and decay learning rate to %f' % lr, file=sys.stderr)
+
+            # load model
+            params = torch.load(args.save_to + '.bin', map_location=lambda storage, loc: storage)
+            model.load_state_dict(params['state_dict'])
+            if args.cuda: model = model.cuda()
+
+            # load optimizers
+            if args.reset_optimizer:
+                print('reset optimizer', file=sys.stderr)
+                optimizer = torch.optim.Adam(model.inference_model.parameters(), lr=lr)
+            else:
+                print('restore parameters of the optimizers', file=sys.stderr)
+                optimizer.load_state_dict(torch.load(args.save_to + '.optim.bin'))
+
+            # set new lr
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = lr
+
+            # reset patience
+            patience = 0
+
+
+def test(args):
+    test_set = Dataset.from_bin_file(args.test_file)
+    assert args.load_model
+
+    print('load model from [%s]' % args.load_model, file=sys.stderr)
+    params = torch.load(args.load_model, map_location=lambda storage, loc: storage)
+    vocab = params['vocab']
+    transition_system = params['transition_system']
+    saved_args = params['args']
+    saved_state = params['state_dict']
+    saved_args.cuda = args.cuda
+
+    parser = Parser(saved_args, vocab, transition_system)
+    parser.load_state_dict(saved_state)
+
+    if args.cuda: parser = parser.cuda()
+    parser.eval()
+
+    eval_results = evaluation.evaluate([e for e in test_set.examples if e.idx == 16182], parser, args, verbose=True)
+    print(eval_results)
+
+
+if __name__ == '__main__':
+    args = init_config()
+    if args.mode == 'train':
+        train(args)
+    elif args.mode == 'test':
+        test(args)
+    else:
+        raise RuntimeError('unknown mode')

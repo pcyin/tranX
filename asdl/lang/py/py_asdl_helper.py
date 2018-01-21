@@ -39,20 +39,19 @@ def python_ast_to_asdl_ast(py_ast_node, grammar):
         if field.cardinality == 'single' or field.cardinality == 'optional':
             if field_value is not None:  # sometimes it could be 0
                 if grammar.is_composite_type(field.type):
-                    asdl_field.value = python_ast_to_asdl_ast(field_value, grammar)
+                    child_node = python_ast_to_asdl_ast(field_value, grammar)
+                    asdl_field.add_value(child_node)
                 else:
-                    asdl_field.value = field_value
-        else:
-            if field_value is not None:
-                vals = []
+                    asdl_field.add_value(str(field_value))
+        # field with multiple cardinality
+        elif field_value is not None:
                 if grammar.is_composite_type(field.type):
                     for val in field_value:
                         child_node = python_ast_to_asdl_ast(val, grammar)
-                        vals.append(child_node)
-
-                    asdl_field.value = vals
+                        asdl_field.add_value(child_node)
                 else:
-                    asdl_field.value = str(field_value)
+                    for val in field_value:
+                        asdl_field.add_value(str(val))
 
         fields.append(asdl_field)
 
@@ -77,18 +76,23 @@ def asdl_ast_to_python_ast(asdl_ast_node, grammar):
             elif field.value and field.cardinality in ('single', 'optional'):
                 field_value = asdl_ast_to_python_ast(field.value, grammar)
         else:
-            # for primitive node
-            if field.type.name == 'object':
-                if isfloat(field.value):
-                    field_value = float(field.value)
-                elif isint(field.value):
+            # for primitive node, note that primitive field may have `None` value
+            if field.value is not None:
+                if field.type.name == 'object':
+                    if '.' in field.value or 'e' in field.value:
+                        field_value = float(field.value)
+                    elif isint(field.value):
+                        field_value = int(field.value)
+                    else:
+                        raise ValueError('cannot convert [%s] to float or int' % field.value)
+                elif field.type.name == 'int':
                     field_value = int(field.value)
                 else:
-                    raise ValueError('cannot convert [%s] to float or int' % field.value)
-            elif field.type.name == 'int':
-                field_value = int(field.value)
-            else:
-                field_value = field.value
+                    field_value = field.value
+
+            # FIXME: hack! if int? is missing value in ImportFrom(identifier? module, alias* names, int? level), fill with 0
+            elif field.name == 'level':
+                field_value = 0
 
         # must set unused fields to default value...
         if field_value is None and field.cardinality == 'multiple':

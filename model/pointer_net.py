@@ -18,14 +18,14 @@ class PointerNet(nn.Module):
 
     def forward(self, src_encodings, src_token_mask, query_vec):
         """
-        :param src_encodings: Variable(src_sent_len, batch_size, hidden_size * 2)
+        :param src_encodings: Variable(batch_size, src_sent_len, hidden_size * 2)
         :param src_token_mask: Variable(src_sent_len, batch_size)
         :param query_vec: Variable(tgt_action_num, batch_size, hidden_size)
         :return: Variable(src_sent_len, batch_size, tgt_action_num)
         """
 
         # (tgt_action_num, batch_size, src_sent_len, ptrnet_hidden_dim)
-        h1 = torch.tanh(self.src_encoding_linear(src_encodings.permute(1, 0, 2)).unsqueeze(0) + self.query_vec_linear(query_vec).unsqueeze(2))
+        h1 = torch.tanh(self.src_encoding_linear(src_encodings).unsqueeze(0) + self.query_vec_linear(query_vec).unsqueeze(2))
         # (tgt_action_num, batch_size, src_sent_len)
         h2 = self.layer2(h1).squeeze(3)
         if src_token_mask is not None:
