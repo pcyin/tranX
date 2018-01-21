@@ -105,7 +105,7 @@ class Parser(nn.Module):
         h_0 = self.decoder_cell_init(enc_last_cell)
         h_0 = F.tanh(h_0)
 
-        return h_0, Variable(self.new_tensor(h_0.size()))
+        return h_0, Variable(self.new_tensor(h_0.size()).zero_())
 
     def score(self, examples):
         """
