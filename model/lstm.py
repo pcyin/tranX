@@ -22,19 +22,22 @@ class LSTMCell(RNNCellBase):
 
         self.W_i = Parameter(torch.Tensor(hidden_size, input_size))
         self.U_i = Parameter(torch.Tensor(hidden_size, hidden_size))
-        self.b_i = Parameter(torch.Tensor(hidden_size))
+        # self.b_i = Parameter(torch.Tensor(hidden_size))
 
         self.W_f = Parameter(torch.Tensor(hidden_size, input_size))
         self.U_f = Parameter(torch.Tensor(hidden_size, hidden_size))
-        self.b_f = Parameter(torch.Tensor(hidden_size))
+        # self.b_f = Parameter(torch.Tensor(hidden_size))
 
         self.W_c = Parameter(torch.Tensor(hidden_size, input_size))
         self.U_c = Parameter(torch.Tensor(hidden_size, hidden_size))
-        self.b_c = Parameter(torch.Tensor(hidden_size))
+        # self.b_c = Parameter(torch.Tensor(hidden_size))
 
         self.W_o = Parameter(torch.Tensor(hidden_size, input_size))
         self.U_o = Parameter(torch.Tensor(hidden_size, hidden_size))
-        self.b_o = Parameter(torch.Tensor(hidden_size))
+        # self.b_o = Parameter(torch.Tensor(hidden_size))
+
+        self.bias_ih = Parameter(torch.Tensor(4 * hidden_size))
+        self.bias_hh = Parameter(torch.Tensor(4 * hidden_size))
 
         self._input_dropout_mask = self._h_dropout_mask = None
 
@@ -49,10 +52,10 @@ class LSTMCell(RNNCellBase):
         init.orthogonal(self.U_c)
         init.orthogonal(self.W_o)
         init.orthogonal(self.U_o)
-        self.b_f.data.fill_(1.)
-        self.b_i.data.zero_()
-        self.b_c.data.zero_()
-        self.b_o.data.zero_()
+        self.bias_ih.data.fill_(0.)
+        # forget gate set to 1.
+        self.bias_ih.data[self.hidden_size:2 * self.hidden_size].fill_(1.)
+        self.bias_hh.data.fill_(0.)
 
     def set_dropout_masks(self, batch_size):
         if self.dropout:
@@ -68,30 +71,36 @@ class LSTMCell(RNNCellBase):
             self._input_dropout_mask = self._h_dropout_mask = [1.] * 4
 
     def forward(self, input, hidden_state):
+        def get_mask_slice(mask, idx):
+            if isinstance(mask, list): return mask[idx]
+            else: return mask[idx][:input.size(0)]
+
         h_tm1, c_tm1 = hidden_state
 
         # if self._input_dropout_mask is None:
         #     self.set_dropout_masks(input.size(0))
 
-        def get_mask_slice(mask, idx):
-            if isinstance(mask, list): return mask[idx]
-            else: return mask[idx][:input.size(0)]
+        xi_t = F.linear(input * get_mask_slice(self._input_dropout_mask, 0), self.W_i)
+        xf_t = F.linear(input * get_mask_slice(self._input_dropout_mask, 1), self.W_f)
+        xc_t = F.linear(input * get_mask_slice(self._input_dropout_mask, 2), self.W_c)
+        xo_t = F.linear(input * get_mask_slice(self._input_dropout_mask, 3), self.W_o)
 
         hi_t = F.linear(h_tm1 * get_mask_slice(self._h_dropout_mask, 0), self.U_i)
         hf_t = F.linear(h_tm1 * get_mask_slice(self._h_dropout_mask, 1), self.U_f)
         hc_t = F.linear(h_tm1 * get_mask_slice(self._h_dropout_mask, 2), self.U_c)
         ho_t = F.linear(h_tm1 * get_mask_slice(self._h_dropout_mask, 3), self.U_o)
 
-        xi_t = F.linear(input * get_mask_slice(self._input_dropout_mask, 0), self.W_i, self.b_i)
-        xf_t = F.linear(input * get_mask_slice(self._input_dropout_mask, 1), self.W_f, self.b_f)
-        xc_t = F.linear(input * get_mask_slice(self._input_dropout_mask, 2), self.W_c, self.b_c)
-        xo_t = F.linear(input * get_mask_slice(self._input_dropout_mask, 3), self.W_o, self.b_o)
-
-        i_t = F.sigmoid(xi_t + hi_t)
-        f_t = F.sigmoid(xf_t + hf_t)
-        c_t = f_t * c_tm1 + i_t * F.tanh(xc_t + hc_t)
-        o_t = F.sigmoid(xo_t + ho_t)
-        h_t = o_t * F.tanh(c_t)
+        if input.is_cuda:
+            igates = torch.cat([xi_t, xf_t, xc_t, xo_t], dim=-1)
+            hgates = torch.cat([hi_t, hf_t, hc_t, ho_t], dim=-1)
+            state = fusedBackend.LSTMFused.apply
+            return state(igates, hgates, c_tm1, self.bias_ih, self.bias_hh)
+        else:
+            i_t = F.sigmoid(xi_t + self.bias_ih[:self.hidden_size] + hi_t + self.bias_hh[:self.hidden_size])
+            f_t = F.sigmoid(xf_t + self.bias_ih[self.hidden_size:2 * self.hidden_size] + hf_t + self.bias_hh[self.hidden_size:2 * self.hidden_size])
+            c_t = f_t * c_tm1 + i_t * F.tanh(xc_t + self.bias_ih[2 * self.hidden_size:3 * self.hidden_size] + hc_t + self.bias_hh[2 * self.hidden_size:3 * self.hidden_size])
+            o_t = F.sigmoid(xo_t + self.bias_ih[3 * self.hidden_size:4 * self.hidden_size] + ho_t + self.bias_hh[3 * self.hidden_size:4 * self.hidden_size])
+            h_t = o_t * F.tanh(c_t)
 
         return h_t, c_t
 
