@@ -24,6 +24,8 @@ def init_config():
     parser.add_argument('--cuda', action='store_true', default=False, help='use gpu')
     parser.add_argument('--mode', choices=['train', 'train_semi', 'test', 'debug_ls'], default='train', help='run mode')
 
+    parser.add_argument('--lstm', choices=['lstm', 'lstm_with_dropout'], default='lstm')
+
     parser.add_argument('--batch_size', default=10, type=int, help='batch size')
     parser.add_argument('--beam_size', default=5, type=int, help='beam size for beam search')
     parser.add_argument('--sample_size', default=5, type=int, help='sample size')
