@@ -41,11 +41,13 @@ class Parser(nn.Module):
         nn.init.xavier_normal(self.type_embed.weight.data)
 
         # LSTMs
-        self.encoder_lstm = nn.LSTM(args.embed_size, args.hidden_size / 2, bidirectional=True)
-        self.decoder_lstm = nn.LSTMCell(args.action_embed_size +   # previous action
-                                        args.action_embed_size + args.field_embed_size + args.type_embed_size +  # frontier info
-                                        args.hidden_size,   # parent hidden state
-                                        args.hidden_size)
+        from lstm import LSTM, LSTMCell
+        self.encoder_lstm = LSTM(args.embed_size, args.hidden_size / 2, bidirectional=True, dropout=args.dropout)
+        self.decoder_lstm = LSTMCell(args.action_embed_size +   # previous action
+                                     args.action_embed_size + args.field_embed_size + args.type_embed_size +  # frontier info
+                                     args.hidden_size,   # parent hidden state
+                                     args.hidden_size,
+                                     dropout=args.dropout)
 
         # pointer net
         self.src_pointer_net = PointerNet(args)
@@ -176,6 +178,8 @@ class Parser(nn.Module):
 
         att_vecs = []
         history_states = []
+
+        self.decoder_lstm.set_dropout_masks(batch_size)
 
         for t in xrange(batch.max_action_num):
             # x: [prev_action, parent_production_embed, parent_field_embed, parent_field_type_embed, parent_action_state]
@@ -313,6 +317,7 @@ class Parser(nn.Module):
                                frontier_field_type_embeds,
                                hist_states], dim=-1)
 
+            self.decoder_lstm.set_dropout_masks(hyp_num)
             (h_t, cell_t), att_t = self.step(x, h_tm1, exp_src_encodings,
                                              exp_src_encodings_att_linear,
                                              src_token_mask=None)

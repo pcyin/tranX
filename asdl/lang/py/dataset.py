@@ -145,7 +145,7 @@ class Django(object):
         return query_tokens, canonical_code, str_map
 
     @staticmethod
-    def parse_django_dataset(annot_file, code_file, asdl_file_path, MAX_QUERY_LENGTH=70):
+    def parse_django_dataset(annot_file, code_file, asdl_file_path, max_query_len=70, vocab_freq_cutoff=5):
         asdl_text = open(asdl_file_path).read()
         grammar = ASDLGrammar.from_text(asdl_text)
         transition_system = PythonTransitionSystem(grammar)
@@ -184,13 +184,13 @@ class Django(object):
 
             print('first pass, processed %d' % idx, file=sys.stderr)
 
-        src_vocab = VocabEntry.from_corpus([e['src_query_tokens'] for e in loaded_examples], size=5000, freq_cutoff=3)
+        src_vocab = VocabEntry.from_corpus([e['src_query_tokens'] for e in loaded_examples], size=5000, freq_cutoff=vocab_freq_cutoff)
 
         primitive_tokens = [map(lambda a: a.token,
                                filter(lambda a: isinstance(a, GenTokenAction), e['tgt_actions']))
                             for e in loaded_examples]
 
-        primitive_vocab = VocabEntry.from_corpus(primitive_tokens, size=5000, freq_cutoff=3)
+        primitive_vocab = VocabEntry.from_corpus(primitive_tokens, size=5000, freq_cutoff=vocab_freq_cutoff)
         assert '_STR:0_' in primitive_vocab
 
         vocab = Vocab(source=src_vocab, primitive=primitive_vocab)
@@ -203,7 +203,7 @@ class Django(object):
         action_len = []
 
         for idx, e in enumerate(loaded_examples):
-            src_query_tokens = e['src_query_tokens'][:MAX_QUERY_LENGTH]
+            src_query_tokens = e['src_query_tokens'][:max_query_len]
             tgt_actions = e['tgt_actions']
             tgt_action_infos = Django.get_action_infos(src_query_tokens, tgt_actions)
 
@@ -267,7 +267,7 @@ class Django(object):
         pickle.dump(train, open('data/django/train.bin', 'w'))
         pickle.dump(dev, open('data/django/dev.bin', 'w'))
         pickle.dump(test, open('data/django/test.bin', 'w'))
-        pickle.dump(vocab, open('data/django/vocab.bin', 'w'))
+        pickle.dump(vocab, open('data/django/vocab.freq5.bin', 'w'))
 
     @staticmethod
     def run():
@@ -291,14 +291,17 @@ class Django(object):
 
             # sanity check
             hyp = Hypothesis()
+            hyp2 = Hypothesis()
             for action in tgt_actions:
                 assert action.__class__ in transition_system.get_valid_continuation_types(hyp)
                 if isinstance(action, ApplyRuleAction):
                     assert action.production in transition_system.get_valid_continuating_productions(hyp)
                 hyp = hyp.clone_and_apply_action(action)
+                hyp2.apply_action(action)
 
             src_from_hyp = astor.to_source(asdl_ast_to_python_ast(hyp.tree, grammar))
             assert src_from_hyp == gold_source
+            assert hyp.tree == hyp2.tree and hyp.tree is not hyp2.tree
 
             print(idx)
 

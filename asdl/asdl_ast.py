@@ -99,6 +99,9 @@ class AbstractSyntaxTree(object):
         if not isinstance(other, self.__class__):
             return False
 
+        if self.created_time != other.created_time:
+            return False
+
         if self.production != other.production:
             return False
 
