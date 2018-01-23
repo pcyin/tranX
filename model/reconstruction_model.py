@@ -23,7 +23,7 @@ class Reconstructor(nn.Module):
                                        embed_size=args.embed_size, hidden_size=args.hidden_size,
                                        ptrnet_hidden_dim=args.ptrnet_hidden_dim,
                                        dropout=args.dropout,
-                                       use_cuda=args.cuda)
+                                       cuda=args.cuda)
 
         self.vocab = vocab
         self.args = args
