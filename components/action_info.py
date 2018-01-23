@@ -4,7 +4,7 @@
 class ActionInfo(object):
     """sufficient statistics for making a prediction of an action at a time step"""
 
-    def __init__(self, action):
+    def __init__(self, action=None):
         self.t = 0
         self.parent_t = -1
         self.action = action

@@ -12,6 +12,8 @@ from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
 from asdl.hypothesis import Hypothesis, GenTokenAction
 from asdl.transition_system import ApplyRuleAction, ReduceAction, Action
+from components.DecodeHypothesis import DecodeHypothesis
+from components.action_info import ActionInfo
 from components.dataset import Batch
 from model import nn_utils
 from model.pointer_net import PointerNet
@@ -266,7 +268,7 @@ class Parser(nn.Module):
             else: token_set.add(tid)
 
         t = 0
-        hypotheses = [Hypothesis()]
+        hypotheses = [DecodeHypothesis()]
         hyp_states = [[]]
         completed_hypotheses = []
 
@@ -350,6 +352,7 @@ class Parser(nn.Module):
 
             gentoken_prev_hyp_ids = []
             gentoken_new_hyp_unks = []
+            gentoken_copy_infos = []
             applyrule_new_hyp_scores = []
             applyrule_new_hyp_prod_ids = []
             applyrule_prev_hyp_ids = []
@@ -379,11 +382,15 @@ class Parser(nn.Module):
                     else:
                         # GenToken action
                         gentoken_prev_hyp_ids.append(hyp_id)
+                        hyp_copy_info = dict()  # of (token_pos, copy_prob)
                         # first, we compute copy probabilities for tokens in the source sentence
                         for token_pos, token_vocab_id in enumerate(src_token_vocab_ids):
-                            if token_vocab_id != -1:
-                                primitive_prob[hyp_id, token_vocab_id] = primitive_prob[hyp_id, token_vocab_id] + \
-                                                                         primitive_predictor_prob[hyp_id, 1] * primitive_copy_prob[hyp_id, token_pos]
+                            if token_vocab_id != -1 and token_vocab_id != primitive_vocab.unk_id:
+                                p_copy = primitive_predictor_prob[hyp_id, 1] * primitive_copy_prob[hyp_id, token_pos]
+                                primitive_prob[hyp_id, token_vocab_id] = primitive_prob[hyp_id, token_vocab_id] + p_copy
+
+                                token = src_sent[token_pos]
+                                hyp_copy_info[token] = (token_pos, p_copy.data[0])
 
                         # second, add the probability of copying the most probable unk word
                         if src_unk_pos_list:
@@ -394,6 +401,10 @@ class Parser(nn.Module):
 
                             unk_copy_score = primitive_predictor_prob[hyp_id, 1] * primitive_copy_prob[hyp_id, unk_pos]
                             primitive_prob[hyp_id, primitive_vocab.unk_id] = unk_copy_score
+
+                            hyp_copy_info[token] = (unk_pos, unk_copy_score.data[0])
+
+                        gentoken_copy_infos.append(hyp_copy_info)
 
             new_hyp_scores = None
             if applyrule_new_hyp_scores:
@@ -411,6 +422,7 @@ class Parser(nn.Module):
             live_hyp_ids = []
             new_hypotheses = []
             for new_hyp_score, new_hyp_pos in zip(top_new_hyp_scores.data.cpu(), top_new_hyp_pos.data.cpu()):
+                action_info = ActionInfo()
                 if new_hyp_pos < len(applyrule_new_hyp_scores):
                     # it's an ApplyRule or Reduce action
                     prev_hyp_id = applyrule_prev_hyp_ids[new_hyp_pos]
@@ -424,14 +436,12 @@ class Parser(nn.Module):
                     # Reduce action
                     else:
                         action = ReduceAction()
-
-                    new_hyp = prev_hyp.clone_and_apply_action(action)
-                    new_hyp.score = new_hyp_score
                 else:
                     # it's a GenToken action
                     token_id = (new_hyp_pos - len(applyrule_new_hyp_scores)) % primitive_prob.size(1)
 
                     k = (new_hyp_pos - len(applyrule_new_hyp_scores)) / primitive_prob.size(1)
+                    copy_info = gentoken_copy_infos[k]
                     prev_hyp_id = gentoken_prev_hyp_ids[k]
                     prev_hyp = hypotheses[prev_hyp_id]
 
@@ -441,8 +451,20 @@ class Parser(nn.Module):
                         token = primitive_vocab.id2word[token_id]
 
                     action = GenTokenAction(token)
-                    new_hyp = prev_hyp.clone_and_apply_action(action)
-                    new_hyp.score = new_hyp_score
+
+                    if token in copy_info:
+                        action_info.copy_from_src = True
+                        action_info.src_token_position = copy_info[token][0]
+
+                action_info.action = action
+                action_info.t = t
+                if t > 0:
+                    action_info.parent_t = prev_hyp.frontier_node.created_time
+                    action_info.frontier_prod = prev_hyp.frontier_node.production
+                    action_info.frontier_field = prev_hyp.frontier_field.field
+
+                new_hyp = prev_hyp.clone_and_apply_action_info(action_info)
+                new_hyp.score = new_hyp_score
 
                 if new_hyp.completed:
                     completed_hypotheses.append(new_hyp)
