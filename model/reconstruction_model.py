@@ -22,7 +22,8 @@ class Reconstructor(nn.Module):
         self.seq2seq = Seq2SeqWithCopy(src_vocab=vocab.primitive, tgt_vocab=vocab.source,
                                        embed_size=args.embed_size, hidden_size=args.hidden_size,
                                        ptrnet_hidden_dim=args.ptrnet_hidden_dim,
-                                       dropout=args.dropout)
+                                       dropout=args.dropout,
+                                       use_cuda=args.cuda)
 
         self.vocab = vocab
         self.args = args

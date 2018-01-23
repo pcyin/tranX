@@ -17,14 +17,14 @@ class Seq2SeqWithCopy(Seq2SeqModel):
     def __init__(self, src_vocab, tgt_vocab, embed_size, hidden_size,
                  ptrnet_hidden_dim,
                  dropout=0.,
-                 cuda=False,
+                 use_cuda=False,
                  src_embed_layer=None, tgt_embed_layer=None):
 
         super(Seq2SeqWithCopy, self).__init__(src_vocab, tgt_vocab,
                                               embed_size, hidden_size,
                                               dropout=dropout,
                                               src_embed_layer=src_embed_layer, tgt_embed_layer=tgt_embed_layer,
-                                              cuda=cuda)
+                                              cuda=use_cuda)
 
         # pointer net to the source
         self.src_pointer_net = PointerNet(src_encoding_size=hidden_size * 2,
@@ -106,7 +106,7 @@ class Seq2SeqWithCopy(Seq2SeqModel):
         dec_init_vec = self.init_decoder_state(last_state, last_cell)
 
         # (batch_size, src_sent_len)
-        src_sent_masks = nn_utils.length_array_to_mask_tensor(src_sents_len, cuda=self.cuda)
+        src_sent_masks = nn_utils.length_array_to_mask_tensor(src_sents_len, cuda=self.use_cuda)
 
         # (tgt_sent_len - 1, batch_size, hidden_size)
         att_vecs = self.decode(src_encodings, src_sent_masks, dec_init_vec, tgt_sents_var)
