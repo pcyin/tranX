@@ -209,6 +209,19 @@ def train_decoder(args):
     if args.cuda: model.cuda()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
+    def evaluate_ppl():
+        model.eval()
+        cum_loss = 0.
+        cum_tgt_words = 0.
+        for batch in dev_set.batch_iter(args.batch_size):
+            loss = -model.score(batch).sum()
+            cum_loss += loss.data[0]
+            cum_tgt_words += sum(len(e.src_sent) + 1 for e in batch)  # add ending </s>
+
+        ppl = np.exp(cum_loss / cum_tgt_words)
+        model.train()
+        return ppl
+
     print('begin training decoder, %d training examples, %d dev examples' % (len(train_set), len(dev_set)), file=sys.stderr)
     print('vocab: %s' % repr(vocab), file=sys.stderr)
 
@@ -249,18 +262,17 @@ def train_decoder(args):
                 report_loss = report_examples = 0.
 
         print('[Epoch %d] epoch elapsed %ds' % (epoch, time.time() - epoch_begin), file=sys.stderr)
-        model_file = args.save_to + '.iter%d.bin' % train_iter
-        print('save model to [%s]' % model_file, file=sys.stderr)
-        model.save(model_file)
+        # model_file = args.save_to + '.iter%d.bin' % train_iter
+        # print('save model to [%s]' % model_file, file=sys.stderr)
+        # model.save(model_file)
 
         # perform validation
-        # print('[Epoch %d] begin validation' % epoch, file=sys.stderr)
-        # eval_start = time.time()
-        # eval_results = evaluation.evaluate(dev_set.examples, model, args, verbose=True)
-        # dev_acc = eval_results['accuracy']
-        # print('[Epoch %d] code generation accuracy=%.5f took %ds' % (epoch, dev_acc, time.time() - eval_start), file=sys.stderr)
-        dev_acc = 0.
-
+        print('[Epoch %d] begin validation' % epoch, file=sys.stderr)
+        eval_start = time.time()
+        # evaluate ppl
+        ppl = evaluate_ppl()
+        print('[Epoch %d] ppl=%.5f took %ds' % (epoch, ppl, time.time() - eval_start), file=sys.stderr)
+        dev_acc = -ppl
         is_better = history_dev_scores == [] or dev_acc > max(history_dev_scores)
         history_dev_scores.append(dev_acc)
 
