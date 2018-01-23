@@ -9,19 +9,19 @@ from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
 
 class PointerNet(nn.Module):
-    def __init__(self, args):
+    def __init__(self, query_vec_size, src_encoding_size, hidden_dim):
         super(PointerNet, self).__init__()
 
-        self.src_encoding_linear = nn.Linear(args.hidden_size, args.ptrnet_hidden_dim)
-        self.query_vec_linear = nn.Linear(args.hidden_size, args.ptrnet_hidden_dim)
-        self.layer2 = nn.Linear(args.ptrnet_hidden_dim, 1)
+        self.src_encoding_linear = nn.Linear(src_encoding_size, hidden_dim)
+        self.query_vec_linear = nn.Linear(query_vec_size, hidden_dim)
+        self.layer2 = nn.Linear(hidden_dim, 1)
 
     def forward(self, src_encodings, src_token_mask, query_vec):
         """
         :param src_encodings: Variable(batch_size, src_sent_len, hidden_size * 2)
         :param src_token_mask: Variable(src_sent_len, batch_size)
         :param query_vec: Variable(tgt_action_num, batch_size, hidden_size)
-        :return: Variable(src_sent_len, batch_size, tgt_action_num)
+        :return: Variable(tgt_action_num, batch_size, src_sent_len)
         """
 
         # (tgt_action_num, batch_size, src_sent_len, ptrnet_hidden_dim)

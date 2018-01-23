@@ -16,13 +16,14 @@ from asdl.lang.py.py_transition_system import PythonTransitionSystem
 from components.dataset import Dataset
 
 from model.parser import Parser
+from model.reconstruction_model import Reconstructor
 
 
 def init_config():
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', default=5783287, type=int, help='random seed')
     parser.add_argument('--cuda', action='store_true', default=False, help='use gpu')
-    parser.add_argument('--mode', choices=['train', 'train_semi', 'test', 'debug_ls'], default='train', help='run mode')
+    parser.add_argument('--mode', choices=['train', 'train_decoder', 'train_semi', 'test', 'debug_ls'], default='train', help='run mode')
 
     parser.add_argument('--lstm', choices=['lstm', 'lstm_with_dropout'], default='lstm')
 
@@ -198,6 +199,115 @@ def train(args):
             patience = 0
 
 
+def train_decoder(args):
+    train_set = Dataset.from_bin_file(args.train_file)
+    dev_set = Dataset.from_bin_file(args.dev_file)
+    vocab = pickle.load(open(args.vocab))
+
+    model = Reconstructor(args, vocab)
+    model.train()
+    if args.cuda: model.cuda()
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+
+    print('begin training decoder, %d training examples, %d dev examples' % (len(train_set), len(dev_set)), file=sys.stderr)
+    print('vocab: %s' % repr(vocab), file=sys.stderr)
+
+    epoch = train_iter = 0
+    report_loss = report_examples = 0.
+    history_dev_scores = []
+    num_trial = patience = 0
+    while True:
+        epoch += 1
+        epoch_begin = time.time()
+
+        for batch_examples in train_set.batch_iter(batch_size=args.batch_size, shuffle=True):
+            batch_examples = [e for e in batch_examples if len(e.tgt_actions) <= args.decode_max_time_step]
+
+            train_iter += 1
+            optimizer.zero_grad()
+
+            loss = -model.score(batch_examples)
+            # print(loss.data)
+            loss_val = torch.sum(loss).data[0]
+            report_loss += loss_val
+            report_examples += len(batch_examples)
+            loss = torch.mean(loss)
+
+            loss.backward()
+
+            # clip gradient
+            grad_norm = torch.nn.utils.clip_grad_norm(model.parameters(), args.clip_grad)
+
+            optimizer.step()
+
+            if train_iter % args.log_every == 0:
+                print('[Iter %d] encoder loss=%.5f' %
+                      (train_iter,
+                       report_loss / report_examples),
+                      file=sys.stderr)
+
+                report_loss = report_examples = 0.
+
+        print('[Epoch %d] epoch elapsed %ds' % (epoch, time.time() - epoch_begin), file=sys.stderr)
+        model_file = args.save_to + '.iter%d.bin' % train_iter
+        print('save model to [%s]' % model_file, file=sys.stderr)
+        model.save(model_file)
+
+        # perform validation
+        # print('[Epoch %d] begin validation' % epoch, file=sys.stderr)
+        # eval_start = time.time()
+        # eval_results = evaluation.evaluate(dev_set.examples, model, args, verbose=True)
+        # dev_acc = eval_results['accuracy']
+        # print('[Epoch %d] code generation accuracy=%.5f took %ds' % (epoch, dev_acc, time.time() - eval_start), file=sys.stderr)
+        dev_acc = 0.
+
+        is_better = history_dev_scores == [] or dev_acc > max(history_dev_scores)
+        history_dev_scores.append(dev_acc)
+
+        if is_better:
+            patience = 0
+            model_file = args.save_to + '.bin'
+            print('save currently the best model ..', file=sys.stderr)
+            print('save model to [%s]' % model_file, file=sys.stderr)
+            model.save(model_file)
+            # also save the optimizers' state
+            torch.save(optimizer.state_dict(), args.save_to + '.optim.bin')
+        elif patience < args.patience:
+            patience += 1
+            print('hit patience %d' % patience, file=sys.stderr)
+
+        if patience == args.patience:
+            num_trial += 1
+            print('hit #%d trial' % num_trial, file=sys.stderr)
+            if num_trial == args.max_num_trial:
+                print('early stop!', file=sys.stderr)
+                exit(0)
+
+            # decay lr, and restore from previously best checkpoint
+            lr = optimizer.param_groups[0]['lr'] * args.lr_decay
+            print('load previously best model and decay learning rate to %f' % lr, file=sys.stderr)
+
+            # load model
+            params = torch.load(args.save_to + '.bin', map_location=lambda storage, loc: storage)
+            model.load_state_dict(params['state_dict'])
+            if args.cuda: model = model.cuda()
+
+            # load optimizers
+            if args.reset_optimizer:
+                print('reset optimizer', file=sys.stderr)
+                optimizer = torch.optim.Adam(model.inference_model.parameters(), lr=lr)
+            else:
+                print('restore parameters of the optimizers', file=sys.stderr)
+                optimizer.load_state_dict(torch.load(args.save_to + '.optim.bin'))
+
+            # set new lr
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = lr
+
+            # reset patience
+            patience = 0
+
+
 def test(args):
     test_set = Dataset.from_bin_file(args.test_file)
     assert args.load_model
@@ -225,6 +335,8 @@ if __name__ == '__main__':
     print(args, file=sys.stderr)
     if args.mode == 'train':
         train(args)
+    elif args.mode == 'train_decoder':
+        train_decoder(args)
     elif args.mode == 'test':
         test(args)
     else:

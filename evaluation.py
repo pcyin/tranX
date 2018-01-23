@@ -58,8 +58,12 @@ def evaluate(examples, parser, args, verbose=False):
             ref_py_ast = ast.parse(ref_code).body[0]
             ref_reformatted_code = astor.to_source(ref_py_ast).strip()
 
-            ref_code_tokens = tokenize_py_code(ref_reformatted_code)
-            hyp_code_tokens = tokenize_py_code(hyp_code)
+            try:
+                ref_code_tokens = tokenize_py_code(ref_reformatted_code)
+                hyp_code_tokens = tokenize_py_code(hyp_code)
+            except:
+                print('error in tokenizing [%s]' % hyp_code, file=sys.stderr)
+                continue
 
             if hyp_code_tokens == ref_code_tokens:
                 cum_acc += 1

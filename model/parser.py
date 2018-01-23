@@ -59,7 +59,7 @@ class Parser(nn.Module):
                                          dropout=args.dropout)
 
         # pointer net
-        self.src_pointer_net = PointerNet(args)
+        self.src_pointer_net = PointerNet(args.hidden_size, args.hidden_size, args.ptrnet_hidden_dim)
 
         self.primitive_predictor = nn.Linear(args.hidden_size, 2)
 
@@ -132,7 +132,7 @@ class Parser(nn.Module):
 
         # ApplyRule action probability
         # (tgt_action_len, batch_size, grammar_size)
-        apply_rule_prob = F.log_softmax(self.production_readout(query_vectors), dim=-1)
+        apply_rule_prob = F.softmax(self.production_readout(query_vectors), dim=-1)
 
         # pointer network scores over source tokens
         # Variable(tgt_action_len, batch_size, src_sent_len)
@@ -154,13 +154,17 @@ class Parser(nn.Module):
                                                          index=batch.primitive_idx_matrix.unsqueeze(2)).squeeze(2)
 
         # (tgt_action_len, batch_size)
+        action_mask = 1. - torch.eq(batch.apply_rule_mask + batch.gen_token_mask + batch.primitive_copy_mask, 0.).float()
         action_prob = tgt_apply_rule_prob * batch.apply_rule_mask + \
-                      torch.log(primitive_predictor_prob[:, :, 0] * tgt_primitive_gen_from_vocab_prob) * batch.gen_token_mask + \
-                      torch.log(primitive_predictor_prob[:, :, 1] * tgt_primitive_copy_prob) * batch.primitive_copy_mask
+                      primitive_predictor_prob[:, :, 0] * tgt_primitive_gen_from_vocab_prob * batch.gen_token_mask + \
+                      primitive_predictor_prob[:, :, 1] * tgt_primitive_copy_prob * batch.primitive_copy_mask
 
-        loss = torch.sum(action_prob, dim=0)
+        action_prob = torch.log(action_prob + 1.e-7 * (1. - action_mask))
+        action_prob = action_prob * action_mask
 
-        return loss
+        scores = torch.sum(action_prob, dim=0)
+
+        return scores
 
     def step(self, x, h_tm1, src_encodings, src_encodings_att_linear, src_token_mask=None):
         # h_t: (batch_size, hidden_size)

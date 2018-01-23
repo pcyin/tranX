@@ -8,6 +8,8 @@ from torch.autograd import Variable
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
+from model import nn_utils
+
 
 class Seq2SeqModel(nn.Module):
     """
@@ -107,7 +109,7 @@ class Seq2SeqModel(nn.Module):
         # initialize the attentional vector
         att_tm1 = Variable(new_tensor(batch_size, self.hidden_size).zero_(), requires_grad=False)
         # (batch_size, src_sent_len)
-        src_sent_masks = dataset.length_array_to_mask_tensor(src_sents_len, cuda=self.cuda)
+        src_sent_masks = nn_utils.length_array_to_mask_tensor(src_sents_len, cuda=self.cuda)
 
         # (tgt_sent_len, batch_size, embed_size)
         tgt_token_embed = self.tgt_embed(tgt_sents_var)
@@ -225,13 +227,13 @@ class Seq2SeqModel(nn.Module):
     def sample(self, src_sents, sample_size):
         src_sents_len = [len(src_sent) for src_sent in src_sents]
         # Variable: (src_sent_len, batch_size)
-        src_sents_var = dataset.to_input_variable(src_sents, self.vocab.src,
-                                                  cuda=self.cuda, training=False)
+        src_sents_var = nn_utils.to_input_variable(src_sents, self.vocab.src,
+                                                   cuda=self.cuda, training=False)
         return self.sample_from_variable(src_sents_var, src_sents_len, sample_size)
 
     def sample_from_src_variable(self, src_sents_var, src_sents_len, sample_size):
         # (batch_size * sample_size, src_sent_len)
-        src_sent_masks = dataset.length_array_to_mask_tensor(
+        src_sent_masks = nn_utils.length_array_to_mask_tensor(
             list(chain.from_iterable([l] * sample_size for l in src_sents_len)),
             cuda=self.cuda)
 
@@ -339,8 +341,8 @@ class Seq2SeqModel(nn.Module):
         :param src_sent: List[word_id], encoded source sentence
         :return: list[list[word_id]] top-k predicted natural language sentence in the beam
         """
-        src_sents_var = dataset.to_input_variable(src_sents, self.src_vocab,
-                                                  cuda=self.cuda, training=False, append_boundary_sym=False)
+        src_sents_var = nn_utils.to_input_variable(src_sents, self.src_vocab,
+                                                   cuda=self.cuda, training=False, append_boundary_sym=False)
 
         #TODO(junxian): check if src_sents_var(src_seq_length, embed_size) is ok
         src_encodings, (last_state, last_cell) = self.encode(src_sents_var, [len(src_sents[0])])
