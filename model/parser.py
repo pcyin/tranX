@@ -75,8 +75,15 @@ class Parser(nn.Module):
         self.att_vec_linear = nn.Linear(args.hidden_size + args.hidden_size, args.hidden_size, bias=False)
 
         # embedding layers
-        self.production_readout = nn.Linear(args.hidden_size, len(transition_system.grammar) + 1)
-        self.tgt_token_readout = nn.Linear(args.hidden_size, len(vocab.primitive))
+        self.query_vec_to_embed = nn.Linear(args.hidden_size, args.embed_size, bias=False)
+        self.production_readout_b = nn.Parameter(torch.FloatTensor(len(transition_system.grammar) + 1).zero_())
+        self.tgt_token_readout_b = nn.Parameter(torch.FloatTensor(len(vocab.primitive)).zero_())
+        self.production_readout = lambda q: F.linear(self.query_vec_to_embed(q),
+                                                     self.production_embed.weight, self.production_readout_b)
+        self.tgt_token_readout = lambda q: F.linear(self.query_vec_to_embed(q),
+                                                    self.primitive_embed.weight, self.tgt_token_readout_b)
+        # self.production_readout = nn.Linear(args.hidden_size, len(transition_system.grammar) + 1)
+        # self.tgt_token_readout = nn.Linear(args.hidden_size, len(vocab.primitive))
 
         # dropout layer
         self.dropout = nn.Dropout(args.dropout)
