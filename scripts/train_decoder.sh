@@ -1,19 +1,20 @@
 #!/bin/bash
 
 vocab="vocab.freq5.bin"
+train_file="train.5000.bin"
 dropout=0.2
 hidden_size=256
 embed_size=128
 ptrnet_hidden_dim=32
 lr_decay=0.5
 lstm='lstm'
-model_name=model.sup.decoder.${lstm}.hidden_size${hidden_size}.embed${embed_size}.dropout${dropout}.ptr_hidden${ptrnet_hidden_dim}.lr_decay${lr_decay}.${vocab}
+model_name=model.sup.decoder.${lstm}.hidden_size${hidden_size}.embed${embed_size}.dropout${dropout}.ptr_hidden${ptrnet_hidden_dim}.lr_decay${lr_decay}.${vocab}.${train_file}
 
 python exp.py \
     --cuda \
-    --mode train \
+    --mode train_decoder \
     --batch_size 10 \
-    --train_file ../data/django/train.bin \
+    --train_file ../data/django/${train_file} \
     --dev_file ../data/django/dev.bin \
     --vocab ../data/django/${vocab} \
     --lstm ${lstm} \
@@ -24,6 +25,5 @@ python exp.py \
     --patience 5 \
     --max_num_trial 5 \
     --lr_decay ${lr_decay} \
-    --beam_size ${beam_size} \
     --log_every 50 \
     --save_to saved_models/${model_name} 2>logs/${model_name}.log
