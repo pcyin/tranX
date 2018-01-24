@@ -401,11 +401,7 @@ def train_semi(args):
             report_unsup_baseline_loss += unsup_baseline_loss.sum().data[0]
             report_unsup_examples += unsup_encoder_loss.size(0)
 
-            unsup_encoder_loss = torch.mean(unsup_encoder_loss)
-            unsup_decoder_loss = torch.mean(unsup_decoder_loss)
-            unsup_baseline_loss = torch.mean(unsup_baseline_loss)
-
-            unsup_loss = unsup_encoder_loss + unsup_decoder_loss + unsup_baseline_loss
+            unsup_loss = torch.mean(unsup_encoder_loss) + torch.mean(unsup_decoder_loss) + torch.mean(unsup_baseline_loss)
 
             loss = sup_loss + args.unsup_loss_weight * unsup_loss
 
@@ -429,10 +425,24 @@ def train_semi(args):
                        report_unsup_baseline_loss / report_unsup_examples),
                       file=sys.stderr)
 
-                print('[Iter %d] unsupervised: baseline=%.5f, raw learning signal=%.5f, learning signal=%.5f' % (train_iter,
-                                                                                       meta_data['baseline'].mean().data[0],
-                                                                                       meta_data['raw_learning_signal'].mean().data[0],
-                                                                                       meta_data['learning_signal'].mean().data[0]), file=sys.stderr)
+                # print('[Iter %d] unsupervised: baseline=%.5f, raw learning signal=%.5f, learning signal=%.5f' % (train_iter,
+                #                                                                        meta_data['baseline'].mean().data[0],
+                #                                                                        meta_data['raw_learning_signal'].mean().data[0],
+                #                                                                        meta_data['learning_signal'].mean().data[0]), file=sys.stderr)
+
+                samples = meta_data['samples']
+                for i, sample in enumerate(samples[:15]):
+                    print('\t[%s] Source: %s' % (sample.idx, ' '.join(sample.src_sent)), file=sys.stderr)
+                    print('\t[%s] Code: \n%s' % (sample.idx, sample.tgt_code), file=sys.stderr)
+                    ref_example = [e for e in unlabeled_examples if e.idx == int(sample.idx[:sample.idx.index('-')])][0]
+                    print('\t[%s] Gold Code: \n%s' % (sample.idx, ref_example.tgt_code), file=sys.stderr)
+                    print('\t[%s] Log p(z|x): %f' % (sample.idx, meta_data['encoding_scores'][i].data[0]), file=sys.stderr)
+                    print('\t[%s] Log p(x|z): %f' % (sample.idx, meta_data['reconstruction_scores'][i].data[0]), file=sys.stderr)
+                    print('\t[%s] b + b_x: %f' % (sample.idx, meta_data['baseline'][i].data[0]), file=sys.stderr)
+                    print('\t[%s] Raw Learning Signal: %f' % (sample.idx, meta_data['raw_learning_signal'][i].data[0]), file=sys.stderr)
+                    print('\t[%s] Learning Signal - baseline: %f' % (sample.idx, meta_data['learning_signal'][i].data[0]), file=sys.stderr)
+                    print('\t[%s] Encoder Loss: %f' % (sample.idx, unsup_encoder_loss[i].data[0]), file=sys.stderr)
+                    print('\t***********', file=sys.stderr)
 
                 report_encoder_loss = report_decoder_loss = report_examples = 0.
                 report_unsup_encoder_loss = report_unsup_decoder_loss = report_unsup_baseline_loss = report_unsup_examples = 0.

@@ -161,7 +161,7 @@ class Django(object):
 
             src_query_tokens, tgt_canonical_code, str_map = Django.canonicalize_example(src_query, tgt_code)
             python_ast = ast.parse(tgt_canonical_code).body[0]
-            gold_source = astor.to_source(python_ast)
+            gold_source = astor.to_source(python_ast).strip()
             tgt_ast = python_ast_to_asdl_ast(python_ast, grammar)
             tgt_actions = transition_system.get_actions(tgt_ast)
 
@@ -173,11 +173,13 @@ class Django(object):
                     assert action.production in transition_system.get_valid_continuating_productions(hyp)
                 hyp = hyp.clone_and_apply_action(action)
 
-            src_from_hyp = astor.to_source(asdl_ast_to_python_ast(hyp.tree, grammar))
+            assert hyp.frontier_node is None and hyp.frontier_field is None
+
+            src_from_hyp = astor.to_source(asdl_ast_to_python_ast(hyp.tree, grammar)).strip()
             assert src_from_hyp == gold_source
 
             loaded_examples.append({'src_query_tokens': src_query_tokens,
-                                    'tgt_canonical_code': tgt_canonical_code,
+                                    'tgt_canonical_code': gold_source,
                                     'tgt_ast': tgt_ast,
                                     'tgt_actions': tgt_actions,
                                     'raw_code': tgt_code, 'str_map': str_map})

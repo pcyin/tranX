@@ -94,6 +94,8 @@ class Hypothesis(object):
         frontier_info = _find_frontier_node_and_field(self.tree)
         if frontier_info:
             self.frontier_node, self.frontier_field = frontier_info
+        else:
+            self.frontier_node, self.frontier_field = None, None
 
     def clone_and_apply_action(self, action):
         new_hyp = self.copy()

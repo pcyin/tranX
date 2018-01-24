@@ -57,6 +57,7 @@ class StructVAE(nn.Module):
 
         meta_data = {'samples': samples,
                      'reconstruction_scores': reconstruction_scores,
+                     'encoding_scores': sample_scores,
                      'raw_learning_signal': raw_learning_signal,
                      'learning_signal': learning_signal,
                      'baseline': self.b + b_x}
