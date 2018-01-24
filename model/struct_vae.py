@@ -34,6 +34,9 @@ class StructVAE(nn.Module):
         self.b_x_l2 = nn.Linear(20, 1, bias=False)
         self.b = nn.Parameter(torch.FloatTensor(1))
 
+        # initialize baseline to be a small negative number
+        self.b.data.fill_(-20.)
+
     def get_unsupervised_loss(self, examples):
         samples, sample_scores, b_x = self.infer(examples)
 
@@ -50,7 +53,7 @@ class StructVAE(nn.Module):
         decoder_loss = -reconstruction_scores
 
         # compute baseline loss
-        baseline_loss = torch.mean(learning_signal ** 2)
+        baseline_loss = learning_signal ** 2
 
         meta_data = None
 
@@ -73,6 +76,7 @@ class StructVAE(nn.Module):
                 try:
                     py_ast = asdl_ast_to_python_ast(hyp.tree, self.encoder.grammar)
                     code = astor.to_source(py_ast).strip()
+                    tokenize_code(code)  # make sure the code is tokenizable!
                     sampled_example = Example(idx='%d-sample%d' % (example.idx, hyp_id),
                                               src_sent=example.src_sent,
                                               tgt_code=code,
