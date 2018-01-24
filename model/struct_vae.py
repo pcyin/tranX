@@ -46,8 +46,8 @@ class StructVAE(nn.Module):
         prior_scores = self.prior([e.tgt_code for e in samples])
         prior_scores = Variable(b_x.data.new(prior_scores))
 
-        learning_signal = reconstruction_scores - self.args.alpha * (sample_scores - prior_scores)
-        learning_signal = learning_signal.detach() - self.b - b_x
+        raw_learning_signal = reconstruction_scores - self.args.alpha * (sample_scores - prior_scores)
+        learning_signal = raw_learning_signal.detach() - self.b - b_x
 
         encoder_loss = -learning_signal.detach() * sample_scores
         decoder_loss = -reconstruction_scores
@@ -55,7 +55,10 @@ class StructVAE(nn.Module):
         # compute baseline loss
         baseline_loss = learning_signal ** 2
 
-        meta_data = None
+        meta_data = {'samples': samples,
+                     'reconstruction_scores': reconstruction_scores,
+                     'learning_signal': raw_learning_signal,
+                     'baseline': self.b + b_x}
 
         return encoder_loss, decoder_loss, baseline_loss, meta_data
 
@@ -90,18 +93,20 @@ class StructVAE(nn.Module):
                     print('-' * 60, file=sys.stdout)
 
         # sort examples by nl length
-        nl_lens = [len(e.src_sent) for e in sampled_examples]
-        sorted_example_ids = sorted(range(len(sampled_examples)), key=lambda x: -nl_lens[x])
+        # nl_lens = [len(e.src_sent) for e in sampled_examples]
+        # sorted_example_ids = sorted(range(len(sampled_examples)), key=lambda x: -nl_lens[x])
+        #
+        # example_old_pos_map = [-1] * len(sampled_examples)
+        # for new_pos, old_pos in enumerate(sorted_example_ids):
+        #     example_old_pos_map[old_pos] = new_pos
+        #
+        # sorted_examples = [sampled_examples[i] for i in sorted_example_ids]
+        # sorted_sample_scores, sorted_enc_states = self.encoder.score(sorted_examples, return_enc_state=True)
+        #
+        # sample_scores = sorted_sample_scores[example_old_pos_map]
+        # enc_states = sorted_enc_states[example_old_pos_map]
 
-        example_old_pos_map = [-1] * len(sampled_examples)
-        for new_pos, old_pos in enumerate(sorted_example_ids):
-            example_old_pos_map[old_pos] = new_pos
-
-        sorted_examples = [sampled_examples[i] for i in sorted_example_ids]
-        sorted_sample_scores, sorted_enc_states = self.encoder.score(sorted_examples, return_enc_state=True)
-
-        sample_scores = sorted_sample_scores[example_old_pos_map]
-        enc_states = sorted_enc_states[example_old_pos_map]
+        sample_scores, enc_states = self.encoder.score(sampled_examples, return_enc_state=True)
 
         # compute baseline, which is an MLP
         # (sample_size) FIXME: reward is log-likelihood, shall we use activation here?
