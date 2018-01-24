@@ -133,7 +133,8 @@ def train(args):
             loss.backward()
 
             # clip gradient
-            grad_norm = torch.nn.utils.clip_grad_norm(model.parameters(), args.clip_grad)
+            if args.clip_grad > 0.:
+                grad_norm = torch.nn.utils.clip_grad_norm(model.parameters(), args.clip_grad)
 
             optimizer.step()
 
@@ -167,6 +168,9 @@ def train(args):
             model.save(model_file)
             # also save the optimizers' state
             torch.save(optimizer.state_dict(), args.save_to + '.optim.bin')
+        elif epoch == args.max_epoch:
+            print('reached max epoch, stop!', file=sys.stderr)
+            exit(0)
         elif patience < args.patience:
             patience += 1
             print('hit patience %d' % patience, file=sys.stderr)
@@ -361,6 +365,7 @@ def train_semi(args):
     epoch = train_iter = 0
     history_dev_scores = []
     while True:
+        epoch += 1
         epoch_begin = time.time()
         unlabeled_examples_iter = unlabeled_data.batch_iter(batch_size=args.batch_size, shuffle=True)
 
