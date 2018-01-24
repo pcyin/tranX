@@ -118,7 +118,7 @@ class Parser(nn.Module):
 
         return h_0, Variable(self.new_tensor(h_0.size()).zero_())
 
-    def score(self, examples):
+    def score(self, examples, return_enc_state=False):
         """
         input: a batch of examples
         output: score for each training example: Variable(batch_size)
@@ -164,7 +164,9 @@ class Parser(nn.Module):
 
         scores = torch.sum(action_prob, dim=0)
 
-        return scores
+        if return_enc_state:
+            return scores, last_state
+        else: return scores
 
     def step(self, x, h_tm1, src_encodings, src_encodings_att_linear, src_token_mask=None):
         # h_t: (batch_size, hidden_size)

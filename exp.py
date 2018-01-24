@@ -16,7 +16,9 @@ from asdl.lang.py.py_transition_system import PythonTransitionSystem
 from components.dataset import Dataset
 
 from model.parser import Parser
+from model.prior import UniformPrior
 from model.reconstruction_model import Reconstructor
+from model.struct_vae import StructVAE
 
 
 def init_config():
@@ -26,6 +28,9 @@ def init_config():
     parser.add_argument('--mode', choices=['train', 'train_decoder', 'train_semi', 'test', 'debug_ls'], default='train', help='run mode')
 
     parser.add_argument('--lstm', choices=['lstm', 'lstm_with_dropout'], default='lstm')
+
+    parser.add_argument('--load_model', default=None, type=str, help='load a pre-trained model')
+    parser.add_argument('--load_decoder', default=None, type=str)
 
     parser.add_argument('--batch_size', default=10, type=int, help='batch size')
     parser.add_argument('--beam_size', default=5, type=int, help='beam size for beam search')
@@ -44,8 +49,7 @@ def init_config():
     parser.add_argument('--asdl_file', type=str)
     parser.add_argument('--vocab', type=str, help='path of the serialized vocabulary')
     parser.add_argument('--train_src', type=str, help='path to the training source file')
-    parser.add_argument('--unlabeled_src', type=str, help='path to the training source file')
-    parser.add_argument('--unlabeled_tgt', type=str, default=None, help='path to the target file')
+    parser.add_argument('--unlabeled_file', type=str, help='path to the training source file')
     parser.add_argument('--train_file', type=str, help='path to the training target file')
     parser.add_argument('--dev_file', type=str, help='path to the dev source file')
     parser.add_argument('--test_file', type=str, help='path to the test target file')
@@ -62,7 +66,7 @@ def init_config():
     parser.add_argument('--valid_metric', default='sp_acc', choices=['nlg_bleu', 'sp_acc'],
                         help='metric used for validation')
     parser.add_argument('--log_every', default=10, type=int, help='every n iterations to log training statistics')
-    parser.add_argument('--load_model', default=None, type=str, help='load a pre-trained model')
+
     parser.add_argument('--save_to', default='model', type=str, help='save trained model to')
     parser.add_argument('--save_decode_to', default=None, type=str, help='save decoding results to file')
     parser.add_argument('--patience', default=5, type=int, help='training patience')
@@ -320,6 +324,167 @@ def train_decoder(args):
             patience = 0
 
 
+def train_semi(args):
+    encoder_params = torch.load(args.load_model, map_location=lambda storage, loc: storage)
+    decoder_params = torch.load(args.load_decoder, map_location=lambda storage, loc: storage)
+
+    print('loaded encoder at %s' % args.load_model, file=sys.stderr)
+    print('loaded decoder at %s' % args.load_decoder, file=sys.stderr)
+
+    vocab = encoder_params['vocab']
+    transition_system = encoder_params['transition_system']
+    encoder_params['args'].cuda = decoder_params['args'].cuda = args.cuda
+
+    encoder = Parser(encoder_params['args'], vocab, transition_system)
+    encoder.load_state_dict(encoder_params['state_dict'])
+    decoder = Reconstructor(decoder_params['args'], vocab)
+    decoder.load_state_dict(decoder_params['state_dict'])
+    prior = UniformPrior()
+
+    structVAE = StructVAE(encoder, decoder, prior, args)
+    if args.cuda: structVAE.cuda()
+
+    labeled_data = Dataset.from_bin_file(args.train_file)
+    unlabeled_data = Dataset.from_bin_file(args.unlabeled_file)   # pretend they are un-labeled!
+    dev_set = Dataset.from_bin_file(args.dev_file)
+
+    optimizer = torch.optim.Adam(structVAE.parameters(), lr=args.lr)
+
+    print('*** begin semi-supervised training %d labeled examples, %d unlabeled examples ***' %
+          (len(labeled_data), len(unlabeled_data)), file=sys.stderr)
+    report_encoder_loss = report_decoder_loss = report_src_sent_words_num = report_tgt_query_words_num = report_examples = 0.
+    report_unsup_examples = report_unsup_encoder_loss = report_unsup_decoder_loss = report_unsup_baseline_loss = 0.
+    patience = 0
+    num_trial = 1
+    epoch = train_iter = 0
+    history_dev_scores = []
+    while True:
+        epoch_begin = time.time()
+        unlabeled_examples_iter = unlabeled_data.batch_iter(batch_size=args.batch_size, shuffle=True)
+
+        for labeled_examples in labeled_data.batch_iter(batch_size=args.batch_size, shuffle=True):
+            train_iter += 1
+            optimizer.zero_grad()
+            report_examples += len(labeled_examples)
+
+            sup_encoder_loss = -encoder.score(labeled_examples)
+            sup_decoder_loss = -decoder.score(labeled_examples)
+
+            report_encoder_loss += sup_encoder_loss.sum().data[0]
+            report_decoder_loss += sup_decoder_loss.sum().data[0]
+
+            sup_encoder_loss = torch.mean(sup_encoder_loss)
+            sup_decoder_loss = torch.mean(sup_decoder_loss)
+
+            sup_loss = sup_encoder_loss + sup_decoder_loss
+
+            # compute unsupervised loss
+            try:
+                unlabeled_examples = next(unlabeled_examples_iter)
+            except StopIteration:
+                # if finished unlabeled data stream, restart it
+                unlabeled_examples_iter = unlabeled_data.batch_iter(batch_size=args.batch_size, shuffle=True)
+                unlabeled_examples = next(unlabeled_examples_iter)
+
+            unsup_encoder_loss, unsup_decoder_loss, unsup_baseline_loss, meta_data = structVAE.get_unsupervised_loss(
+                unlabeled_examples)
+
+            report_unsup_encoder_loss += unsup_encoder_loss.sum().data[0]
+            report_unsup_decoder_loss += unsup_decoder_loss.sum().data[0]
+            report_unsup_baseline_loss += unsup_baseline_loss.sum().data[0]
+            report_unsup_examples += unsup_encoder_loss.size(0)
+
+            unsup_encoder_loss = torch.mean(unsup_encoder_loss)
+            unsup_decoder_loss = torch.mean(unsup_decoder_loss)
+            unsup_baseline_loss = torch.mean(unsup_baseline_loss)
+
+            unsup_loss = unsup_encoder_loss + unsup_decoder_loss + unsup_baseline_loss
+
+            loss = sup_loss + args.unsup_loss_weight * unsup_loss
+
+            loss.backward()
+
+            # clip gradient
+            grad_norm = torch.nn.utils.clip_grad_norm(structVAE.parameters(), args.clip_grad)
+            optimizer.step()
+
+            if train_iter % args.log_every == 0:
+                print('[Iter %d] supervised: encoder loss=%.5f, decoder loss=%.5f' %
+                      (train_iter,
+                       report_encoder_loss / report_examples,
+                       report_decoder_loss / report_examples),
+                      file=sys.stderr)
+
+                print('[Iter %d] unsupervised: encoder loss=%.5f, decoder loss=%.5f, baseline loss=%.5f' %
+                      (train_iter,
+                       report_unsup_encoder_loss / report_unsup_examples,
+                       report_unsup_decoder_loss / report_unsup_examples,
+                       report_unsup_baseline_loss / report_unsup_examples),
+                      file=sys.stderr)
+
+                report_encoder_loss = report_decoder_loss = report_examples = 0.
+                report_unsup_encoder_loss = report_unsup_decoder_loss = report_unsup_baseline_loss = report_unsup_examples = 0.
+
+        print('[Epoch %d] epoch elapsed %ds' % (epoch, time.time() - epoch_begin), file=sys.stderr)
+        # perform validation
+        print('[Epoch %d] begin validation' % epoch, file=sys.stderr)
+
+        eval_start = time.time()
+        eval_results = evaluation.evaluate(dev_set.examples, encoder, args, verbose=True)
+        dev_acc = eval_results['accuracy']
+        print('[Epoch %d] code generation accuracy=%.5f took %ds' % (epoch, dev_acc, time.time() - eval_start),
+              file=sys.stderr)
+        is_better = history_dev_scores == [] or dev_acc > max(history_dev_scores)
+        history_dev_scores.append(dev_acc)
+
+        model_file = args.save_to + '.iter%d.bin' % train_iter
+        print('save model to [%s]' % model_file, file=sys.stderr)
+        structVAE.save(model_file)
+
+        if is_better:
+            patience = 0
+            model_file = args.save_to + '.bin'
+            print('save currently the best model ..', file=sys.stderr)
+            print('save model to [%s]' % model_file, file=sys.stderr)
+            model.save(model_file)
+            # also save the optimizers' state
+            torch.save(optimizer.state_dict(), args.save_to + '.optim.bin')
+        elif patience < args.patience:
+            patience += 1
+            print('hit patience %d' % patience, file=sys.stderr)
+
+        if patience == args.patience:
+            num_trial += 1
+            print('hit #%d trial' % num_trial, file=sys.stderr)
+            if num_trial == args.max_num_trial:
+                print('early stop!', file=sys.stderr)
+                exit(0)
+
+            # decay lr, and restore from previously best checkpoint
+            lr = optimizer.param_groups[0]['lr'] * args.lr_decay
+            print('load previously best model and decay learning rate to %f' % lr, file=sys.stderr)
+
+            # load model
+            params = torch.load(args.save_to + '.bin', map_location=lambda storage, loc: storage)
+            model.load_state_dict(params['state_dict'])
+            if args.cuda: model = model.cuda()
+
+            # load optimizers
+            if args.reset_optimizer:
+                print('reset to a new infer_optimizer', file=sys.stderr)
+                optimizer = torch.optim.Adam(model.inference_model.parameters(), lr=lr)
+            else:
+                print('restore parameters of the optimizers', file=sys.stderr)
+                optimizer.load_state_dict(torch.load(args.save_to + '.optim.bin'))
+
+            # set new lr
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = lr
+
+            # reset patience
+            patience = 0
+
+
 def test(args):
     test_set = Dataset.from_bin_file(args.test_file)
     assert args.load_model
@@ -349,6 +514,8 @@ if __name__ == '__main__':
         train(args)
     elif args.mode == 'train_decoder':
         train_decoder(args)
+    elif args.mode == 'train_semi':
+        train_semi(args)
     elif args.mode == 'test':
         test(args)
     else:
