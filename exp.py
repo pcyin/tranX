@@ -345,8 +345,10 @@ def train_semi(args):
     if args.cuda: structVAE.cuda()
 
     labeled_data = Dataset.from_bin_file(args.train_file)
+    # labeled_data.examples = labeled_data.examples[:10]
     unlabeled_data = Dataset.from_bin_file(args.unlabeled_file)   # pretend they are un-labeled!
     dev_set = Dataset.from_bin_file(args.dev_file)
+    # dev_set.examples = dev_set.examples[:10]
 
     optimizer = torch.optim.Adam(structVAE.parameters(), lr=args.lr)
 
@@ -422,6 +424,11 @@ def train_semi(args):
                        report_unsup_baseline_loss / report_unsup_examples),
                       file=sys.stderr)
 
+                print('[Iter %d] unsupervised: baseline=%.5f, raw learning signal=%.5f, learning signal=%.5f' % (train_iter,
+                                                                                       meta_data['baseline'].mean().data[0],
+                                                                                       meta_data['raw_learning_signal'].mean().data[0],
+                                                                                       meta_data['learning_signal'].mean().data[0]), file=sys.stderr)
+
                 report_encoder_loss = report_decoder_loss = report_examples = 0.
                 report_unsup_encoder_loss = report_unsup_decoder_loss = report_unsup_baseline_loss = report_unsup_examples = 0.
 
@@ -446,7 +453,7 @@ def train_semi(args):
             model_file = args.save_to + '.bin'
             print('save currently the best model ..', file=sys.stderr)
             print('save model to [%s]' % model_file, file=sys.stderr)
-            model.save(model_file)
+            structVAE.save(model_file)
             # also save the optimizers' state
             torch.save(optimizer.state_dict(), args.save_to + '.optim.bin')
         elif patience < args.patience:
@@ -464,15 +471,14 @@ def train_semi(args):
             lr = optimizer.param_groups[0]['lr'] * args.lr_decay
             print('load previously best model and decay learning rate to %f' % lr, file=sys.stderr)
 
-            # load model
-            params = torch.load(args.save_to + '.bin', map_location=lambda storage, loc: storage)
-            model.load_state_dict(params['state_dict'])
-            if args.cuda: model = model.cuda()
+            # load best model's parameters
+            structVAE.load_parameters(args.save_to + '.bin')
+            if args.cuda: structVAE = structVAE.cuda()
 
             # load optimizers
             if args.reset_optimizer:
                 print('reset to a new infer_optimizer', file=sys.stderr)
-                optimizer = torch.optim.Adam(model.inference_model.parameters(), lr=lr)
+                optimizer = torch.optim.Adam(structVAE.encoder.parameters(), lr=lr)
             else:
                 print('restore parameters of the optimizers', file=sys.stderr)
                 optimizer.load_state_dict(torch.load(args.save_to + '.optim.bin'))

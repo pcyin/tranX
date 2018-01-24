@@ -57,7 +57,8 @@ class StructVAE(nn.Module):
 
         meta_data = {'samples': samples,
                      'reconstruction_scores': reconstruction_scores,
-                     'learning_signal': raw_learning_signal,
+                     'raw_learning_signal': raw_learning_signal,
+                     'learning_signal': learning_signal,
                      'baseline': self.b + b_x}
 
         return encoder_loss, decoder_loss, baseline_loss, meta_data
@@ -92,20 +93,6 @@ class StructVAE(nn.Module):
                     traceback.print_exc(file=sys.stdout)
                     print('-' * 60, file=sys.stdout)
 
-        # sort examples by nl length
-        # nl_lens = [len(e.src_sent) for e in sampled_examples]
-        # sorted_example_ids = sorted(range(len(sampled_examples)), key=lambda x: -nl_lens[x])
-        #
-        # example_old_pos_map = [-1] * len(sampled_examples)
-        # for new_pos, old_pos in enumerate(sorted_example_ids):
-        #     example_old_pos_map[old_pos] = new_pos
-        #
-        # sorted_examples = [sampled_examples[i] for i in sorted_example_ids]
-        # sorted_sample_scores, sorted_enc_states = self.encoder.score(sorted_examples, return_enc_state=True)
-        #
-        # sample_scores = sorted_sample_scores[example_old_pos_map]
-        # enc_states = sorted_enc_states[example_old_pos_map]
-
         sample_scores, enc_states = self.encoder.score(sampled_examples, return_enc_state=True)
 
         # compute baseline, which is an MLP
@@ -118,3 +105,22 @@ class StructVAE(nn.Module):
         fname, ext = os.path.splitext(path)
         self.encoder.save(fname + '.encoder' + ext)
         self.decoder.save(fname + '.decoder' + ext)
+        state_dict = {k: v for k, v in self.state_dict().iteritems() if not (k.startswith('decoder') or k.startswith('encoder'))}
+
+        params = {
+            'args': self.args,
+            'state_dict': state_dict
+        }
+
+        torch.save(params, path)
+
+    def load_parameters(self, path):
+        fname, ext = os.path.splitext(path)
+        encoder_states = torch.load(fname + '.encoder' + ext, map_location=lambda storage, loc: storage)['state_dict']
+        self.encoder.load_state_dict(encoder_states)
+
+        decoder_states = torch.load(fname + '.decoder' + ext, map_location=lambda storage, loc: storage)['state_dict']
+        self.decoder.load_state_dict(decoder_states)
+
+        vae_states = torch.load(path, map_location=lambda storage, loc: storage)['state_dict']
+        self.load_state_dict(vae_states, strict=False)
