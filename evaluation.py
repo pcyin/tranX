@@ -23,7 +23,7 @@ def decode(examples, model, args, verbose=False):
     for example in examples:
         hyps = model.parse(example.src_sent, beam_size=args.beam_size)
         decoded_hyps = []
-        for hyp_id, hyp in enumerate(hyps[:10]):
+        for hyp_id, hyp in enumerate(hyps[:args.sample_size]):
             try:
                 py_ast = asdl_ast_to_python_ast(hyp.tree, model.grammar)
                 code = astor.to_source(py_ast).strip()
@@ -48,26 +48,30 @@ def decode(examples, model, args, verbose=False):
 
 
 def evaluate(examples, parser, args, verbose=False):
-    cum_acc = 0.0
+    cum_oracle_acc = cum_acc = 0.0
     decode_results = decode(examples, parser, args, verbose=verbose)
     for example, hyps in zip(examples, decode_results):
         if hyps:
-            hyp, hyp_code = hyps[0]
+            for hyp_id, (hyp, hyp_code) in enumerate(hyps):
 
-            ref_code = example.tgt_code
-            ref_py_ast = ast.parse(ref_code).body[0]
-            ref_reformatted_code = astor.to_source(ref_py_ast).strip()
+                ref_code = example.tgt_code
+                ref_py_ast = ast.parse(ref_code).body[0]
+                ref_reformatted_code = astor.to_source(ref_py_ast).strip()
 
-            try:
-                ref_code_tokens = tokenize_py_code(ref_reformatted_code)
-                hyp_code_tokens = tokenize_py_code(hyp_code)
-            except:
-                print('error in tokenizing [%s]' % hyp_code, file=sys.stderr)
-                continue
+                try:
+                    ref_code_tokens = tokenize_py_code(ref_reformatted_code)
+                    hyp_code_tokens = tokenize_py_code(hyp_code)
+                except:
+                    print('error in tokenizing [%s]' % hyp_code, file=sys.stderr)
+                    continue
 
-            if hyp_code_tokens == ref_code_tokens:
-                cum_acc += 1
+                if hyp_id == 0 and hyp_code_tokens == ref_code_tokens:
+                    cum_acc += 1
 
-    eval_result = {'accuracy': cum_acc / len(examples)}
+                if hyp_code_tokens == ref_code_tokens:
+                    cum_oracle_acc += 1
+
+    eval_result = {'accuracy': cum_acc / len(examples),
+                   'oracle_accuracy': cum_oracle_acc / len(examples)}
 
     return eval_result
