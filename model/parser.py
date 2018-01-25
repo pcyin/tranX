@@ -1,7 +1,9 @@
 # coding=utf-8
-import os
+from __future__ import print_function
 
+import os
 import path
+import sys
 
 import torch
 import torch.nn as nn
@@ -453,10 +455,20 @@ class Parser(nn.Module):
                     # it's a GenToken action
                     token_id = (new_hyp_pos - len(applyrule_new_hyp_scores)) % primitive_prob.size(1)
 
-                    k = (new_hyp_pos - len(applyrule_new_hyp_scores)) / primitive_prob.size(1)
-                    copy_info = gentoken_copy_infos[k]
-                    prev_hyp_id = gentoken_prev_hyp_ids[k]
-                    prev_hyp = hypotheses[prev_hyp_id]
+                    try:
+                        k = (new_hyp_pos - len(applyrule_new_hyp_scores)) / primitive_prob.size(1)
+                        copy_info = gentoken_copy_infos[k]
+                        prev_hyp_id = gentoken_prev_hyp_ids[k]
+                        prev_hyp = hypotheses[prev_hyp_id]
+                    except:
+                        print('k=%d' % k, file=sys.stderr)
+                        print('primitive_prob.size(1)=%d' % primitive_prob.size(1), file=sys.stderr)
+                        print('len copy_info=%d' % len(gentoken_copy_infos), file=sys.stderr)
+                        print('prev_hyp_id=%s' % ', '.join(str(i) for i in gentoken_prev_hyp_ids), file=sys.stderr)
+                        print('len applyrule_new_hyp_scores=%d' % len(applyrule_new_hyp_scores), file=sys.stderr)
+                        print('top_new_hyp_pos=%s' % top_new_hyp_pos, file=sys.stderr)
+
+                        exit(-1)
 
                     if token_id == primitive_vocab.unk_id:
                         token = gentoken_new_hyp_unks[k]
