@@ -370,6 +370,8 @@ def train_semi(args):
         unlabeled_examples_iter = unlabeled_data.batch_iter(batch_size=args.batch_size, shuffle=True)
 
         for labeled_examples in labeled_data.batch_iter(batch_size=args.batch_size, shuffle=True):
+            labeled_examples = [e for e in labeled_examples if len(e.tgt_actions) <= args.decode_max_time_step]
+
             train_iter += 1
             optimizer.zero_grad()
             report_examples += len(labeled_examples)
@@ -392,6 +394,7 @@ def train_semi(args):
                 # if finished unlabeled data stream, restart it
                 unlabeled_examples_iter = unlabeled_data.batch_iter(batch_size=args.batch_size, shuffle=True)
                 unlabeled_examples = next(unlabeled_examples_iter)
+                unlabeled_examples = [e for e in unlabeled_examples if len(e.tgt_actions) <= args.decode_max_time_step]
 
             unsup_encoder_loss, unsup_decoder_loss, unsup_baseline_loss, meta_data = structVAE.get_unsupervised_loss(
                 unlabeled_examples)
@@ -471,6 +474,9 @@ def train_semi(args):
             structVAE.save(model_file)
             # also save the optimizers' state
             torch.save(optimizer.state_dict(), args.save_to + '.optim.bin')
+        elif epoch == args.max_epoch:
+            print('reached max epoch, stop!', file=sys.stderr)
+            exit(0)
         elif patience < args.patience:
             patience += 1
             print('hit patience %d' % patience, file=sys.stderr)
