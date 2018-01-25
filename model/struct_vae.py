@@ -49,7 +49,14 @@ class StructVAE(nn.Module):
         raw_learning_signal = reconstruction_scores - self.args.alpha * (sample_scores - prior_scores)
         learning_signal = raw_learning_signal.detach() - self.b - b_x
 
-        encoder_loss = -learning_signal.detach() * sample_scores
+        # clip learning signal
+        if self.args.clip_learning_signal is not None:
+            mask = torch.lt(learning_signal, self.args.clip_learning_signal).float()
+            clipped_learning_signal = learning_signal * (1. - mask) + mask * self.args.clip_learning_signal
+        else:
+            clipped_learning_signal = learning_signal
+
+        encoder_loss = -clipped_learning_signal.detach() * sample_scores
         decoder_loss = -reconstruction_scores
 
         # compute baseline loss
@@ -71,6 +78,9 @@ class StructVAE(nn.Module):
         self.encoder.eval()
 
         hypotheses = [self.encoder.parse(e.src_sent, beam_size=self.args.sample_size) for e in examples]
+
+        if len(hypotheses) == 0:
+            raise ValueError('No candidate hypotheses.')
 
         if was_training: self.encoder.train()
 

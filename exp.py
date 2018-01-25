@@ -56,6 +56,7 @@ def init_config():
     parser.add_argument('--prior_lm_path', type=str, help='path to the prior LM')
 
     # semi-supervised learning arguments
+    parser.add_argument('--clip_learning_signal', type=float, default=None)
     parser.add_argument('--begin_semisup_after_dev_acc', type=float, default=0., help='begin semi-supervised learning after'
                                                                                     'we have reached certain dev performance')
 
@@ -346,6 +347,7 @@ def train_semi(args):
     prior = UniformPrior()
 
     structVAE = StructVAE(encoder, decoder, prior, args)
+    structVAE.train()
     if args.cuda: structVAE.cuda()
 
     labeled_data = Dataset.from_bin_file(args.train_file)
@@ -396,8 +398,12 @@ def train_semi(args):
                 unlabeled_examples = next(unlabeled_examples_iter)
                 unlabeled_examples = [e for e in unlabeled_examples if len(e.tgt_actions) <= args.decode_max_time_step]
 
-            unsup_encoder_loss, unsup_decoder_loss, unsup_baseline_loss, meta_data = structVAE.get_unsupervised_loss(
-                unlabeled_examples)
+            try:
+                unsup_encoder_loss, unsup_decoder_loss, unsup_baseline_loss, meta_data = structVAE.get_unsupervised_loss(
+                    unlabeled_examples)
+            except ValueError as e:
+                print(e.message, file=sys.stderr)
+                continue
 
             report_unsup_encoder_loss += unsup_encoder_loss.sum().data[0]
             report_unsup_decoder_loss += unsup_decoder_loss.sum().data[0]

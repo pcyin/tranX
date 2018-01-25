@@ -52,12 +52,11 @@ def evaluate(examples, parser, args, verbose=False):
     decode_results = decode(examples, parser, args, verbose=verbose)
     for example, hyps in zip(examples, decode_results):
         if hyps:
+            ref_code = example.tgt_code
+            ref_py_ast = ast.parse(ref_code).body[0]
+            ref_reformatted_code = astor.to_source(ref_py_ast).strip()
+
             for hyp_id, (hyp, hyp_code) in enumerate(hyps):
-
-                ref_code = example.tgt_code
-                ref_py_ast = ast.parse(ref_code).body[0]
-                ref_reformatted_code = astor.to_source(ref_py_ast).strip()
-
                 try:
                     ref_code_tokens = tokenize_py_code(ref_reformatted_code)
                     hyp_code_tokens = tokenize_py_code(hyp_code)
