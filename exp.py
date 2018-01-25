@@ -442,7 +442,7 @@ def train_semi(args):
                     print('\t[%s] Raw Learning Signal: %f' % (sample.idx, meta_data['raw_learning_signal'][i].data[0]), file=sys.stderr)
                     print('\t[%s] Learning Signal - baseline: %f' % (sample.idx, meta_data['learning_signal'][i].data[0]), file=sys.stderr)
                     print('\t[%s] Encoder Loss: %f' % (sample.idx, unsup_encoder_loss[i].data[0]), file=sys.stderr)
-                    print('\t***********', file=sys.stderr)
+                    print('\t**************************', file=sys.stderr)
 
                 report_encoder_loss = report_decoder_loss = report_examples = 0.
                 report_unsup_encoder_loss = report_unsup_decoder_loss = report_unsup_baseline_loss = report_unsup_examples = 0.
