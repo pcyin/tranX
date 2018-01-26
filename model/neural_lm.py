@@ -15,8 +15,11 @@ class LSTMLanguageModel(nn.Module):
     def __init__(self, vocab, embed_size, hidden_size, dropout=0.):
         super(LSTMLanguageModel, self).__init__()
 
+        self.vocab = vocab
+
         self.embed = nn.Embedding(len(vocab), embed_size)
         nn.init.xavier_normal(self.embed.weight)
+
         self.lstm = nn.LSTM(embed_size, hidden_size)
         self.read_out = nn.Linear(hidden_size, len(vocab))
         self.dropout = nn.Dropout(dropout)

@@ -1,3 +1,4 @@
+# coding=utf-8
 from __future__ import print_function
 
 import ast
@@ -61,9 +62,9 @@ def train_lstm_lm(args):
         for examples in nn_utils.batch_iter(dev_data, args.batch_size):
             batch_tokens = [e['tokens'] for e in examples]
             batch = nn_utils.to_input_variable(batch_tokens, vocab, cuda=args.cuda, append_boundary_sym=True)
-            loss = -model.forward(batch).sum()
+            loss = model.forward(batch).sum()
             cum_loss += loss.data[0]
-            cum_tgt_words += sum(len(e['tokens']) + 1 for e in batch)  # add ending </s>
+            cum_tgt_words += sum(len(tokens) + 1 for tokens in batch_tokens)  # add ending </s>
 
         ppl = np.exp(cum_loss / cum_tgt_words)
         model.train()
