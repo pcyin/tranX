@@ -9,30 +9,35 @@ from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
 
 class PointerNet(nn.Module):
-    def __init__(self, query_vec_size, src_encoding_size, hidden_dim):
+    def __init__(self, query_vec_size, src_encoding_size):
         super(PointerNet, self).__init__()
 
-        self.src_encoding_linear = nn.Linear(src_encoding_size, hidden_dim)
-        self.query_vec_linear = nn.Linear(query_vec_size, hidden_dim)
-        self.layer2 = nn.Linear(hidden_dim, 1)
+        self.src_encoding_linear = nn.Linear(src_encoding_size, query_vec_size, bias=False)
 
     def forward(self, src_encodings, src_token_mask, query_vec):
         """
         :param src_encodings: Variable(batch_size, src_sent_len, hidden_size * 2)
-        :param src_token_mask: Variable(src_sent_len, batch_size)
-        :param query_vec: Variable(tgt_action_num, batch_size, hidden_size)
+        :param src_token_mask: Variable(batch_size, src_sent_len)
+        :param query_vec: Variable(tgt_action_num, batch_size, query_vec_size)
         :return: Variable(tgt_action_num, batch_size, src_sent_len)
         """
 
-        # (tgt_action_num, batch_size, src_sent_len, ptrnet_hidden_dim)
-        h1 = torch.tanh(self.src_encoding_linear(src_encodings).unsqueeze(0) + self.query_vec_linear(query_vec).unsqueeze(2))
+        # (batch_size, 1, src_sent_len, query_vec_size)
+        src_trans = self.src_encoding_linear(src_encodings).unsqueeze(1)
+        # (batch_size, tgt_action_num, query_vec_size, 1)
+        q = query_vec.permute(1, 0, 2).unsqueeze(3)
+
+        # (batch_size, tgt_action_num, src_sent_len)
+        weights = torch.matmul(src_trans, q).squeeze(3)
+
         # (tgt_action_num, batch_size, src_sent_len)
-        h2 = self.layer2(h1).squeeze(3)
+        weights = weights.permute(1, 0, 2)
+
         if src_token_mask is not None:
             # (tgt_action_num, batch_size, src_sent_len)
-            src_token_mask = src_token_mask.unsqueeze(0).expand_as(h2)
-            h2.data.masked_fill_(src_token_mask, -float('inf'))
+            src_token_mask = src_token_mask.unsqueeze(0).expand_as(weights)
+            weights.data.masked_fill_(src_token_mask, -float('inf'))
 
-        ptr_weights = F.softmax(h2, dim=-1)
+        ptr_weights = F.softmax(weights, dim=-1)
 
         return ptr_weights

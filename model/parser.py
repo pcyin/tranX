@@ -61,7 +61,7 @@ class Parser(nn.Module):
                                          dropout=args.dropout)
 
         # pointer net
-        self.src_pointer_net = PointerNet(args.hidden_size, args.hidden_size, args.ptrnet_hidden_dim)
+        self.src_pointer_net = PointerNet(args.hidden_size, args.hidden_size)
 
         self.primitive_predictor = nn.Linear(args.hidden_size, 2)
 
