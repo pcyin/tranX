@@ -338,13 +338,12 @@ def train_semi(args):
     print('loaded encoder at %s' % args.load_model, file=sys.stderr)
     print('loaded decoder at %s' % args.load_decoder, file=sys.stderr)
 
-    vocab = encoder_params['vocab']
     transition_system = encoder_params['transition_system']
     encoder_params['args'].cuda = decoder_params['args'].cuda = args.cuda
 
-    encoder = Parser(encoder_params['args'], vocab, transition_system)
+    encoder = Parser(encoder_params['args'], encoder_params['vocab'], transition_system)
     encoder.load_state_dict(encoder_params['state_dict'])
-    decoder = Reconstructor(decoder_params['args'], vocab)
+    decoder = Reconstructor(decoder_params['args'], decoder_params['vocab'])
     decoder.load_state_dict(decoder_params['state_dict'])
     prior = UniformPrior()
 
