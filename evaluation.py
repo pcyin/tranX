@@ -56,6 +56,7 @@ def evaluate(examples, parser, args, verbose=False):
             ref_py_ast = ast.parse(ref_code).body[0]
             ref_reformatted_code = astor.to_source(ref_py_ast).strip()
 
+            cur_oracle = 0.
             for hyp_id, (hyp, hyp_code) in enumerate(hyps):
                 try:
                     ref_code_tokens = tokenize_py_code(ref_reformatted_code)
@@ -67,8 +68,10 @@ def evaluate(examples, parser, args, verbose=False):
                 if hyp_id == 0 and hyp_code_tokens == ref_code_tokens:
                     cum_acc += 1
 
-                if hyp_code_tokens == ref_code_tokens:
-                    cum_oracle_acc += 1
+                if cur_oracle == 0. and hyp_code_tokens == ref_code_tokens:
+                    cur_oracle = 1.
+
+            cum_oracle_acc += cur_oracle
 
     eval_result = {'accuracy': cum_acc / len(examples),
                    'oracle_accuracy': cum_oracle_acc / len(examples)}
