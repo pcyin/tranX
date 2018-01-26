@@ -19,7 +19,7 @@ from asdl.lang.py.py_utils import tokenize_code
 class Reconstructor(nn.Module):
     def __init__(self, args, vocab):
         super(Reconstructor, self).__init__()
-        self.seq2seq = Seq2SeqWithCopy(src_vocab=vocab.primitive, tgt_vocab=vocab.source,
+        self.seq2seq = Seq2SeqWithCopy(src_vocab=vocab.code, tgt_vocab=vocab.source,
                                        embed_size=args.embed_size, hidden_size=args.hidden_size,
                                        ptrnet_hidden_dim=args.ptrnet_hidden_dim,
                                        dropout=args.dropout,
@@ -35,7 +35,7 @@ class Reconstructor(nn.Module):
         # src_code = [self.tokenize_code(e.tgt_code) for e in examples]
         # tgt_nl = [e.src_sent for e in examples]
 
-        src_code_var = nn_utils.to_input_variable(src_codes, self.vocab.primitive, cuda=args.cuda)
+        src_code_var = nn_utils.to_input_variable(src_codes, self.vocab.code, cuda=args.cuda)
         tgt_nl_var = nn_utils.to_input_variable(tgt_nls, self.vocab.source, cuda=args.cuda, append_boundary_sym=True)
 
         tgt_token_copy_pos, tgt_token_copy_mask, tgt_token_gen_mask = self.get_generate_and_copy_meta_tensor(src_codes, tgt_nls)
@@ -68,7 +68,7 @@ class Reconstructor(nn.Module):
         return scores
 
     def tokenize_code(self, code):
-        return tokenize_code(code)
+        return tokenize_code(code, mode='decoder')
 
     def get_generate_and_copy_meta_tensor(self, src_codes, tgt_nls):
         tgt_token_copy_pos = []
@@ -93,11 +93,11 @@ class Reconstructor(nn.Module):
                     except ValueError:
                         pass
 
-                    if copy_mask and tgt_token in self.vocab.primitive:
+                    if copy_mask and tgt_token in self.vocab.code:
                         gen_mask = 1
-                    elif copy_mask and tgt_token not in self.vocab.primitive:
+                    elif copy_mask and tgt_token not in self.vocab.code:
                         gen_mask = 0
-                    elif copy_mask == 0 and tgt_token in self.vocab.primitive:
+                    elif copy_mask == 0 and tgt_token in self.vocab.code:
                         gen_mask = 1
                     else:
                         gen_mask = 1

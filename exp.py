@@ -3,6 +3,8 @@ from __future__ import print_function
 
 import argparse
 import cPickle as pickle
+import traceback
+
 import numpy as np
 import time
 import math
@@ -403,6 +405,11 @@ def train_semi(args):
                     unlabeled_examples)
             except ValueError as e:
                 print(e.message, file=sys.stderr)
+                continue
+            except Exception as e:
+                print('********** Error **********', file=sys.stderr)
+                traceback.print_exc(file=sys.stdout)
+                print('********** Error **********', file=sys.stderr)
                 continue
 
             report_unsup_encoder_loss += unsup_encoder_loss.sum().data[0]

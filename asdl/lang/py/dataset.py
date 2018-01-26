@@ -15,6 +15,7 @@ from asdl.asdl_ast import RealizedField
 from asdl.lang.py.py_asdl_helper import python_ast_to_asdl_ast, asdl_ast_to_python_ast
 from asdl.lang.py.py_transition_system import PythonTransitionSystem
 from asdl.hypothesis import *
+from asdl.lang.py.py_utils import tokenize_code
 
 from components.action_info import ActionInfo
 
@@ -145,7 +146,7 @@ class Django(object):
         return query_tokens, canonical_code, str_map
 
     @staticmethod
-    def parse_django_dataset(annot_file, code_file, asdl_file_path, max_query_len=70, vocab_freq_cutoff=5):
+    def parse_django_dataset(annot_file, code_file, asdl_file_path, max_query_len=70, vocab_freq_cutoff=10):
         asdl_text = open(asdl_file_path).read()
         grammar = ASDLGrammar.from_text(asdl_text)
         transition_system = PythonTransitionSystem(grammar)
@@ -195,7 +196,11 @@ class Django(object):
         primitive_vocab = VocabEntry.from_corpus(primitive_tokens, size=5000, freq_cutoff=vocab_freq_cutoff)
         assert '_STR:0_' in primitive_vocab
 
-        vocab = Vocab(source=src_vocab, primitive=primitive_vocab)
+        # generate vocabulary for the code tokens!
+        code_tokens = [tokenize_code(e['tgt_canonical_code'], mode='decoder') for e in loaded_examples]
+        code_vocab = VocabEntry.from_corpus(code_tokens, size=5000, freq_cutoff=vocab_freq_cutoff)
+
+        vocab = Vocab(source=src_vocab, primitive=primitive_vocab, code=code_vocab)
         print('generated vocabulary %s' % repr(vocab), file=sys.stderr)
 
         train_examples = []
@@ -266,10 +271,10 @@ class Django(object):
 
         (train, dev, test), vocab = Django.parse_django_dataset(annot_file, code_file, 'asdl/lang/py/py_asdl.txt')
 
-        pickle.dump(train, open('data/django/train.bin', 'w'))
-        pickle.dump(dev, open('data/django/dev.bin', 'w'))
-        pickle.dump(test, open('data/django/test.bin', 'w'))
-        pickle.dump(vocab, open('data/django/vocab.freq5.bin', 'w'))
+        # pickle.dump(train, open('data/django/train.bin', 'w'))
+        # pickle.dump(dev, open('data/django/dev.bin', 'w'))
+        # pickle.dump(test, open('data/django/test.bin', 'w'))
+        pickle.dump(vocab, open('data/django/vocab.freq10.bin', 'w'))
 
     @staticmethod
     def run():
@@ -306,6 +311,15 @@ class Django(object):
             assert hyp.tree == hyp2.tree and hyp.tree is not hyp2.tree
 
             print(idx)
+
+    @staticmethod
+    def canonicalize_raw_django_oneliner(code):
+        # use the astor-style code
+        code = Django.canonicalize_code(code)
+        py_ast = ast.parse(code).body[0]
+        code = astor.to_source(py_ast).strip()
+
+        return code
 
 
 if __name__ == '__main__':

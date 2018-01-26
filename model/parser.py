@@ -14,7 +14,7 @@ from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
 from asdl.hypothesis import Hypothesis, GenTokenAction
 from asdl.transition_system import ApplyRuleAction, ReduceAction, Action
-from components.DecodeHypothesis import DecodeHypothesis
+from components.decode_hypothesis import DecodeHypothesis
 from components.action_info import ActionInfo
 from components.dataset import Batch
 from model import nn_utils

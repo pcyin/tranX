@@ -11,7 +11,7 @@ if __name__ == '__main__':
     full_train_file = sys.argv[1]
     full_train_set = pickle.load(open(full_train_file))
 
-    splits = [3000, 5000, 8000, 10000]
+    splits = [2000, 3000, 5000, 8000, 10000]
     np.random.shuffle(full_train_set)
 
     fname, ext = os.path.splitext(full_train_file)

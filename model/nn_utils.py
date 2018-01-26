@@ -92,3 +92,16 @@ def to_input_variable(sequences, vocab, cuda=False, training=True, append_bounda
 
 def variable_constr(x, v, cuda=False):
     return Variable(torch.cuda.x(v)) if cuda else Variable(torch.x(v))
+
+
+def batch_iter(examples, batch_size, shuffle=False):
+    index_arr = np.arange(len(examples))
+    if shuffle:
+        np.random.shuffle(index_arr)
+
+    batch_num = int(np.ceil(len(examples) / float(batch_size)))
+    for batch_id in xrange(batch_num):
+        batch_ids = index_arr[batch_size * batch_id: batch_size * (batch_id + 1)]
+        batch_examples = [examples[i] for i in batch_ids]
+
+        yield batch_examples
