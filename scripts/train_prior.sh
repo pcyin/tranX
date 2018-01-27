@@ -5,7 +5,7 @@ dropout=0.2
 freq_cutoff=5
 model_name=prior.dropout${dropout}.freq_cutoff${freq_cutoff}
 
-python exp.py \
+python scripts/train_lstm_prior.py \
     --cuda \
     --batch_size 32 \
     --code_dir ${code_dir} \
