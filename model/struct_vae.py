@@ -15,6 +15,7 @@ from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
 from asdl.lang.py.py_asdl_helper import asdl_ast_to_python_ast
 from components.dataset import Example
+from model.prior import UniformPrior
 from parser import *
 from reconstruction_model import *
 
@@ -44,9 +45,11 @@ class StructVAE(nn.Module):
 
         # compute prior probability
         prior_scores = self.prior([e.tgt_code for e in samples])
-        prior_scores = Variable(b_x.data.new(prior_scores))
+        if isinstance(self.prior, UniformPrior):
+            prior_scores = Variable(b_x.data.new(prior_scores))
 
-        raw_learning_signal = reconstruction_scores - self.args.alpha * (sample_scores - prior_scores)
+        kl_term = self.args.alpha * (sample_scores - prior_scores)
+        raw_learning_signal = reconstruction_scores - kl_term
         learning_signal = raw_learning_signal.detach() - self.b - b_x
 
         # clip learning signal
@@ -67,7 +70,9 @@ class StructVAE(nn.Module):
                      'encoding_scores': sample_scores,
                      'raw_learning_signal': raw_learning_signal,
                      'learning_signal': learning_signal,
-                     'baseline': self.b + b_x}
+                     'baseline': self.b + b_x,
+                     'kl_term': kl_term,
+                     'prior': prior_scores}
 
         return encoder_loss, decoder_loss, baseline_loss, meta_data
 
@@ -116,7 +121,7 @@ class StructVAE(nn.Module):
         fname, ext = os.path.splitext(path)
         self.encoder.save(fname + '.encoder' + ext)
         self.decoder.save(fname + '.decoder' + ext)
-        state_dict = {k: v for k, v in self.state_dict().iteritems() if not (k.startswith('decoder') or k.startswith('encoder'))}
+        state_dict = {k: v for k, v in self.state_dict().iteritems() if not (k.startswith('decoder') or k.startswith('encoder') or k.startswith('prior'))}
 
         params = {
             'args': self.args,
@@ -135,3 +140,7 @@ class StructVAE(nn.Module):
 
         vae_states = torch.load(path, map_location=lambda storage, loc: storage)['state_dict']
         self.load_state_dict(vae_states, strict=False)
+
+    def train(self):
+        super(StructVAE, self).train()
+        self.prior.eval()

@@ -11,6 +11,7 @@ import math
 
 import sys
 import torch
+from torch.autograd import Variable
 
 import evaluation
 from asdl.asdl import ASDLGrammar
@@ -18,7 +19,7 @@ from asdl.lang.py.py_transition_system import PythonTransitionSystem
 from components.dataset import Dataset
 
 from model.parser import Parser
-from model.prior import UniformPrior
+from model.prior import UniformPrior, LSTMPrior
 from model.reconstruction_model import Reconstructor
 from model.struct_vae import StructVAE
 
@@ -58,6 +59,8 @@ def init_config():
     parser.add_argument('--prior_lm_path', type=str, help='path to the prior LM')
 
     # semi-supervised learning arguments
+    parser.add_argument('--prior', choices=['lstm', 'uniform'])
+    parser.add_argument('--load_prior', type=str, default=None)
     parser.add_argument('--clip_learning_signal', type=float, default=None)
     parser.add_argument('--begin_semisup_after_dev_acc', type=float, default=0., help='begin semi-supervised learning after'
                                                                                     'we have reached certain dev performance')
@@ -345,7 +348,13 @@ def train_semi(args):
     encoder.load_state_dict(encoder_params['state_dict'])
     decoder = Reconstructor(decoder_params['args'], decoder_params['vocab'])
     decoder.load_state_dict(decoder_params['state_dict'])
-    prior = UniformPrior()
+
+    if args.prior == 'lstm':
+        prior = LSTMPrior.load(args.load_prior, args.cuda)
+        print('loaded prior at %s' % args.load_prior, file=sys.stderr)
+        prior.eval()
+    else:
+        prior = UniformPrior()
 
     structVAE = StructVAE(encoder, decoder, prior, args)
     structVAE.train()
@@ -446,6 +455,8 @@ def train_semi(args):
                 #                                                                        meta_data['learning_signal'].mean().data[0]), file=sys.stderr)
 
                 samples = meta_data['samples']
+                for v in meta_data.itervalues():
+                    if isinstance(v, Variable): v.cpu()
                 for i, sample in enumerate(samples[:15]):
                     print('\t[%s] Source: %s' % (sample.idx, ' '.join(sample.src_sent)), file=sys.stderr)
                     print('\t[%s] Code: \n%s' % (sample.idx, sample.tgt_code), file=sys.stderr)
@@ -453,6 +464,8 @@ def train_semi(args):
                     print('\t[%s] Gold Code: \n%s' % (sample.idx, ref_example.tgt_code), file=sys.stderr)
                     print('\t[%s] Log p(z|x): %f' % (sample.idx, meta_data['encoding_scores'][i].data[0]), file=sys.stderr)
                     print('\t[%s] Log p(x|z): %f' % (sample.idx, meta_data['reconstruction_scores'][i].data[0]), file=sys.stderr)
+                    print('\t[%s] KL term: %f' % (sample.idx, meta_data['kl_term'][i].data[0]), file=sys.stderr)
+                    print('\t[%s] Piror: %f' % (sample.idx, meta_data['prior'][i].data[0]), file=sys.stderr)
                     print('\t[%s] b + b_x: %f' % (sample.idx, meta_data['baseline'][i].data[0]), file=sys.stderr)
                     print('\t[%s] Raw Learning Signal: %f' % (sample.idx, meta_data['raw_learning_signal'][i].data[0]), file=sys.stderr)
                     print('\t[%s] Learning Signal - baseline: %f' % (sample.idx, meta_data['learning_signal'][i].data[0]), file=sys.stderr)
