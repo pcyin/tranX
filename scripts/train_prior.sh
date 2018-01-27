@@ -13,6 +13,6 @@ python exp.py \
     --freq_cutoff ${freq_cutoff} \
     --patience 5 \
     --max_num_trial 5 \
-    --lr_decay ${lr_decay} \
+    --lr_decay 0.5 \
     --log_every 10 \
     --save_to saved_models/prior/${model_name} 2>logs/${model_name}.log
