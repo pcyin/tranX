@@ -37,6 +37,7 @@ def init_config():
     parser.add_argument('--load_decoder', default=None, type=str)
 
     parser.add_argument('--batch_size', default=10, type=int, help='batch size')
+    parser.add_argument('--unsup_batch_size', default=10, type=int)
     parser.add_argument('--beam_size', default=5, type=int, help='beam size for beam search')
     parser.add_argument('--sample_size', default=5, type=int, help='sample size')
     parser.add_argument('--embed_size', default=128, type=int, help='size of word embeddings')
@@ -383,7 +384,7 @@ def train_semi(args):
     while True:
         epoch += 1
         epoch_begin = time.time()
-        unlabeled_examples_iter = unlabeled_data.batch_iter(batch_size=args.batch_size, shuffle=True)
+        unlabeled_examples_iter = unlabeled_data.batch_iter(batch_size=args.unsup_batch_size, shuffle=True)
 
         for labeled_examples in labeled_data.batch_iter(batch_size=args.batch_size, shuffle=True):
             labeled_examples = [e for e in labeled_examples if len(e.tgt_actions) <= args.decode_max_time_step]
