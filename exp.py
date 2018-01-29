@@ -469,7 +469,7 @@ def train_semi(args):
                     print('\t[%s] Log p(z|x): %f' % (sample.idx, meta_data['encoding_scores'][i].data[0]), file=sys.stderr)
                     print('\t[%s] Log p(x|z): %f' % (sample.idx, meta_data['reconstruction_scores'][i].data[0]), file=sys.stderr)
                     print('\t[%s] KL term: %f' % (sample.idx, meta_data['kl_term'][i].data[0]), file=sys.stderr)
-                    print('\t[%s] Piror: %f' % (sample.idx, meta_data['prior'][i].data[0]), file=sys.stderr)
+                    print('\t[%s] Prior: %f' % (sample.idx, meta_data['prior'][i].data[0]), file=sys.stderr)
                     print('\t[%s] b + b_x: %f' % (sample.idx, meta_data['baseline'][i].data[0]), file=sys.stderr)
                     print('\t[%s] Raw Learning Signal: %f' % (sample.idx, meta_data['raw_learning_signal'][i].data[0]), file=sys.stderr)
                     print('\t[%s] Learning Signal - baseline: %f' % (sample.idx, meta_data['learning_signal'][i].data[0]), file=sys.stderr)
@@ -491,9 +491,9 @@ def train_semi(args):
         is_better = history_dev_scores == [] or dev_acc > max(history_dev_scores)
         history_dev_scores.append(dev_acc)
 
-        model_file = args.save_to + '.iter%d.bin' % train_iter
-        print('save model to [%s]' % model_file, file=sys.stderr)
-        structVAE.save(model_file)
+        # model_file = args.save_to + '.iter%d.bin' % train_iter
+        # print('save model to [%s]' % model_file, file=sys.stderr)
+        # structVAE.save(model_file)
 
         if is_better:
             patience = 0
