@@ -4,6 +4,7 @@ from __future__ import print_function
 import argparse
 import cPickle as pickle
 import traceback
+from itertools import ifilter
 
 import numpy as np
 import time
@@ -352,6 +353,9 @@ def train_semi(args):
     if args.prior == 'lstm':
         prior = LSTMPrior.load(args.load_prior, args.cuda)
         print('loaded prior at %s' % args.load_prior, file=sys.stderr)
+        # freeze prior parameters
+        for p in prior.parameters():
+            p.requires_grad = False
         prior.eval()
     else:
         prior = UniformPrior()
@@ -366,7 +370,7 @@ def train_semi(args):
     dev_set = Dataset.from_bin_file(args.dev_file)
     # dev_set.examples = dev_set.examples[:10]
 
-    optimizer = torch.optim.Adam(structVAE.parameters(), lr=args.lr)
+    optimizer = torch.optim.Adam(ifilter(lambda p: p.requires_grad, structVAE.parameters()), lr=args.lr)
 
     print('*** begin semi-supervised training %d labeled examples, %d unlabeled examples ***' %
           (len(labeled_data), len(unlabeled_data)), file=sys.stderr)
@@ -524,7 +528,7 @@ def train_semi(args):
             # load optimizers
             if args.reset_optimizer:
                 print('reset to a new infer_optimizer', file=sys.stderr)
-                optimizer = torch.optim.Adam(structVAE.encoder.parameters(), lr=lr)
+                optimizer = torch.optim.Adam(ifilter(lambda p: p.requires_grad, structVAE.parameters()), lr=lr)
             else:
                 print('restore parameters of the optimizers', file=sys.stderr)
                 optimizer.load_state_dict(torch.load(args.save_to + '.optim.bin'))
