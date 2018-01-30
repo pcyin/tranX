@@ -439,6 +439,7 @@ def train_semi(args):
                 print('batch unlabeled examples: ', file=sys.stderr)
                 for example in unlabeled_examples:
                     print('%s %s' % (example.idx, ' '.join(example.src_sent)), file=sys.stderr)
+                print(e.message, file=sys.stderr)
                 traceback.print_exc(file=sys.stderr)
                 print('********** Error **********', file=sys.stderr)
                 continue
