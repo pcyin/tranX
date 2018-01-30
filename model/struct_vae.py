@@ -172,3 +172,7 @@ class StructVAE_LMBaseline(StructVAE):
         p_lm = -self.b_lm(src_sent_var)
 
         return self.b_lm_weight * p_lm - self.b
+    
+    def train(self):
+        super(StructVAE_LMBaseline, self).train()
+        self.b_lm.eval()
