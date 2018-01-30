@@ -363,7 +363,8 @@ class Parser(nn.Module):
 
             # Variable(batch_size, primitive_vocab_size)
             primitive_prob = primitive_predictor_prob[:, 0].unsqueeze(1) * gen_from_vocab_prob
-            primitive_prob[:, primitive_vocab.unk_id] = 0.
+            if src_unk_pos_list:
+                primitive_prob[:, primitive_vocab.unk_id] = 0.
 
             gentoken_prev_hyp_ids = []
             gentoken_new_hyp_unks = []

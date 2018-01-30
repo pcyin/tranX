@@ -436,20 +436,20 @@ def train_semi(args):
             except ValueError as e:
                 print(e.message, file=sys.stderr)
                 continue
-            except Exception as e:
-                print('********** Error **********', file=sys.stderr)
-                print('batch labeled examples: ', file=sys.stderr)
-                for example in labeled_examples:
-                    print('%s %s' % (example.idx, ' '.join(example.src_sent)), file=sys.stderr)
-                print('batch unlabeled examples: ', file=sys.stderr)
-                for example in unlabeled_examples:
-                    print('%s %s' % (example.idx, ' '.join(example.src_sent)), file=sys.stderr)
-                print(e.message, file=sys.stderr)
-                traceback.print_exc(file=sys.stderr)
-                for k, v in meta_data.iteritems():
-                    print('%s: %s' % (k, v), file=sys.stderr)
-                print('********** Error **********', file=sys.stderr)
-                continue
+            # except Exception as e:
+            #     print('********** Error **********', file=sys.stderr)
+            #     print('batch labeled examples: ', file=sys.stderr)
+            #     for example in labeled_examples:
+            #         print('%s %s' % (example.idx, ' '.join(example.src_sent)), file=sys.stderr)
+            #     print('batch unlabeled examples: ', file=sys.stderr)
+            #     for example in unlabeled_examples:
+            #         print('%s %s' % (example.idx, ' '.join(example.src_sent)), file=sys.stderr)
+            #     print(e.message, file=sys.stderr)
+            #     traceback.print_exc(file=sys.stderr)
+            #     for k, v in meta_data.iteritems():
+            #         print('%s: %s' % (k, v), file=sys.stderr)
+            #     print('********** Error **********', file=sys.stderr)
+            #     continue
 
             unsup_loss = torch.mean(unsup_encoder_loss) + torch.mean(unsup_decoder_loss) + torch.mean(unsup_baseline_loss)
 
