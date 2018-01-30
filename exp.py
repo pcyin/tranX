@@ -18,11 +18,12 @@ import evaluation
 from asdl.asdl import ASDLGrammar
 from asdl.lang.py.py_transition_system import PythonTransitionSystem
 from components.dataset import Dataset
+from model.neural_lm import LSTMLanguageModel
 
 from model.parser import Parser
 from model.prior import UniformPrior, LSTMPrior
 from model.reconstruction_model import Reconstructor
-from model.struct_vae import StructVAE
+from model.struct_vae import StructVAE, StructVAE_LMBaseline
 
 
 def init_config():
@@ -34,7 +35,6 @@ def init_config():
     parser.add_argument('--lstm', choices=['lstm', 'lstm_with_dropout'], default='lstm')
 
     parser.add_argument('--load_model', default=None, type=str, help='load a pre-trained model')
-    parser.add_argument('--load_decoder', default=None, type=str)
 
     parser.add_argument('--batch_size', default=10, type=int, help='batch size')
     parser.add_argument('--unsup_batch_size', default=10, type=int)
@@ -61,6 +61,10 @@ def init_config():
     parser.add_argument('--prior_lm_path', type=str, help='path to the prior LM')
 
     # semi-supervised learning arguments
+    parser.add_argument('--load_decoder', default=None, type=str)
+    parser.add_argument('--load_src_lm', default=None, type=str)
+
+    parser.add_argument('--baseline', choices=['mlp', 'src_lm'], default='mlp')
     parser.add_argument('--prior', choices=['lstm', 'uniform'])
     parser.add_argument('--load_prior', type=str, default=None)
     parser.add_argument('--clip_learning_signal', type=float, default=None)
@@ -361,7 +365,15 @@ def train_semi(args):
     else:
         prior = UniformPrior()
 
-    structVAE = StructVAE(encoder, decoder, prior, args)
+    if args.baseline == 'mlp':
+        structVAE = StructVAE(encoder, decoder, prior, args)
+    elif args.baseline == 'src_lm':
+        src_lm = LSTMLanguageModel.load(args.load_src_lm)
+        print('loaded source LM at %s' % args.load_src_lm, file=sys.stderr)
+        structVAE = StructVAE_LMBaseline(encoder, decoder, prior, src_lm, args)
+    else:
+        raise ValueError('unknown baseline')
+
     structVAE.train()
     if args.cuda: structVAE.cuda()
 
@@ -459,6 +471,12 @@ def train_semi(args):
                 #                                                                        meta_data['raw_learning_signal'].mean().data[0],
                 #                                                                        meta_data['learning_signal'].mean().data[0]), file=sys.stderr)
 
+                if isinstance(structVAE, StructVAE_LMBaseline):
+                    print('[Iter %d] baseline: source LM b_lm_weight: %.3f, b: %.3f' % (train_iter,
+                                                                                        structVAE.b_lm_weight.data[0],
+                                                                                        structVAE.b.data[0]),
+                          file=sys.stderr)
+
                 samples = meta_data['samples']
                 for v in meta_data.itervalues():
                     if isinstance(v, Variable): v.cpu()
@@ -471,7 +489,7 @@ def train_semi(args):
                     print('\t[%s] Log p(x|z): %f' % (sample.idx, meta_data['reconstruction_scores'][i].data[0]), file=sys.stderr)
                     print('\t[%s] KL term: %f' % (sample.idx, meta_data['kl_term'][i].data[0]), file=sys.stderr)
                     print('\t[%s] Prior: %f' % (sample.idx, meta_data['prior'][i].data[0]), file=sys.stderr)
-                    print('\t[%s] b + b_x: %f' % (sample.idx, meta_data['baseline'][i].data[0]), file=sys.stderr)
+                    print('\t[%s] baseline: %f' % (sample.idx, meta_data['baseline'][i].data[0]), file=sys.stderr)
                     print('\t[%s] Raw Learning Signal: %f' % (sample.idx, meta_data['raw_learning_signal'][i].data[0]), file=sys.stderr)
                     print('\t[%s] Learning Signal - baseline: %f' % (sample.idx, meta_data['learning_signal'][i].data[0]), file=sys.stderr)
                     print('\t[%s] Encoder Loss: %f' % (sample.idx, unsup_encoder_loss[i].data[0]), file=sys.stderr)
