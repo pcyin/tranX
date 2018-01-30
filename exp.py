@@ -433,7 +433,13 @@ def train_semi(args):
                 continue
             except Exception as e:
                 print('********** Error **********', file=sys.stderr)
-                traceback.print_exc(file=sys.stdout)
+                print('batch labeled examples: ', file=sys.stderr)
+                for example in labeled_examples:
+                    print('%s %s' % (example.idx, ' '.join(example.src_sent)), file=sys.stderr)
+                print('batch unlabeled examples: ', file=sys.stderr)
+                for example in unlabeled_examples:
+                    print('%s %s' % (example.idx, ' '.join(example.src_sent)), file=sys.stderr)
+                traceback.print_exc(file=sys.stderr)
                 print('********** Error **********', file=sys.stderr)
                 continue
 
