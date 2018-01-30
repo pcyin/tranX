@@ -84,7 +84,7 @@ class StructVAE(nn.Module):
 
         b_x = self.b_x_l2(F.tanh(self.b_x_l1(enc_states.detach()))).view(-1)
 
-        return b_x - self.b
+        return b_x + self.b
 
     def infer(self, examples):
         # currently use beam search as sampling method
