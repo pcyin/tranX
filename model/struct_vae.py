@@ -160,10 +160,10 @@ class StructVAE_LMBaseline(StructVAE):
         del self.b_x_l2
 
         self.b_lm = src_lm
-        self.b_lm_weight = nn.Parameter(torch.FloatTensor([1.]))
+        self.b_lm_weight = nn.Parameter(torch.FloatTensor([.5]))
 
         # initialize baseline to be a small negative number
-        self.b.data.fill_(0.)
+        self.b.data.fill_(-2.)
 
     def baseline(self, samples, enc_states):
         src_sent_var = nn_utils.to_input_variable([e.src_sent for e in samples],
