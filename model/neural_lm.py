@@ -55,6 +55,14 @@ class LSTMLanguageModel(nn.Module):
 
         return scores
 
+    @classmethod
+    def load(self, model_path, cuda=False):
+        params = torch.load(model_path, map_location=lambda storage, loc: storage)
+        model = LSTMLanguageModel(params['vocab'], *params['args'])
+        model.load_state_dict(params['state_dict'])
+
+        return model
+
     def save(self, path):
         dir_name = os.path.dirname(path)
         if not os.path.exists(dir_name):

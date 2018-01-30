@@ -32,19 +32,11 @@ def init_config():
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', default=5783287, type=int, help='random seed')
     parser.add_argument('--cuda', action='store_true', default=False, help='use gpu')
-    parser.add_argument('--mode', choices=['train', 'train_decoder', 'train_semi', 'test', 'debug_ls'], default='train', help='run mode')
-
-    parser.add_argument('--lstm', choices=['lstm', 'lstm_with_dropout'], default='lstm')
-
-    parser.add_argument('--load_model', default=None, type=str, help='load a pre-trained model')
 
     parser.add_argument('--batch_size', default=10, type=int, help='batch size')
     parser.add_argument('--embed_size', default=128, type=int, help='size of word embeddings')
     parser.add_argument('--hidden_size', default=256, type=int, help='size of LSTM hidden states')
     parser.add_argument('--dropout', default=0., type=float, help='dropout rate')
-    parser.add_argument('--decoder_word_dropout', default=0.3, type=float, help='word dropout on decoder')
-    parser.add_argument('--kl_anneal', default=False, action='store_true')
-    parser.add_argument('--alpha', default=0.1, type=float)
 
     parser.add_argument('--vocab', type=str, help='path of the serialized vocabulary')
     parser.add_argument('--train_file', type=str, help='path to the training target file')

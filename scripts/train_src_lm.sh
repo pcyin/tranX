@@ -8,9 +8,8 @@ embed_size=128
 lr_decay=0.5
 model_name=src_lm.hidden${hidden_size}.embed${embed_size}.dropout${dropout}.lr_decay${lr_decay}.${vocab}.${train_file}
 
-python exp.py \
+python scripts/train_src_lm \
     --cuda \
-    --mode train_decoder \
     --batch_size 10 \
     --train_file ../data/django/${train_file} \
     --dev_file ../data/django/dev.bin \
