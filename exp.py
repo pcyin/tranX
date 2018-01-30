@@ -428,6 +428,11 @@ def train_semi(args):
             try:
                 unsup_encoder_loss, unsup_decoder_loss, unsup_baseline_loss, meta_data = structVAE.get_unsupervised_loss(
                     unlabeled_examples)
+
+                report_unsup_encoder_loss += unsup_encoder_loss.sum().data[0]
+                report_unsup_decoder_loss += unsup_decoder_loss.sum().data[0]
+                report_unsup_baseline_loss += unsup_baseline_loss.sum().data[0]
+                report_unsup_examples += unsup_encoder_loss.size(0)
             except ValueError as e:
                 print(e.message, file=sys.stderr)
                 continue
@@ -441,13 +446,10 @@ def train_semi(args):
                     print('%s %s' % (example.idx, ' '.join(example.src_sent)), file=sys.stderr)
                 print(e.message, file=sys.stderr)
                 traceback.print_exc(file=sys.stderr)
+                for k, v in meta_data.iteritems():
+                    print('%s: %s' % (k, v), file=sys.stderr)
                 print('********** Error **********', file=sys.stderr)
                 continue
-
-            report_unsup_encoder_loss += unsup_encoder_loss.sum().data[0]
-            report_unsup_decoder_loss += unsup_decoder_loss.sum().data[0]
-            report_unsup_baseline_loss += unsup_baseline_loss.sum().data[0]
-            report_unsup_examples += unsup_encoder_loss.size(0)
 
             unsup_loss = torch.mean(unsup_encoder_loss) + torch.mean(unsup_decoder_loss) + torch.mean(unsup_baseline_loss)
 
