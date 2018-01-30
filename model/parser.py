@@ -472,7 +472,10 @@ class Parser(nn.Module):
                     #     exit(-1)
 
                     if token_id == primitive_vocab.unk_id:
-                        token = gentoken_new_hyp_unks[k]
+                        if gentoken_new_hyp_unks:
+                            token = gentoken_new_hyp_unks[k]
+                        else:
+                            token = primitive_vocab.id2word[primitive_vocab.unk_id]
                     else:
                         token = primitive_vocab.id2word[token_id]
 
