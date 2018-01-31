@@ -48,9 +48,10 @@ class Parser(nn.Module):
         if args.lstm == 'lstm':
             self.encoder_lstm = nn.LSTM(args.embed_size, args.hidden_size / 2, bidirectional=True)
             self.decoder_lstm = nn.LSTMCell(args.action_embed_size +  # previous action
-                                         args.action_embed_size + args.field_embed_size + args.type_embed_size +  # frontier info
-                                         args.hidden_size,  # parent hidden state
-                                         args.hidden_size)
+                                            args.action_embed_size + args.field_embed_size + args.type_embed_size +  # frontier info
+                                            args.hidden_size +  # parent hidden state
+                                            args.hidden_size,   # input feeding
+                                            args.hidden_size)
         else:
             from lstm import LSTM, LSTMCell
             self.encoder_lstm = LSTM(args.embed_size, args.hidden_size / 2, bidirectional=True, dropout=args.dropout)
@@ -233,6 +234,7 @@ class Parser(nn.Module):
                 a_tm1_embeds = torch.stack(a_tm1_embeds)
 
                 x = torch.cat([a_tm1_embeds,
+                               att_tm1,
                                self.production_embed(batch.get_frontier_prod_idx(t)),
                                self.field_embed(batch.get_frontier_field_idx(t)),
                                self.type_embed(batch.get_frontier_field_type_idx(t))], dim=-1)
@@ -251,6 +253,7 @@ class Parser(nn.Module):
             history_states.append(h_t)
             att_vecs.append(att_t)
             h_tm1 = (h_t, cell_t)
+            att_tm1 = att_t
 
         att_vecs = torch.stack(att_vecs)
         return att_vecs
@@ -337,6 +340,7 @@ class Parser(nn.Module):
                 hist_states = torch.stack([hyp_states[hyp_id][p_t] for hyp_id, p_t in enumerate(p_ts)])
 
                 x = torch.cat([a_tm1_embeds,
+                               att_tm1,
                                frontier_prod_embeds,
                                frontier_field_embeds,
                                frontier_field_type_embeds,
@@ -504,6 +508,7 @@ class Parser(nn.Module):
             if live_hyp_ids:
                 hyp_states = [hyp_states[i] + [h_t[i]] for i in live_hyp_ids]
                 h_tm1 = (h_t[live_hyp_ids], cell_t[live_hyp_ids])
+                att_tm1 = att_t[live_hyp_ids]
                 hypotheses = new_hypotheses
                 hyp_scores = Variable(self.new_tensor([hyp.score for hyp in hypotheses]))
                 t += 1
