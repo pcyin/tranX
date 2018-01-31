@@ -23,7 +23,7 @@ from model.neural_lm import LSTMLanguageModel
 from model.parser import Parser
 from model.prior import UniformPrior, LSTMPrior
 from model.reconstruction_model import Reconstructor
-from model.struct_vae import StructVAE, StructVAE_LMBaseline
+from model.struct_vae import StructVAE, StructVAE_LMBaseline, StructVAE_SrcLmAndLinearBaseline
 
 
 def init_config():
@@ -64,7 +64,7 @@ def init_config():
     parser.add_argument('--load_decoder', default=None, type=str)
     parser.add_argument('--load_src_lm', default=None, type=str)
 
-    parser.add_argument('--baseline', choices=['mlp', 'src_lm'], default='mlp')
+    parser.add_argument('--baseline', choices=['mlp', 'src_lm', 'src_lm_and_linear'], default='mlp')
     parser.add_argument('--prior', choices=['lstm', 'uniform'])
     parser.add_argument('--load_prior', type=str, default=None)
     parser.add_argument('--clip_learning_signal', type=float, default=None)
@@ -367,10 +367,11 @@ def train_semi(args):
 
     if args.baseline == 'mlp':
         structVAE = StructVAE(encoder, decoder, prior, args)
-    elif args.baseline == 'src_lm':
+    elif args.baseline == 'src_lm' or args.baseline == 'src_lm_and_linear':
         src_lm = LSTMLanguageModel.load(args.load_src_lm)
         print('loaded source LM at %s' % args.load_src_lm, file=sys.stderr)
-        structVAE = StructVAE_LMBaseline(encoder, decoder, prior, src_lm, args)
+        Baseline = StructVAE_LMBaseline if args.baseline == 'src_lm' else StructVAE_SrcLmAndLinearBaseline
+        structVAE = Baseline(encoder, decoder, prior, src_lm, args)
     else:
         raise ValueError('unknown baseline')
 

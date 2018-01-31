@@ -176,3 +176,19 @@ class StructVAE_LMBaseline(StructVAE):
     def train(self):
         super(StructVAE_LMBaseline, self).train()
         self.b_lm.eval()
+
+
+class StructVAE_SrcLmAndLinearBaseline(StructVAE_LMBaseline):
+    def __init__(self, encoder, decoder, prior, src_lm, args):
+        super(StructVAE_SrcLmAndLinearBaseline, self).__init__(encoder, decoder, prior, src_lm, args)
+
+        # For MLP baseline
+        # for baseline
+        self.b_x_l1 = nn.Linear(args.hidden_size, 1)
+
+    def baseline(self, samples, enc_states):
+        b_linear = self.b_x_l1(enc_states.detach()).view(-1)
+
+        b_lm = super(StructVAE_SrcLmAndLinearBaseline, self).baseline(samples, enc_states)
+
+        return b_linear + b_lm
