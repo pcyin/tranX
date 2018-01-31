@@ -57,13 +57,18 @@ def evaluate(examples, parser, args, verbose=False):
             ref_reformatted_code = astor.to_source(ref_py_ast).strip()
 
             cur_oracle = 0.
+            hyp_code_set = set()
             for hyp_id, (hyp, hyp_code) in enumerate(hyps):
                 try:
                     ref_code_tokens = tokenize_py_code(ref_reformatted_code)
                     hyp_code_tokens = tokenize_py_code(hyp_code)
                 except:
-                    print('error in tokenizing [%s]' % hyp_code, file=sys.stderr)
+                    print('Hyp Id [%d] error in tokenizing [%s]' % (hyp_id, hyp_code), file=sys.stderr)
                     continue
+
+                if hyp_code in hyp_code_set:
+                    print('Duplicate Hyp Example [%d], Code %s' % (example.idx, hyp_code), file=sys.stderr)
+                hyp_code_set.add(hyp_code)
 
                 if hyp_id == 0 and hyp_code_tokens == ref_code_tokens:
                     cum_acc += 1

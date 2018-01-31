@@ -1,4 +1,5 @@
 # coding=utf-8
+import os
 from itertools import chain
 
 import torch
@@ -16,6 +17,9 @@ class LSTMLanguageModel(nn.Module):
         super(LSTMLanguageModel, self).__init__()
 
         self.vocab = vocab
+        self.embed_size = embed_size
+        self.hidden_size = hidden_size
+        self.dropout_rate = dropout
 
         self.embed = nn.Embedding(len(vocab), embed_size)
         nn.init.xavier_normal(self.embed.weight)
@@ -50,3 +54,24 @@ class LSTMLanguageModel(nn.Module):
         scores = scores.sum(dim=0)
 
         return scores
+
+    @classmethod
+    def load(self, model_path, cuda=False):
+        params = torch.load(model_path, map_location=lambda storage, loc: storage)
+        model = LSTMLanguageModel(params['vocab'], *params['args'])
+        model.load_state_dict(params['state_dict'])
+
+        return model
+
+    def save(self, path):
+        dir_name = os.path.dirname(path)
+        if not os.path.exists(dir_name):
+            os.makedirs(dir_name)
+
+        params = {
+            'args': (self.embed_size, self.hidden_size, self.dropout_rate),
+            'vocab': self.vocab,
+            'state_dict': self.state_dict()
+        }
+
+        torch.save(params, path)

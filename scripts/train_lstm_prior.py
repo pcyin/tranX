@@ -2,13 +2,14 @@
 from __future__ import print_function
 
 import ast
+import fnmatch
 import traceback
 
 import astor
 import time
 
 import sys
-
+import os
 from asdl.lang.py.dataset import Django
 from asdl.lang.py.py_utils import tokenize_code
 from components.vocab import *
@@ -20,32 +21,48 @@ import numpy as np
 from model.prior import LSTMPrior
 
 
-def load_code_data(file_path, args):
+def load_code_dir(code_dir):
+    all_code = []
+    for root, dirnames, filenames in os.walk(code_dir):
+        for filename in fnmatch.filter(filenames, '*.py'):
+            file_path = os.path.join(root, filename)
+            print('parsing %s' % file_path, file=sys.stderr)
+            code_data = load_code_data(file_path)
+            all_code.extend(code_data)
+
+    return all_code
+
+
+def load_code_data(file_path):
     # read in lines of Python code to train a prior
     processed_code = []
     for line in open(file_path):
         raw_code = line.strip()
         # perform canonicalization same as how we pre-process the dataset
-        code = Django.canonicalize_code(raw_code)
-        try:
-            # use the astor-style code
-            py_ast = ast.parse(code).body[0]
-            code = astor.to_source(py_ast).strip()
-            code_tokens = tokenize_code(code, mode='canonicalize')
-            if len(code_tokens) < 50:
-                processed_code.append({'code': code, 'tokens': code_tokens})
-        except:
-            print("Exception in reading line: %s" % raw_code, file=sys.stdout)
-            print('-' * 60, file=sys.stdout)
-            traceback.print_exc(file=sys.stdout)
-            print('-' * 60, file=sys.stdout)
+        if raw_code:
+            code = Django.canonicalize_code(raw_code)
+            try:
+                # use the astor-style code
+                py_ast = ast.parse(code).body[0]
+                code = astor.to_source(py_ast).strip()
+                code_tokens = tokenize_code(code, mode='canonicalize')
+                if len(code_tokens) < 50:
+                    processed_code.append({'code': code, 'tokens': code_tokens})
+            except:
+                print("Exception in reading line: %s" % raw_code, file=sys.stdout)
+                print('-' * 60, file=sys.stdout)
+                traceback.print_exc(file=sys.stdout)
+                print('-' * 60, file=sys.stdout)
 
     return processed_code
 
 
 def train_lstm_lm(args):
-    train_data = load_code_data(args.train_file, args)
-    dev_data = load_code_data(args.dev_file, args)
+    all_data = load_code_dir(args.code_dir)
+    np.random.shuffle(all_data)
+    train_data = all_data[:-1000]
+    dev_data = all_data[-1000:]
+    print('train data size: %d, dev data size: %d' % (len(train_data), len(dev_data)), file=sys.stderr)
 
     vocab = VocabEntry.from_corpus([e['tokens'] for e in train_data], size=args.vocab_size, freq_cutoff=args.freq_cutoff)
     print('vocab size: %d' % len(vocab), file=sys.stderr)
@@ -174,10 +191,11 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', default=32, type=int, help='batch size')
     parser.add_argument('--embed_size', default=128, type=int, help='size of word embeddings')
     parser.add_argument('--hidden_size', default=256, type=int, help='size of LSTM hidden states')
-    parser.add_argument('--dropout', default=0., type=float, help='dropout rate')
+    parser.add_argument('--dropout', default=0.4, type=float, help='dropout rate')
     parser.add_argument('--vocab_size', default=10000, type=int, help='vocab size')
     parser.add_argument('--freq_cutoff', default=5, type=int, help='vocab size')
 
+    parser.add_argument('--code_dir', type=str)
     parser.add_argument('--train_file', type=str, help='path to the training target file')
     parser.add_argument('--dev_file', type=str, help='path to the dev source file')
 

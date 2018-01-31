@@ -19,6 +19,9 @@ class Prior(object):
     def __call__(self, code_list):
         raise NotImplementedError
 
+    def eval(self):
+        pass
+
 
 class UniformPrior(Prior):
     def __init__(self, **kwargs):
@@ -40,7 +43,7 @@ class LSTMPrior(LSTMLanguageModel, Prior):
         code_var = nn_utils.to_input_variable(code_tokens, self.vocab,
                                               cuda=self.args.cuda, append_boundary_sym=True)
 
-        return self.forward(code_var)
+        return -self.forward(code_var)
 
     @classmethod
     def load(self, model_path, cuda=False):

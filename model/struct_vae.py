@@ -6,6 +6,7 @@ import traceback
 
 import os
 import astor
+import copy
 import torch
 import torch.nn as nn
 import torch.nn.utils
@@ -15,6 +16,7 @@ from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
 from asdl.lang.py.py_asdl_helper import asdl_ast_to_python_ast
 from components.dataset import Example
+from model.prior import UniformPrior
 from parser import *
 from reconstruction_model import *
 
@@ -38,16 +40,19 @@ class StructVAE(nn.Module):
         self.b.data.fill_(-20.)
 
     def get_unsupervised_loss(self, examples):
-        samples, sample_scores, b_x = self.infer(examples)
+        samples, sample_scores, enc_states = self.infer(examples)
 
         reconstruction_scores = self.decoder.score(samples)
 
         # compute prior probability
         prior_scores = self.prior([e.tgt_code for e in samples])
-        prior_scores = Variable(b_x.data.new(prior_scores))
+        if isinstance(self.prior, UniformPrior):
+            prior_scores = Variable(sample_scores.data.new(prior_scores))
 
-        raw_learning_signal = reconstruction_scores - self.args.alpha * (sample_scores - prior_scores)
-        learning_signal = raw_learning_signal.detach() - self.b - b_x
+        kl_term = self.args.alpha * (sample_scores - prior_scores)
+        raw_learning_signal = reconstruction_scores - kl_term
+        baseline = self.baseline(samples, enc_states)
+        learning_signal = raw_learning_signal.detach() - baseline
 
         # clip learning signal
         if self.args.clip_learning_signal is not None:
@@ -67,9 +72,19 @@ class StructVAE(nn.Module):
                      'encoding_scores': sample_scores,
                      'raw_learning_signal': raw_learning_signal,
                      'learning_signal': learning_signal,
-                     'baseline': self.b + b_x}
+                     'baseline': baseline,
+                     'kl_term': kl_term,
+                     'prior': prior_scores}
 
         return encoder_loss, decoder_loss, baseline_loss, meta_data
+
+    def baseline(self, samples, enc_states):
+        # compute baseline, which is an MLP
+        # (sample_size) FIXME: reward is log-likelihood, shall we use activation here?
+
+        b_x = self.b_x_l2(F.tanh(self.b_x_l1(enc_states.detach()))).view(-1)
+
+        return b_x + self.b
 
     def infer(self, examples):
         # currently use beam search as sampling method
@@ -106,17 +121,13 @@ class StructVAE(nn.Module):
 
         sample_scores, enc_states = self.encoder.score(sampled_examples, return_enc_state=True)
 
-        # compute baseline, which is an MLP
-        # (sample_size) FIXME: reward is log-likelihood, shall we use activation here?
-        b_x = self.b_x_l2(F.tanh(self.b_x_l1(enc_states.detach()))).view(-1)
-
-        return sampled_examples, sample_scores, b_x
+        return sampled_examples, sample_scores, enc_states
 
     def save(self, path):
         fname, ext = os.path.splitext(path)
         self.encoder.save(fname + '.encoder' + ext)
         self.decoder.save(fname + '.decoder' + ext)
-        state_dict = {k: v for k, v in self.state_dict().iteritems() if not (k.startswith('decoder') or k.startswith('encoder'))}
+        state_dict = {k: v for k, v in self.state_dict().iteritems() if not (k.startswith('decoder') or k.startswith('encoder') or k.startswith('prior'))}
 
         params = {
             'args': self.args,
@@ -135,3 +146,49 @@ class StructVAE(nn.Module):
 
         vae_states = torch.load(path, map_location=lambda storage, loc: storage)['state_dict']
         self.load_state_dict(vae_states, strict=False)
+
+    def train(self):
+        super(StructVAE, self).train()
+        self.prior.eval()
+
+
+class StructVAE_LMBaseline(StructVAE):
+    def __init__(self, encoder, decoder, prior, src_lm, args):
+        super(StructVAE_LMBaseline, self).__init__(encoder, decoder, prior, args)
+
+        del self.b_x_l1
+        del self.b_x_l2
+
+        self.b_lm = src_lm
+        self.b_lm_weight = nn.Parameter(torch.FloatTensor([.5]))
+
+        # initialize baseline to be a small negative number
+        self.b.data.fill_(-2.)
+
+    def baseline(self, samples, enc_states):
+        src_sent_var = nn_utils.to_input_variable([e.src_sent for e in samples],
+                                                  self.b_lm.vocab, cuda=self.args.cuda,
+                                                  append_boundary_sym=True)
+        p_lm = -self.b_lm(src_sent_var)
+
+        return self.b_lm_weight * p_lm - self.b
+    
+    def train(self):
+        super(StructVAE_LMBaseline, self).train()
+        self.b_lm.eval()
+
+
+class StructVAE_SrcLmAndLinearBaseline(StructVAE_LMBaseline):
+    def __init__(self, encoder, decoder, prior, src_lm, args):
+        super(StructVAE_SrcLmAndLinearBaseline, self).__init__(encoder, decoder, prior, src_lm, args)
+
+        # For MLP baseline
+        # for baseline
+        self.b_x_l1 = nn.Linear(args.hidden_size, 1)
+
+    def baseline(self, samples, enc_states):
+        b_linear = self.b_x_l1(enc_states.detach()).view(-1)
+
+        b_lm = super(StructVAE_SrcLmAndLinearBaseline, self).baseline(samples, enc_states)
+
+        return b_linear + b_lm
