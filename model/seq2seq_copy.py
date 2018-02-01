@@ -15,7 +15,6 @@ from model.seq2seq import Seq2SeqModel
 
 class Seq2SeqWithCopy(Seq2SeqModel):
     def __init__(self, src_vocab, tgt_vocab, embed_size, hidden_size,
-                 ptrnet_hidden_dim,
                  dropout=0.,
                  cuda=False,
                  src_embed_layer=None, tgt_embed_layer=None):
@@ -28,8 +27,7 @@ class Seq2SeqWithCopy(Seq2SeqModel):
 
         # pointer net to the source
         self.src_pointer_net = PointerNet(src_encoding_size=hidden_size * 2,
-                                          query_vec_size=hidden_size,
-                                          hidden_dim=ptrnet_hidden_dim)
+                                          query_vec_size=hidden_size)
 
         self.tgt_token_predictor = nn.Linear(hidden_size, 2)
 
