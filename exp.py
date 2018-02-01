@@ -159,9 +159,9 @@ def train(args):
                 report_loss = report_examples = 0.
 
         print('[Epoch %d] epoch elapsed %ds' % (epoch, time.time() - epoch_begin), file=sys.stderr)
-        model_file = args.save_to + '.iter%d.bin' % train_iter
-        print('save model to [%s]' % model_file, file=sys.stderr)
-        model.save(model_file)
+        # model_file = args.save_to + '.iter%d.bin' % train_iter
+        # print('save model to [%s]' % model_file, file=sys.stderr)
+        # model.save(model_file)
 
         # perform validation
         print('[Epoch %d] begin validation' % epoch, file=sys.stderr)
