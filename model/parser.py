@@ -367,8 +367,8 @@ class Parser(nn.Module):
 
             # Variable(batch_size, primitive_vocab_size)
             primitive_prob = primitive_predictor_prob[:, 0].unsqueeze(1) * gen_from_vocab_prob
-            # if src_unk_pos_list:
-            #     primitive_prob[:, primitive_vocab.unk_id] = 0.
+            if src_unk_pos_list:
+                primitive_prob[:, primitive_vocab.unk_id] = 1.e-10
 
             gentoken_prev_hyp_ids = []
             gentoken_new_hyp_unks = []
@@ -460,8 +460,8 @@ class Parser(nn.Module):
                     # it's a GenToken action
                     token_id = (new_hyp_pos - len(applyrule_new_hyp_scores)) % primitive_prob.size(1)
 
-                    # try:
                     k = (new_hyp_pos - len(applyrule_new_hyp_scores)) / primitive_prob.size(1)
+                    # try:
                     copy_info = gentoken_copy_infos[k]
                     prev_hyp_id = gentoken_prev_hyp_ids[k]
                     prev_hyp = hypotheses[prev_hyp_id]
@@ -471,9 +471,16 @@ class Parser(nn.Module):
                     #     print('len copy_info=%d' % len(gentoken_copy_infos), file=sys.stderr)
                     #     print('prev_hyp_id=%s' % ', '.join(str(i) for i in gentoken_prev_hyp_ids), file=sys.stderr)
                     #     print('len applyrule_new_hyp_scores=%d' % len(applyrule_new_hyp_scores), file=sys.stderr)
+                    #     print('len gentoken_prev_hyp_ids=%d' % len(gentoken_prev_hyp_ids), file=sys.stderr)
                     #     print('top_new_hyp_pos=%s' % top_new_hyp_pos, file=sys.stderr)
+                    #     print('applyrule_new_hyp_scores=%s' % applyrule_new_hyp_scores, file=sys.stderr)
+                    #     print('new_hyp_scores=%s' % new_hyp_scores, file=sys.stderr)
+                    #     print('top_new_hyp_scores=%s' % top_new_hyp_scores, file=sys.stderr)
                     #
-                    #     exit(-1)
+                    #     torch.save((applyrule_new_hyp_scores, primitive_prob), 'data.bin')
+                    #
+                    #     # exit(-1)
+                    #     raise ValueError()
 
                     if token_id == primitive_vocab.unk_id:
                         if gentoken_new_hyp_unks:

@@ -47,7 +47,7 @@ def decode(examples, model, args, verbose=False):
     return decode_results
 
 
-def evaluate(examples, parser, args, verbose=False):
+def evaluate(examples, parser, args, verbose=False, return_decode_result=False):
     cum_oracle_acc = cum_acc = 0.0
     decode_results = decode(examples, parser, args, verbose=verbose)
     for example, hyps in zip(examples, decode_results):
@@ -67,7 +67,7 @@ def evaluate(examples, parser, args, verbose=False):
                     continue
 
                 if hyp_code in hyp_code_set:
-                    print('Duplicate Hyp Example [%d], Code %s' % (example.idx, hyp_code), file=sys.stderr)
+                    print('Duplicate Hyp Example [%d], Code %s' % (example.idx, hyp_code), file=sys.stdout)
                 hyp_code_set.add(hyp_code)
 
                 if hyp_id == 0 and hyp_code_tokens == ref_code_tokens:
@@ -81,4 +81,7 @@ def evaluate(examples, parser, args, verbose=False):
     eval_result = {'accuracy': cum_acc / len(examples),
                    'oracle_accuracy': cum_oracle_acc / len(examples)}
 
-    return eval_result
+    if return_decode_result:
+        return eval_result, decode_results
+    else:
+        return eval_result

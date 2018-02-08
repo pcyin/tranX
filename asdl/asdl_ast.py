@@ -119,6 +119,17 @@ class AbstractSyntaxTree(object):
     def __repr__(self):
         return repr(self.production)
 
+    @property
+    def size(self):
+        node_num = 1
+        for field in self.fields:
+            for val in field.as_value_list:
+                if isinstance(val, AbstractSyntaxTree):
+                    node_num += val.size
+                else: node_num += 1
+
+        return node_num
+
 
 class RealizedField(Field):
     """wrapper of field realized with values"""

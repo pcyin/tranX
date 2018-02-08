@@ -14,6 +14,7 @@ if __name__ == '__main__':
     #py_code = '1e10'
     py_ast = ast.parse(py_code)
     asdl_ast = python_ast_to_asdl_ast(py_ast.body[0], grammar)
+    print(asdl_ast.size)
     py_ast_reconstructed = asdl_ast_to_python_ast(asdl_ast, grammar)
 
     asdl_ast2 = asdl_ast.copy()

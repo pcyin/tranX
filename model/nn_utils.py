@@ -105,3 +105,8 @@ def batch_iter(examples, batch_size, shuffle=False):
         batch_examples = [examples[i] for i in batch_ids]
 
         yield batch_examples
+
+
+def isnan(data):
+    data = data.cpu().numpy()
+    return np.isnan(data).any() or np.isinf(data).any()

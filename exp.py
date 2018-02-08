@@ -9,8 +9,10 @@ from itertools import ifilter
 import numpy as np
 import time
 import math
-
+import os
 import sys
+import cPickle as pkl
+
 import torch
 from torch.autograd import Variable
 
@@ -18,6 +20,7 @@ import evaluation
 from asdl.asdl import ASDLGrammar
 from asdl.lang.py.py_transition_system import PythonTransitionSystem
 from components.dataset import Dataset
+from model import nn_utils
 from model.neural_lm import LSTMLanguageModel
 
 from model.parser import Parser
@@ -30,7 +33,7 @@ def init_config():
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', default=5783287, type=int, help='random seed')
     parser.add_argument('--cuda', action='store_true', default=False, help='use gpu')
-    parser.add_argument('--mode', choices=['train', 'train_decoder', 'train_semi', 'test', 'debug_ls'], default='train', help='run mode')
+    parser.add_argument('--mode', choices=['train', 'train_decoder', 'train_semi', 'log_semi', 'test'], default='train', help='run mode')
 
     parser.add_argument('--lstm', choices=['lstm', 'lstm_with_dropout'], default='lstm')
 
@@ -255,6 +258,7 @@ def train_decoder(args):
 
         for batch_examples in train_set.batch_iter(batch_size=args.batch_size, shuffle=True):
             batch_examples = [e for e in batch_examples if len(e.tgt_actions) <= args.decode_max_time_step]
+            # batch_examples = [e for e in train_set.examples if e.idx in [10192, 10894, 9706, 4659, 5609, 1442, 5849, 10644, 4592, 1875]]
 
             train_iter += 1
             optimizer.zero_grad()
@@ -430,6 +434,24 @@ def train_semi(args):
                 unsup_encoder_loss, unsup_decoder_loss, unsup_baseline_loss, meta_data = structVAE.get_unsupervised_loss(
                     unlabeled_examples)
 
+                nan = False
+                if nn_utils.isnan(sup_loss.data):
+                    print('Nan in sup_loss')
+                    nan = True
+                if nn_utils.isnan(unsup_encoder_loss.data):
+                    print('Nan in unsup_encoder_loss!', file=sys.stderr)
+                    nan = True
+                if nn_utils.isnan(unsup_decoder_loss.data):
+                    print('Nan in unsup_decoder_loss!', file=sys.stderr)
+                    nan = True
+                if nn_utils.isnan(unsup_baseline_loss.data):
+                    print('Nan in unsup_baseline_loss!', file=sys.stderr)
+                    nan = True
+
+                if nan:
+                    # torch.save((unsup_encoder_loss, unsup_decoder_loss, unsup_baseline_loss, meta_data), 'nan_data.bin')
+                    continue
+
                 report_unsup_encoder_loss += unsup_encoder_loss.sum().data[0]
                 report_unsup_decoder_loss += unsup_decoder_loss.sum().data[0]
                 report_unsup_baseline_loss += unsup_baseline_loss.sum().data[0]
@@ -570,6 +592,90 @@ def train_semi(args):
             patience = 0
 
 
+def log_semi(args):
+    print('loading VAE at %s' % args.load_model, file=sys.stderr)
+    fname, ext = os.path.splitext(args.load_model)
+    encoder_path = fname + '.encoder' + ext
+    decoder_path = fname + '.decoder' + ext
+
+    vae_params = torch.load(args.load_model, map_location=lambda storage, loc: storage)
+    encoder_params = torch.load(encoder_path, map_location=lambda storage, loc: storage)
+    decoder_params = torch.load(decoder_path, map_location=lambda storage, loc: storage)
+
+    transition_system = encoder_params['transition_system']
+    vae_params['args'].cuda = encoder_params['args'].cuda = decoder_params['args'].cuda = args.cuda
+
+    encoder = Parser(encoder_params['args'], encoder_params['vocab'], transition_system)
+    decoder = Reconstructor(decoder_params['args'], decoder_params['vocab'])
+
+    if vae_params['args'].prior == 'lstm':
+        prior = LSTMPrior.load(vae_params['args'].load_prior, args.cuda)
+        print('loaded prior at %s' % vae_params['args'].load_prior, file=sys.stderr)
+        # freeze prior parameters
+        for p in prior.parameters():
+            p.requires_grad = False
+        prior.eval()
+    else:
+        prior = UniformPrior()
+
+    if vae_params['args'].baseline == 'mlp':
+        structVAE = StructVAE(encoder, decoder, prior, vae_params['args'])
+    elif vae_params['args'].baseline == 'src_lm' or vae_params['args'].baseline == 'src_lm_and_linear':
+        src_lm = LSTMLanguageModel.load(vae_params['args'].load_src_lm)
+        print('loaded source LM at %s' % vae_params['args'].load_src_lm, file=sys.stderr)
+        Baseline = StructVAE_LMBaseline if args.baseline == 'src_lm' else StructVAE_SrcLmAndLinearBaseline
+        structVAE = Baseline(encoder, decoder, prior, src_lm, vae_params['args'])
+    else:
+        raise ValueError('unknown baseline')
+
+    structVAE.load_parameters(args.load_model)
+    structVAE.train()
+    if args.cuda: structVAE.cuda()
+
+    unlabeled_data = Dataset.from_bin_file(args.unlabeled_file)  # pretend they are un-labeled!
+
+    print('*** begin sampling ***', file=sys.stderr)
+    start_time = time.time()
+    train_iter = 0
+    log_entries = []
+    for unlabeled_examples in unlabeled_data.batch_iter(batch_size=args.batch_size, shuffle=False):
+        unlabeled_examples = [e for e in unlabeled_examples if len(e.tgt_actions) <= args.decode_max_time_step]
+
+        train_iter += 1
+        try:
+            unsup_encoder_loss, unsup_decoder_loss, unsup_baseline_loss, meta_data = structVAE.get_unsupervised_loss(
+                unlabeled_examples)
+
+        except ValueError as e:
+            print(e.message, file=sys.stderr)
+            continue
+
+        samples = meta_data['samples']
+        for v in meta_data.itervalues():
+            if isinstance(v, Variable): v.cpu()
+
+        for i, sample in enumerate(samples):
+            ref_example = [e for e in unlabeled_examples if e.idx == int(sample.idx[:sample.idx.index('-')])][0]
+            log_entry = {
+                'sample': sample,
+                'ref_example': ref_example,
+                'log_p_z_x': meta_data['encoding_scores'][i].data[0],
+                'log_p_x_z': meta_data['reconstruction_scores'][i].data[0],
+                'kl': meta_data['kl_term'][i].data[0],
+                'prior': meta_data['prior'][i].data[0],
+                'baseline': meta_data['baseline'][i].data[0],
+                'learning_signal': meta_data['raw_learning_signal'][i].data[0],
+                'learning_signal - baseline': meta_data['learning_signal'][i].data[0],
+                'encoder_loss': unsup_encoder_loss[i].data[0],
+                'decoder_loss': unsup_decoder_loss[i].data[0]
+            }
+
+            log_entries.append(log_entry)
+
+    print('done! took %d s' % (time.time() - start_time), file=sys.stderr)
+    pkl.dump(log_entries, open(args.save_to, 'wb'))
+
+
 def test(args):
     test_set = Dataset.from_bin_file(args.test_file)
     assert args.load_model
@@ -588,8 +694,11 @@ def test(args):
     if args.cuda: parser = parser.cuda()
     parser.eval()
 
-    eval_results = evaluation.evaluate(test_set.examples, parser, args, verbose=True)
+    eval_results, decode_results = evaluation.evaluate(test_set.examples, parser, args,
+                                                       verbose=True, return_decode_result=True)
     print(eval_results, file=sys.stderr)
+    if args.save_decode_to:
+        pkl.dump(decode_results, open(args.save_decode_to, 'wb'))
 
 
 if __name__ == '__main__':
@@ -603,5 +712,7 @@ if __name__ == '__main__':
         train_semi(args)
     elif args.mode == 'test':
         test(args)
+    elif args.mode == 'log_semi':
+        log_semi(args)
     else:
         raise RuntimeError('unknown mode')

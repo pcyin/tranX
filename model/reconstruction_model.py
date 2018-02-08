@@ -1,7 +1,10 @@
 # coding=utf-8
+from __future__ import print_function
+
 import os
 from itertools import chain
 
+import sys
 import torch
 import torch.nn as nn
 import torch.nn.utils
@@ -63,6 +66,11 @@ class Reconstructor(nn.Module):
         sorted_scores = self._score(sorted_src_codes, sorted_tgt_nls)
 
         scores = sorted_scores[example_old_pos_map]
+
+        # if nn_utils.isnan(scores.data):
+        #     print('Decoder encounters Nan: %s' % scores.data, file=sys.stderr)
+        #     torch.save((examples, scores), 'decoder_scores.bin')
+        #     exit(0)
 
         return scores
 
