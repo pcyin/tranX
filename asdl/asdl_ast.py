@@ -34,12 +34,20 @@ class AbstractSyntaxTree(object):
         self.fields.append(realized_field)
         realized_field.parent_node = self
 
+    def __getitem__(self, field_name):
+        for field in self.fields:
+            if field.name == field_name: return field
+        raise KeyError
+
     def sanity_check(self):
         if len(self.production.fields) != len(self.fields):
             raise ValueError('filed number must match')
+        for field, realized_field in zip(self.production.fields, self.fields):
+            assert field == realized_field.field
         for child in self.fields:
-            if isinstance(child.value, AbstractSyntaxTree):
-                child.value.sanity_check()
+            for child_val in child.as_value_list:
+                if isinstance(child_val, AbstractSyntaxTree):
+                    child_val.sanity_check()
 
     def copy(self):
         new_tree = AbstractSyntaxTree(self.production)
