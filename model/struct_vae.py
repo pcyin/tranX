@@ -104,7 +104,7 @@ class StructVAE(nn.Module):
             for hyp_id, hyp in enumerate(hyps):
                 try:
                     code = self.transition_system.ast_to_surface_code(hyp.tree)
-                    code = self.transition_system.tokenize_code(code)  # make sure the code is tokenizable!
+                    self.transition_system.tokenize_code(code)  # make sure the code is tokenizable!
                     sampled_example = Example(idx='%d-sample%d' % (example.idx, hyp_id),
                                               src_sent=example.src_sent,
                                               tgt_code=code,
