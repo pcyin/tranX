@@ -3,8 +3,8 @@
 from cStringIO import StringIO
 from collections import Iterable
 
-from asdl import *
-from asdl_ast import AbstractSyntaxTree, RealizedField
+from asdl.asdl import *
+from asdl.asdl_ast import AbstractSyntaxTree, RealizedField
 
 
 def parse_lambda_expr_helper(s, offset):

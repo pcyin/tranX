@@ -1,14 +1,8 @@
 # coding=utf-8
 from __future__ import print_function
 
-import ast
 import sys
 import traceback
-
-import astor
-
-from asdl.lang.py.py_asdl_helper import asdl_ast_to_python_ast, python_ast_to_asdl_ast
-from asdl.lang.py.py_utils import tokenize_code as tokenize_py_code
 
 
 def decode(examples, model, args, verbose=False):
@@ -23,11 +17,10 @@ def decode(examples, model, args, verbose=False):
     for example in examples:
         hyps = model.parse(example.src_sent, beam_size=args.beam_size)
         decoded_hyps = []
-        for hyp_id, hyp in enumerate(hyps[:args.sample_size]):
+        for hyp_id, hyp in enumerate(hyps):
             try:
-                py_ast = asdl_ast_to_python_ast(hyp.tree, model.grammar)
-                code = astor.to_source(py_ast).strip()
-                decoded_hyps.append((hyp, code))
+                hyp.code = model.transition_system.ast_to_surface_code(hyp.tree)
+                decoded_hyps.append(hyp)
             except:
                 if verbose:
                     print("Exception in converting tree to code:", file=sys.stdout)
@@ -52,29 +45,23 @@ def evaluate(examples, parser, args, verbose=False, return_decode_result=False):
     decode_results = decode(examples, parser, args, verbose=verbose)
     for example, hyps in zip(examples, decode_results):
         if hyps:
-            ref_code = example.tgt_code
-            ref_py_ast = ast.parse(ref_code).body[0]
-            ref_reformatted_code = astor.to_source(ref_py_ast).strip()
-
             cur_oracle = 0.
             hyp_code_set = set()
             for hyp_id, (hyp, hyp_code) in enumerate(hyps):
                 try:
-                    ref_code_tokens = tokenize_py_code(ref_reformatted_code)
-                    hyp_code_tokens = tokenize_py_code(hyp_code)
+                    result = parser.transition_system.hyp_correct(hyp, example)
+
+                    if hyp_id == 0 and result:
+                        cum_acc += 1
+                    if cur_oracle == 0. and result:
+                        cur_oracle = 1.
                 except:
-                    print('Hyp Id [%d] error in tokenizing [%s]' % (hyp_id, hyp_code), file=sys.stderr)
+                    print('Hyp Id [%d] error in evluating [%s]' % (hyp_id, hyp_code), file=sys.stderr)
                     continue
 
                 if hyp_code in hyp_code_set:
                     print('Duplicate Hyp Example [%d], Code %s' % (example.idx, hyp_code), file=sys.stdout)
                 hyp_code_set.add(hyp_code)
-
-                if hyp_id == 0 and hyp_code_tokens == ref_code_tokens:
-                    cum_acc += 1
-
-                if cur_oracle == 0. and hyp_code_tokens == ref_code_tokens:
-                    cur_oracle = 1.
 
             cum_oracle_acc += cur_oracle
 

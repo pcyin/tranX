@@ -16,11 +16,10 @@ from model.pointer_net import PointerNet
 from model.seq2seq import Seq2SeqModel
 import nn_utils
 from model.seq2seq_copy import Seq2SeqWithCopy
-from asdl.lang.py.py_utils import tokenize_code
 
 
 class Reconstructor(nn.Module):
-    def __init__(self, args, vocab):
+    def __init__(self, args, vocab, transition_system):
         super(Reconstructor, self).__init__()
         self.seq2seq = Seq2SeqWithCopy(src_vocab=vocab.code, tgt_vocab=vocab.source,
                                        embed_size=args.embed_size, hidden_size=args.hidden_size,
@@ -29,6 +28,7 @@ class Reconstructor(nn.Module):
 
         self.vocab = vocab
         self.args = args
+        self.transition_system = transition_system
 
     def _score(self, src_codes, tgt_nls):
         """score examples sorted by code length"""
@@ -75,7 +75,7 @@ class Reconstructor(nn.Module):
         return scores
 
     def tokenize_code(self, code):
-        return tokenize_code(code, mode='decoder')
+        return self.transition_system.tokenize_code(code, mode='decoder')
 
     def get_generate_and_copy_meta_tensor(self, src_codes, tgt_nls):
         tgt_token_copy_pos = []
@@ -130,7 +130,8 @@ class Reconstructor(nn.Module):
         params = {
             'args': self.args,
             'vocab': self.vocab,
-            'state_dict': self.state_dict()
+            'state_dict': self.state_dict(),
+            'transition_system': self.transition_system
         }
 
         torch.save(params, path)

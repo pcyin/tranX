@@ -10,6 +10,7 @@ class DecodeHypothesis(Hypothesis):
         super(DecodeHypothesis, self).__init__()
 
         self.action_infos = []
+        self.code = None
 
     def clone_and_apply_action_info(self, action_info):
         action = action_info.action
@@ -29,6 +30,7 @@ class DecodeHypothesis(Hypothesis):
         new_hyp.score = self.score
         new_hyp._value_buffer = list(self._value_buffer)
         new_hyp.t = self.t
+        new_hyp.code = self.code
 
         new_hyp.update_frontier_info()
 

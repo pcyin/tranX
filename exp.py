@@ -18,7 +18,7 @@ from torch.autograd import Variable
 
 import evaluation
 from asdl.asdl import ASDLGrammar
-from asdl.lang.py.py_transition_system import PythonTransitionSystem
+from asdl.transition_system import TransitionSystem
 from components.dataset import Dataset
 from model import nn_utils
 from model.neural_lm import LSTMLanguageModel
@@ -33,6 +33,7 @@ def init_config():
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', default=5783287, type=int, help='random seed')
     parser.add_argument('--cuda', action='store_true', default=False, help='use gpu')
+    parser.add_argument('--lang', choices=['python', 'lambda_dcs'], default='python')
     parser.add_argument('--mode', choices=['train', 'train_decoder', 'train_semi', 'log_semi', 'test'], default='train', help='run mode')
 
     parser.add_argument('--lstm', choices=['lstm', 'lstm_with_dropout'], default='lstm')
@@ -111,7 +112,7 @@ def init_config():
 
 def train(args):
     grammar = ASDLGrammar.from_text(open(args.asdl_file).read())
-    transition_system = PythonTransitionSystem(grammar)
+    transition_system = TransitionSystem.get_class_by_lang(args.lang)(grammar)
     train_set = Dataset.from_bin_file(args.train_file)
     dev_set = Dataset.from_bin_file(args.dev_file)
     vocab = pickle.load(open(args.vocab))
@@ -227,7 +228,10 @@ def train_decoder(args):
     dev_set = Dataset.from_bin_file(args.dev_file)
     vocab = pickle.load(open(args.vocab))
 
-    model = Reconstructor(args, vocab)
+    grammar = ASDLGrammar.from_text(open(args.asdl_file).read())
+    transition_system = TransitionSystem.get_class_by_lang(args.lang)(grammar)
+
+    model = Reconstructor(args, vocab, transition_system)
     model.train()
     if args.cuda: model.cuda()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -356,7 +360,7 @@ def train_semi(args):
 
     encoder = Parser(encoder_params['args'], encoder_params['vocab'], transition_system)
     encoder.load_state_dict(encoder_params['state_dict'])
-    decoder = Reconstructor(decoder_params['args'], decoder_params['vocab'])
+    decoder = Reconstructor(decoder_params['args'], decoder_params['vocab'], transition_system)
     decoder.load_state_dict(decoder_params['state_dict'])
 
     if args.prior == 'lstm':
@@ -374,8 +378,8 @@ def train_semi(args):
     elif args.baseline == 'src_lm' or args.baseline == 'src_lm_and_linear':
         src_lm = LSTMLanguageModel.load(args.load_src_lm)
         print('loaded source LM at %s' % args.load_src_lm, file=sys.stderr)
-        Baseline = StructVAE_LMBaseline if args.baseline == 'src_lm' else StructVAE_SrcLmAndLinearBaseline
-        structVAE = Baseline(encoder, decoder, prior, src_lm, args)
+        vae_cls = StructVAE_LMBaseline if args.baseline == 'src_lm' else StructVAE_SrcLmAndLinearBaseline
+        structVAE = vae_cls(encoder, decoder, prior, src_lm, args)
     else:
         raise ValueError('unknown baseline')
 

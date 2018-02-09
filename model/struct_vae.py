@@ -5,7 +5,6 @@ import sys
 import traceback
 
 import os
-import astor
 import copy
 import torch
 import torch.nn as nn
@@ -14,7 +13,6 @@ from torch.autograd import Variable
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
-from asdl.lang.py.py_asdl_helper import asdl_ast_to_python_ast
 from components.dataset import Example
 from model.prior import UniformPrior
 from parser import *
@@ -29,6 +27,7 @@ class StructVAE(nn.Module):
         self.decoder = decoder
         self.prior = prior
 
+        self.transition_system = self.encoder.transition_system
         self.args = args
 
         # for baseline
@@ -104,9 +103,8 @@ class StructVAE(nn.Module):
         for e_id, (example, hyps) in enumerate(zip(examples, hypotheses)):
             for hyp_id, hyp in enumerate(hyps):
                 try:
-                    py_ast = asdl_ast_to_python_ast(hyp.tree, self.encoder.grammar)
-                    code = astor.to_source(py_ast).strip()
-                    tokenize_code(code)  # make sure the code is tokenizable!
+                    code = self.transition_system.ast_to_surface_code(hyp.tree)
+                    code = self.transition_system.tokenize_code(code)  # make sure the code is tokenizable!
                     sampled_example = Example(idx='%d-sample%d' % (example.idx, hyp_id),
                                               src_sent=example.src_sent,
                                               tgt_code=code,

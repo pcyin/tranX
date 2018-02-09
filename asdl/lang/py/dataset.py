@@ -29,6 +29,31 @@ p_decorator = re.compile(r'^@.*')
 QUOTED_STRING_RE = re.compile(r"(?P<quote>['\"])(?P<string>.*?)(?<!\\)(?P=quote)")
 
 
+def get_action_infos(src_query, tgt_actions):
+    action_infos = []
+    hyp = Hypothesis()
+    for t, action in enumerate(tgt_actions):
+        action_info = ActionInfo(action)
+        action_info.t = t
+        if hyp.frontier_node:
+            action_info.parent_t = hyp.frontier_node.created_time
+            action_info.frontier_prod = hyp.frontier_node.production
+            action_info.frontier_field = hyp.frontier_field.field
+
+        if isinstance(action, GenTokenAction):
+            try:
+                tok_src_idx = src_query.index(str(action.token))
+                action_info.copy_from_src = True
+                action_info.src_token_position = tok_src_idx
+            except ValueError:
+                pass
+
+        hyp.apply_action(action)
+        action_infos.append(action_info)
+
+    return action_infos
+
+
 class Django(object):
     @staticmethod
     def canonicalize_code(code):
@@ -212,7 +237,7 @@ class Django(object):
         for idx, e in enumerate(loaded_examples):
             src_query_tokens = e['src_query_tokens'][:max_query_len]
             tgt_actions = e['tgt_actions']
-            tgt_action_infos = Django.get_action_infos(src_query_tokens, tgt_actions)
+            tgt_action_infos = get_action_infos(src_query_tokens, tgt_actions)
 
             example = Example(idx=idx,
                               src_sent=src_query_tokens,
@@ -238,31 +263,6 @@ class Django(object):
         print('Actions larger than 100: %d' % len(filter(lambda x: x > 100, action_len)), file=sys.stderr)
 
         return (train_examples, dev_examples, test_examples), vocab
-
-    @staticmethod
-    def get_action_infos(src_query, tgt_actions):
-        action_infos = []
-        hyp = Hypothesis()
-        for t, action in enumerate(tgt_actions):
-            action_info = ActionInfo(action)
-            action_info.t = t
-            if hyp.frontier_node:
-                action_info.parent_t = hyp.frontier_node.created_time
-                action_info.frontier_prod = hyp.frontier_node.production
-                action_info.frontier_field = hyp.frontier_field.field
-
-            if isinstance(action, GenTokenAction):
-                try:
-                    tok_src_idx = src_query.index(str(action.token))
-                    action_info.copy_from_src = True
-                    action_info.src_token_position = tok_src_idx
-                except ValueError:
-                    pass
-
-            hyp.apply_action(action)
-            action_infos.append(action_info)
-
-        return action_infos
 
     @staticmethod
     def generate_django_dataset():

@@ -1,0 +1,22 @@
+# define primitive fields
+var, ent, num, var_type, pred
+
+expr = Variable(var variable)
+    | Entity(ent entity)
+    | Number(num number)
+    | Apply(pred predicate, expr* arguments)
+    | Argmax(var variable, expr domain, expr body)
+    | Argmin(var variable, expr domain, expr body)
+    | Count(var variable, expr body)
+    | Exists(var variable, expr body)
+    | Lambda(var variable, var_type type, expr body)
+    | Max(var variable, expr body)
+    | Min(var variable, expr body)
+    | Sum(var variable, expr domain, expr body)
+    | The(var variable, expr body)
+    | Not(expr argument)
+    | And(expr* arguments)
+    | Or(expr* arguments)
+    | Compare(cmp_op op, expr left, expr right)
+
+cmp_op = GreaterThan | Equal | LessThan

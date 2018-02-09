@@ -76,6 +76,15 @@ class TransitionSystem(object):
 
         return actions
 
+    def tokenize_code(self, code, mode):
+        raise NotImplementedError
+
+    def hyp_correct(self, hyp, example):
+        raise NotImplementedError
+
+    def ast_to_surface_code(self, asdl_ast):
+        raise NotImplementedError
+
     def get_primitive_field_actions(self, realized_field):
         raise NotImplementedError
 
@@ -107,3 +116,14 @@ class TransitionSystem(object):
                 raise ValueError
         else:
             return self.grammar[self.grammar.root_type]
+
+    @staticmethod
+    def get_class_by_lang(lang):
+        if lang == 'python':
+            from lang.py.py_transition_system import PythonTransitionSystem
+            return PythonTransitionSystem
+        elif lang == 'lambda_dcs':
+            from lang.lambda_dcs.lambda_dcs_transition_system import LambdaCalculusTransitionSystem
+            return LambdaCalculusTransitionSystem
+
+        raise ValueError
