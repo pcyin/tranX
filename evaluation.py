@@ -47,7 +47,7 @@ def evaluate(examples, parser, args, verbose=False, return_decode_result=False):
         if hyps:
             cur_oracle = 0.
             hyp_code_set = set()
-            for hyp_id, (hyp, hyp_code) in enumerate(hyps):
+            for hyp_id, hyp in enumerate(hyps):
                 try:
                     result = parser.transition_system.hyp_correct(hyp, example)
 
@@ -56,12 +56,12 @@ def evaluate(examples, parser, args, verbose=False, return_decode_result=False):
                     if cur_oracle == 0. and result:
                         cur_oracle = 1.
                 except:
-                    print('Hyp Id [%d] error in evluating [%s]' % (hyp_id, hyp_code), file=sys.stderr)
+                    print('Hyp Id [%d] error in evluating [%s]' % (hyp_id, hyp.code), file=sys.stderr)
                     continue
 
-                if hyp_code in hyp_code_set:
-                    print('Duplicate Hyp Example [%d], Code %s' % (example.idx, hyp_code), file=sys.stdout)
-                hyp_code_set.add(hyp_code)
+                if hyp.code in hyp_code_set:
+                    print('Duplicate Hyp Example [%d], Code %s' % (example.idx, hyp.code), file=sys.stdout)
+                hyp_code_set.add(hyp.code)
 
             cum_oracle_acc += cur_oracle
 
