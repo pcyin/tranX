@@ -1,26 +1,26 @@
 #!/bin/bash
 
-vocab="vocab.freq10.bin"
-train_file="train.1000.bin"
-dropout=0.2
+vocab="vocab.bin"
+train_file="train.500.bin"
+dropout=0.3
 hidden_size=256
 embed_size=128
-ptrnet_hidden_dim=32
 lr_decay=0.5
 lstm='lstm'
-model_name=model.sup.decoder.${lstm}.hidden${hidden_size}.embed${embed_size}.dropout${dropout}.lr_decay${lr_decay}.${vocab}.${train_file}
+model_name=model.atis.sup.decoder.${lstm}.hidden${hidden_size}.embed${embed_size}.dropout${dropout}.lr_decay${lr_decay}.${vocab}.${train_file}
 
 python exp.py \
     --cuda \
+    --lang lambda_dcs \
+    --asdl_file lang/lambda_dcs/lambda_asdl.txt \
     --mode train_decoder \
     --batch_size 10 \
-    --train_file ../data/django/${train_file} \
-    --dev_file ../data/django/dev.bin \
-    --vocab ../data/django/${vocab} \
+    --train_file ../data/atis/${train_file} \
+    --dev_file ../data/atis/dev.bin \
+    --vocab ../data/atis/${vocab} \
     --lstm ${lstm} \
     --hidden_size ${hidden_size} \
     --embed_size ${embed_size} \
-    --ptrnet_hidden_dim ${ptrnet_hidden_dim} \
     --dropout ${dropout} \
     --patience 5 \
     --max_num_trial 5 \
