@@ -610,7 +610,7 @@ def log_semi(args):
     vae_params['args'].cuda = encoder_params['args'].cuda = decoder_params['args'].cuda = args.cuda
 
     encoder = Parser(encoder_params['args'], encoder_params['vocab'], transition_system)
-    decoder = Reconstructor(decoder_params['args'], decoder_params['vocab'])
+    decoder = Reconstructor(decoder_params['args'], decoder_params['vocab'], transition_system)
 
     if vae_params['args'].prior == 'lstm':
         prior = LSTMPrior.load(vae_params['args'].load_prior, args.cuda)
