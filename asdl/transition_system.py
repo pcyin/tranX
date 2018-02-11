@@ -82,7 +82,13 @@ class TransitionSystem(object):
     def hyp_correct(self, hyp, example):
         raise NotImplementedError
 
+    def compare_ast(self, hyp_ast, ref_ast):
+        raise NotImplementedError
+
     def ast_to_surface_code(self, asdl_ast):
+        raise NotImplementedError
+
+    def surface_code_to_ast(self, code):
         raise NotImplementedError
 
     def get_primitive_field_actions(self, realized_field):
