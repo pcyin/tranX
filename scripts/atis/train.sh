@@ -1,7 +1,7 @@
 #!/bin/bash
 
 vocab="vocab.bin"
-train_file="train.bin"
+train_file="train.3000.bin"
 dropout=0.3
 hidden_size=256
 embed_size=128
@@ -37,4 +37,4 @@ python exp.py \
     --log_every 50 \
     --save_to saved_models/${model_name} 2>logs/${model_name}.log
 
-. scripts/test.sh saved_models/${model_name}.bin 2>>logs/${model_name}.log
+. scripts/atis/test.sh saved_models/${model_name}.bin 2>>logs/${model_name}.log
