@@ -18,6 +18,9 @@ class ApplyRuleAction(Action):
     def __ne__(self, other):
         return not self.__eq__(other)
 
+    def __repr__(self):
+        return 'ApplyRule[%s]' % self.production.__repr__()
+
 
 class GenTokenAction(Action):
     def __init__(self, token):
@@ -26,9 +29,13 @@ class GenTokenAction(Action):
     def is_stop_signal(self):
         return self.token == '</primitive>'
 
+    def __repr__(self):
+        return 'GenToken[%s]' % self.token
+
 
 class ReduceAction(Action):
-   pass
+   def __repr__(self):
+       return 'Reduce'
 
 
 class TransitionSystem(object):
