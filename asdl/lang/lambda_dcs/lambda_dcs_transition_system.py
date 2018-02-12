@@ -4,7 +4,7 @@ from asdl.transition_system import TransitionSystem, GenTokenAction, ReduceActio
 from asdl.asdl import *
 from asdl.asdl_ast import *
 
-from logical_form import ast_to_logical_form, logical_form_to_ast, Node
+from logical_form import ast_to_logical_form, logical_form_to_ast, Node, parse_lambda_expr
 
 
 class LambdaCalculusTransitionSystem(TransitionSystem):
@@ -12,9 +12,14 @@ class LambdaCalculusTransitionSystem(TransitionSystem):
         return code.strip().split(' ')
 
     def hyp_correct(self, hyp, example):
-        ref_ast = example.tgt_ast
+        return self.compare_ast(hyp.tree, example.tgt_ast)
+
+    def surface_code_to_ast(self, code):
+        return logical_form_to_ast(self.grammar, parse_lambda_expr(code))
+
+    def compare_ast(self, hyp_ast, ref_ast):
         ref_lf = ast_to_logical_form(ref_ast)
-        hyp_lf = ast_to_logical_form(hyp.tree)
+        hyp_lf = ast_to_logical_form(hyp_ast)
 
         return ref_lf == hyp_lf
 

@@ -18,6 +18,9 @@ class ApplyRuleAction(Action):
     def __ne__(self, other):
         return not self.__eq__(other)
 
+    def __repr__(self):
+        return 'ApplyRule[%s]' % self.production.__repr__()
+
 
 class GenTokenAction(Action):
     def __init__(self, token):
@@ -26,9 +29,13 @@ class GenTokenAction(Action):
     def is_stop_signal(self):
         return self.token == '</primitive>'
 
+    def __repr__(self):
+        return 'GenToken[%s]' % self.token
+
 
 class ReduceAction(Action):
-   pass
+   def __repr__(self):
+       return 'Reduce'
 
 
 class TransitionSystem(object):
@@ -82,7 +89,13 @@ class TransitionSystem(object):
     def hyp_correct(self, hyp, example):
         raise NotImplementedError
 
+    def compare_ast(self, hyp_ast, ref_ast):
+        raise NotImplementedError
+
     def ast_to_surface_code(self, asdl_ast):
+        raise NotImplementedError
+
+    def surface_code_to_ast(self, code):
         raise NotImplementedError
 
     def get_primitive_field_actions(self, realized_field):
