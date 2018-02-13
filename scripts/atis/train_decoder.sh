@@ -1,7 +1,7 @@
 #!/bin/bash
 
 vocab="vocab.bin"
-train_file="train.500.bin"
+train_file="train.bin"
 dropout=0.3
 hidden_size=256
 embed_size=128
@@ -12,7 +12,7 @@ model_name=model.atis.sup.decoder.${lstm}.hidden${hidden_size}.embed${embed_size
 python exp.py \
     --cuda \
     --lang lambda_dcs \
-    --asdl_file lang/lambda_dcs/lambda_asdl.txt \
+    --asdl_file asdl/lang/lambda_dcs/lambda_asdl.txt \
     --mode train_decoder \
     --batch_size 10 \
     --train_file ../data/atis/${train_file} \
