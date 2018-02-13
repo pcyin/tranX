@@ -42,10 +42,11 @@ class LSTMPrior(LSTMLanguageModel, Prior):
         return -self.forward(code_var)
 
     @classmethod
-    def load(self, model_path, cuda=False):
+    def load(self, model_path, transition_system=None, cuda=False):
         params = torch.load(model_path, map_location=lambda storage, loc: storage)
         params['args'].cuda = cuda
-        model = LSTMPrior(params['args'], params['vocab'], params['transition_system'])
+        model = LSTMPrior(params['args'], params['vocab'],
+                          transition_system if transition_system else params['transition_system'])
         model.load_state_dict(params['state_dict'])
 
         return model

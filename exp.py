@@ -364,7 +364,7 @@ def train_semi(args):
     decoder.load_state_dict(decoder_params['state_dict'])
 
     if args.prior == 'lstm':
-        prior = LSTMPrior.load(args.load_prior, args.cuda)
+        prior = LSTMPrior.load(args.load_prior, transition_system=transition_system, cuda=args.cuda)
         print('loaded prior at %s' % args.load_prior, file=sys.stderr)
         # freeze prior parameters
         for p in prior.parameters():
