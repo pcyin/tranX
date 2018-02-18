@@ -613,7 +613,7 @@ def log_semi(args):
     decoder = Reconstructor(decoder_params['args'], decoder_params['vocab'], transition_system)
 
     if vae_params['args'].prior == 'lstm':
-        prior = LSTMPrior.load(vae_params['args'].load_prior, args.cuda, transition_system=decoder_params['transition_system'])
+        prior = LSTMPrior.load(vae_params['args'].load_prior, transition_system=decoder_params['transition_system'], cuda=args.cuda)
         print('loaded prior at %s' % vae_params['args'].load_prior, file=sys.stderr)
         # freeze prior parameters
         for p in prior.parameters():
