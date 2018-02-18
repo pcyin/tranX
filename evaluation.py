@@ -55,8 +55,11 @@ def evaluate(examples, parser, args, verbose=False, return_decode_result=False):
                         cum_acc += 1
                     if cur_oracle == 0. and result:
                         cur_oracle = 1.
+
+                    hyp.correct = result
                 except:
                     print('Hyp Id [%d] error in evluating [%s]' % (hyp_id, hyp.code), file=sys.stderr)
+                    hyp.correct = False
                     continue
 
                 if hyp.code in hyp_code_set:
