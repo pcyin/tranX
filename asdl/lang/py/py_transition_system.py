@@ -4,7 +4,7 @@ import ast
 
 import astor
 
-from asdl.lang.py.py_asdl_helper import asdl_ast_to_python_ast
+from asdl.lang.py.py_asdl_helper import asdl_ast_to_python_ast, python_ast_to_asdl_ast
 from asdl.lang.py.py_utils import tokenize_code
 from asdl.transition_system import TransitionSystem, GenTokenAction
 
@@ -22,6 +22,10 @@ class PythonTransitionSystem(TransitionSystem):
         hyp_code_tokens = tokenize_code(hyp.code)
 
         return ref_code_tokens == hyp_code_tokens
+
+    def surface_code_to_ast(self, code):
+        py_ast = ast.parse(code).body[0]
+        return python_ast_to_asdl_ast(py_ast, self.grammar)
 
     def ast_to_surface_code(self, asdl_ast):
         py_ast = asdl_ast_to_python_ast(asdl_ast, self.grammar)

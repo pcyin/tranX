@@ -55,6 +55,26 @@ class LSTMLanguageModel(nn.Module):
 
         return scores
 
+    def sample(self, max_time_step=200):
+        """generate one sample"""
+        sample_words = [self.vocab['<s>']]
+        h_tm1 = None
+        for t in xrange(max_time_step):
+            x_tm1_embed = self.embed(Variable(torch.LongTensor([sample_words[-1]])))
+            x_tm1_embed = x_tm1_embed.unsqueeze(0)
+            h_t, (last_state, last_cell) = self.lstm(x_tm1_embed, h_tm1)
+            h_t = self.dropout(h_t.view(-1))
+            p_t = F.softmax(self.read_out(h_t), dim=-1)
+            x_t_wid = torch.multinomial(p_t).data[0]
+            x_t = self.vocab.id2word[x_t_wid]
+
+            if x_t == '</s>':
+                return [self.vocab.id2word[wid] for wid in sample_words[1:]]
+            else:
+                sample_words.append(x_t_wid)
+
+            h_tm1 = last_state, last_cell
+
     @classmethod
     def load(self, model_path, cuda=False):
         params = torch.load(model_path, map_location=lambda storage, loc: storage)

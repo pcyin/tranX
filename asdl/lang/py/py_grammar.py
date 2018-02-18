@@ -9,11 +9,12 @@ from asdl.lang.py.py_transition_system import *
 if __name__ == '__main__':
     asdl_text = open('py_asdl.txt').read()
     grammar = ASDLGrammar.from_text(asdl_text)
-    py_code = 'sorted(mydict, key=mydict.get, reverse=True, how="hahaha", sadf=0.3)'
+    py_code = 'sorted(mylist, reverse=True)'
     #py_code = 'a = dict({a: None, b:False, s:"I love my mother", sd:124+3})'
     #py_code = '1e10'
     py_ast = ast.parse(py_code)
     asdl_ast = python_ast_to_asdl_ast(py_ast.body[0], grammar)
+    print(asdl_ast.to_string())
     print(asdl_ast.size)
     py_ast_reconstructed = asdl_ast_to_python_ast(asdl_ast, grammar)
 
@@ -30,6 +31,7 @@ if __name__ == '__main__':
         # assert action.__class__ in parser.get_valid_continuation_types(hyp)
         # if isinstance(action, ApplyRuleAction):
         #     assert action.production in grammar[hyp.frontier_field.type]
+        print(action)
         hyp.apply_action(action)
 
     import astor

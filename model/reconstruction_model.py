@@ -74,6 +74,12 @@ class Reconstructor(nn.Module):
 
         return scores
 
+    def sample(self, code, sample_size=5):
+        tokenized_code = self.tokenize_code(code)
+        samples = self.seq2seq.sample(tokenized_code, sample_size=sample_size, decode_max_time_step=self.args.decode_max_time_step)
+
+        return samples
+
     def tokenize_code(self, code):
         return self.transition_system.tokenize_code(code, mode='decoder')
 

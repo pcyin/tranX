@@ -155,3 +155,143 @@ class Seq2SeqWithCopy(Seq2SeqModel):
         att_t = self.dropout(att_t)
 
         return (h_t, cell_t), att_t
+
+    def sample(self, src_sent, sample_size, decode_max_time_step, cuda=False, mode='sample'):
+        new_float_tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
+        new_long_tensor = torch.cuda.LongTensor if cuda else torch.LongTensor
+
+        src_sent_var = nn_utils.to_input_variable([src_sent], self.src_vocab,
+                                                  cuda=cuda, training=False)
+
+        # analyze which tokens can be copied from the source
+        src_token_tgt_vocab_ids = [self.tgt_vocab[token] for token in src_sent]
+        src_unk_pos_list = [pos for pos, token_id in enumerate(src_token_tgt_vocab_ids) if
+                            token_id == self.tgt_vocab.unk_id]
+        # sometimes a word may appear multi-times in the source, in this case,
+        # we just copy its first appearing position. Therefore we mask the words
+        # appearing second and onwards to -1
+        token_set = set()
+        for i, tid in enumerate(src_token_tgt_vocab_ids):
+            if tid in token_set:
+                src_token_tgt_vocab_ids[i] = -1
+            else:
+                token_set.add(tid)
+
+        src_encodings, (last_state, last_cell) = self.encode(src_sent_var, [len(src_sent)])
+        h_tm1 = self.init_decoder_state(last_state, last_cell)
+
+        # (batch_size, 1, hidden_size)
+        src_encodings_att_linear = self.att_src_linear(src_encodings)
+
+        t = 0
+        eos_id = self.tgt_vocab['</s>']
+
+        completed_hypotheses = []
+        completed_hypothesis_scores = []
+
+        if mode == 'beam_search':
+            hypotheses = [['<s>']]
+            hypotheses_word_ids = [[self.tgt_vocab['<s>']]]
+        else:
+            hypotheses = [['<s>'] for _ in xrange(sample_size)]
+            hypotheses_word_ids = [[self.tgt_vocab['<s>']] for _ in xrange(sample_size)]
+
+        att_tm1 = Variable(new_float_tensor(len(hypotheses), self.hidden_size).zero_(), volatile=True)
+        hyp_scores = Variable(new_float_tensor(len(hypotheses)).zero_(), volatile=True)
+
+        while len(completed_hypotheses) < sample_size and t < decode_max_time_step:
+            t += 1
+            hyp_num = len(hypotheses)
+
+            expanded_src_encodings = src_encodings.expand(hyp_num, src_encodings.size(1), src_encodings.size(2))
+            expanded_src_encodings_att_linear = src_encodings_att_linear.expand(hyp_num,
+                                                                                src_encodings_att_linear.size(1),
+                                                                                src_encodings_att_linear.size(2))
+
+            y_tm1 = Variable(new_long_tensor([hyp[-1] for hyp in hypotheses_word_ids]), volatile=True)
+            y_tm1_embed = self.tgt_embed(y_tm1)
+
+            x = torch.cat([y_tm1_embed, att_tm1], 1)
+
+            (h_t, cell_t), att_t = self.step(x, h_tm1,
+                                             expanded_src_encodings, expanded_src_encodings_att_linear)
+
+            # (batch_size, 2)
+            tgt_token_predictor = F.softmax(self.tgt_token_predictor(att_t), dim=-1)
+
+            # (batch_size, tgt_vocab_size)
+            token_gen_prob = F.softmax(self.readout(att_t), dim=-1)
+
+            # (batch_size, src_sent_len)
+            token_copy_prob = self.src_pointer_net(src_encodings, src_token_mask=None, query_vec=att_t.unsqueeze(0)).squeeze(0)
+
+            # (batch_size, tgt_vocab_size)
+            token_gen_prob = tgt_token_predictor[:, 0].unsqueeze(1) * token_gen_prob
+
+            for token_pos, token_vocab_id in enumerate(src_token_tgt_vocab_ids):
+                if token_vocab_id != -1 and token_vocab_id != self.tgt_vocab.unk_id:
+                    p_copy = tgt_token_predictor[:, 1] * token_copy_prob[:, token_pos]
+                    token_gen_prob[:, token_vocab_id] = token_gen_prob[:, token_vocab_id] + p_copy
+
+            # second, add the probability of copying the most probable unk word
+            gentoken_new_hyp_unks = []
+            if src_unk_pos_list:
+                for hyp_id in xrange(hyp_num):
+                    unk_pos = token_copy_prob[hyp_id][src_unk_pos_list].data.cpu().numpy().argmax()
+                    unk_pos = src_unk_pos_list[unk_pos]
+                    token = src_sent[unk_pos]
+                    gentoken_new_hyp_unks.append(token)
+
+                    unk_copy_score = tgt_token_predictor[hyp_id, 1] * token_copy_prob[hyp_id, unk_pos]
+                    token_gen_prob[hyp_id, self.tgt_vocab.unk_id] = unk_copy_score
+
+            live_hyp_num = sample_size - len(completed_hypotheses)
+
+            if mode == 'beam_search':
+                log_token_gen_prob = torch.log(token_gen_prob)
+                new_hyp_scores = (hyp_scores.unsqueeze(1).expand_as(token_gen_prob) + log_token_gen_prob).view(-1)
+                top_new_hyp_scores, top_new_hyp_pos = torch.topk(new_hyp_scores, k=live_hyp_num)
+                prev_hyp_ids = (top_new_hyp_pos / len(self.tgt_vocab)).cpu().data
+                word_ids = (top_new_hyp_pos % len(self.tgt_vocab)).cpu().data
+                top_new_hyp_scores = top_new_hyp_scores.cpu().data
+            else:
+                word_ids = torch.multinomial(token_gen_prob, num_samples=1)
+                prev_hyp_ids = range(live_hyp_num)
+                top_new_hyp_scores = hyp_scores + torch.log(torch.gather(token_gen_prob, dim=1, index=word_ids)).squeeze(1)
+                top_new_hyp_scores = top_new_hyp_scores.cpu().data
+                word_ids = word_ids.view(-1).cpu().data
+
+            new_hypotheses = []
+            new_hypotheses_word_ids = []
+            live_hyp_ids = []
+            new_hyp_scores = []
+            for prev_hyp_id, word_id, new_hyp_score in zip(prev_hyp_ids, word_ids, top_new_hyp_scores):
+                if word_id == eos_id:
+                    hyp_tgt_words = hypotheses[prev_hyp_id][1:]
+                    completed_hypotheses.append(hyp_tgt_words)  # remove <s> and </s> in completed hypothesis
+                    completed_hypothesis_scores.append(new_hyp_score)
+                else:
+                    if word_id == self.tgt_vocab.unk_id:
+                        if gentoken_new_hyp_unks: word = gentoken_new_hyp_unks[prev_hyp_id]
+                        else: word = self.tgt_vocab.id2word[self.tgt_vocab.unk_id]
+                    else:
+                        word = self.tgt_vocab.id2word[word_id]
+
+                    hyp_tgt_words = hypotheses[prev_hyp_id] + [word]
+                    new_hypotheses.append(hyp_tgt_words)
+                    new_hypotheses_word_ids.append(hypotheses_word_ids[prev_hyp_id] + [word_id])
+                    live_hyp_ids.append(prev_hyp_id)
+                    new_hyp_scores.append(new_hyp_score)
+
+            if len(completed_hypotheses) == sample_size:
+                break
+
+            live_hyp_ids = new_long_tensor(live_hyp_ids)
+            h_tm1 = (h_t[live_hyp_ids], cell_t[live_hyp_ids])
+            att_tm1 = att_t[live_hyp_ids]
+
+            hyp_scores = Variable(new_float_tensor(new_hyp_scores), volatile=True)  # new_hyp_scores[live_hyp_ids]
+            hypotheses = new_hypotheses
+            hypotheses_word_ids = new_hypotheses_word_ids
+
+        return completed_hypotheses

@@ -34,7 +34,7 @@ def init_config():
     parser.add_argument('--seed', default=5783287, type=int, help='random seed')
     parser.add_argument('--cuda', action='store_true', default=False, help='use gpu')
     parser.add_argument('--lang', choices=['python', 'lambda_dcs'], default='python')
-    parser.add_argument('--mode', choices=['train', 'train_decoder', 'train_semi', 'log_semi', 'test'], default='train', help='run mode')
+    parser.add_argument('--mode', choices=['train', 'train_decoder', 'train_semi', 'log_semi', 'test', 'sample'], default='train', help='run mode')
 
     parser.add_argument('--lstm', choices=['lstm', 'lstm_with_dropout'], default='lstm')
 
@@ -613,7 +613,7 @@ def log_semi(args):
     decoder = Reconstructor(decoder_params['args'], decoder_params['vocab'], transition_system)
 
     if vae_params['args'].prior == 'lstm':
-        prior = LSTMPrior.load(vae_params['args'].load_prior, args.cuda)
+        prior = LSTMPrior.load(vae_params['args'].load_prior, args.cuda, transition_system=decoder_params['transition_system'])
         print('loaded prior at %s' % vae_params['args'].load_prior, file=sys.stderr)
         # freeze prior parameters
         for p in prior.parameters():
@@ -680,6 +680,55 @@ def log_semi(args):
     pkl.dump(log_entries, open(args.save_to, 'wb'))
 
 
+def sample(args):
+    print('loading VAE at %s' % args.load_model, file=sys.stderr)
+    fname, ext = os.path.splitext(args.load_model)
+    encoder_path = fname + '.encoder' + ext
+    decoder_path = fname + '.decoder' + ext
+
+    vae_params = torch.load(args.load_model, map_location=lambda storage, loc: storage)
+    encoder_params = torch.load(encoder_path, map_location=lambda storage, loc: storage)
+    decoder_params = torch.load(decoder_path, map_location=lambda storage, loc: storage)
+
+    transition_system = encoder_params['transition_system']
+    vae_params['args'].cuda = encoder_params['args'].cuda = decoder_params['args'].cuda = args.cuda
+
+    decoder = Reconstructor(decoder_params['args'], decoder_params['vocab'], transition_system)
+    decoder.load_state_dict(decoder_params['state_dict'])
+
+    assert vae_params['args'].prior == 'lstm'
+    prior = LSTMPrior.load(args.load_prior, transition_system=decoder_params['transition_system'], cuda=args.cuda)
+    print('loaded prior at %s' % args.load_prior, file=sys.stderr)
+    # freeze prior parameters
+    for p in prior.parameters():
+        p.requires_grad = False
+
+    decoder.eval()
+    prior.eval()
+
+    if args.cuda:
+        decoder.cuda()
+        prior.cuda()
+
+    while True:
+        sampled_z = prior.sample()
+        sampled_z = ' '.join(sampled_z)
+        sampled_z = sampled_z.replace(' else :', 'else :').replace(' except ', 'except ').replace(' elif ', 'elif ').replace('<unk>', 'unk')
+
+        print('Z: %s' % sampled_z)
+        print('Sampled NL sentences:')
+
+        try:
+            transition_system.surface_code_to_ast(sampled_z)
+            sampled_nls = decoder.sample(sampled_z)
+            for i, sampled_nl in enumerate(sampled_nls):
+                print('[%d] %s' % (i, ' '.join(sampled_nl)))
+        except:
+            print('Error!')
+
+        print()
+
+
 def test(args):
     test_set = Dataset.from_bin_file(args.test_file)
     assert args.load_model
@@ -718,5 +767,7 @@ if __name__ == '__main__':
         test(args)
     elif args.mode == 'log_semi':
         log_semi(args)
+    elif args.mode == 'sample':
+        sample(args)
     else:
         raise RuntimeError('unknown mode')
