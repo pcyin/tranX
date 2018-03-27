@@ -710,23 +710,34 @@ def sample(args):
         decoder.cuda()
         prior.cuda()
 
-    while True:
+    err_num = 0
+    total_num = 0
+
+    # while True:
+    for sample_id in xrange(10000):
         sampled_z = prior.sample()
         sampled_z = ' '.join(sampled_z)
         sampled_z = sampled_z.replace(' else :', 'else :').replace(' except ', 'except ').replace(' elif ', 'elif ').replace('<unk>', 'unk')
 
         print('Z: %s' % sampled_z)
-        print('Sampled NL sentences:')
+        total_num += 1
 
         try:
             transition_system.surface_code_to_ast(sampled_z)
-            sampled_nls = decoder.sample(sampled_z)
-            for i, sampled_nl in enumerate(sampled_nls):
-                print('[%d] %s' % (i, ' '.join(sampled_nl)))
         except:
             print('Error!')
+            err_num += 1
+            continue
+
+        print('Sampled NL sentences:')
+        sampled_nls = decoder.sample(sampled_z)
+        for i, sampled_nl in enumerate(sampled_nls):
+            print('[%d] %s' % (i, ' '.join(sampled_nl)))
 
         print()
+
+    print('Ratio of well-formed samples: %d/%d=%.5f' % (total_num - err_num, total_num,
+                                                        (total_num - err_num) / float(total_num)), file=sys.stderr)
 
 
 def test(args):
