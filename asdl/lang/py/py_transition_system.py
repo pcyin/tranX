@@ -33,6 +33,15 @@ class PythonTransitionSystem(TransitionSystem):
 
         return code
 
+    def compare_ast(self, hyp_ast, ref_ast):
+        hyp_code = self.ast_to_surface_code(hyp_ast)
+        ref_reformatted_code = self.ast_to_surface_code(ref_ast)
+
+        ref_code_tokens = tokenize_code(ref_reformatted_code)
+        hyp_code_tokens = tokenize_code(hyp_code)
+
+        return ref_code_tokens == hyp_code_tokens
+
     def get_primitive_field_actions(self, realized_field):
         actions = []
         if realized_field.value is not None:
