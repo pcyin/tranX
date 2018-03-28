@@ -370,7 +370,7 @@ def self_training(args):
     saved_args.cuda = args.cuda
     saved_args.save_to = args.save_to
     saved_args.train_file = args.train_file
-    saved_args.unlabeled_data = args.unlabeled_data
+    saved_args.unlabeled_file = args.unlabeled_file
     saved_args.dev_file = args.dev_file
     saved_args.load_decode_results = args.load_decode_results
     args = saved_args
