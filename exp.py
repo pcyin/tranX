@@ -34,7 +34,7 @@ def init_config():
     parser.add_argument('--seed', default=5783287, type=int, help='random seed')
     parser.add_argument('--cuda', action='store_true', default=False, help='use gpu')
     parser.add_argument('--lang', choices=['python', 'lambda_dcs'], default='python')
-    parser.add_argument('--mode', choices=['train', 'train_decoder', 'train_semi', 'log_semi', 'test', 'sample'], default='train', help='run mode')
+    parser.add_argument('--mode', choices=['train', 'self_train', 'train_decoder', 'train_semi', 'log_semi', 'test', 'sample'], default='train', help='run mode')
 
     parser.add_argument('--lstm', choices=['lstm', 'lstm_with_dropout'], default='lstm')
 
@@ -931,6 +931,8 @@ if __name__ == '__main__':
     print(args, file=sys.stderr)
     if args.mode == 'train':
         train(args)
+    elif args.mode == 'self_train':
+        self_training(args)
     elif args.mode == 'train_decoder':
         train_decoder(args)
     elif args.mode == 'train_semi':
