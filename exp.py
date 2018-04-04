@@ -385,7 +385,7 @@ def self_training(args):
     print('load unlabeled data [%s]' % args.unlabeled_file, file=sys.stderr)
     unlabeled_data = Dataset.from_bin_file(args.unlabeled_file)
 
-    print('load decoding results on unlabeled data [%s]' % args.load_decode_results, file=sys.stderr)
+    print('load decoding results of unlabeled data [%s]' % args.load_decode_results, file=sys.stderr)
     decode_results = pkl.load(open(args.load_decode_results))
 
     labeled_data = Dataset.from_bin_file(args.train_file)
