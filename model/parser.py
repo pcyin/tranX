@@ -258,7 +258,7 @@ class Parser(nn.Module):
         att_vecs = torch.stack(att_vecs)
         return att_vecs
 
-    def parse(self, src_sent, beam_size=5):
+    def parse(self, src_sent, context=None, beam_size=5):
         args = self.args
         primitive_vocab = self.vocab.primitive
 
