@@ -133,10 +133,13 @@ class TransitionSystem(object):
     @staticmethod
     def get_class_by_lang(lang):
         if lang == 'python':
-            from lang.py.py_transition_system import PythonTransitionSystem
+            from .lang.py.py_transition_system import PythonTransitionSystem
             return PythonTransitionSystem
         elif lang == 'lambda_dcs':
-            from lang.lambda_dcs.lambda_dcs_transition_system import LambdaCalculusTransitionSystem
+            from .lang.lambda_dcs.lambda_dcs_transition_system import LambdaCalculusTransitionSystem
             return LambdaCalculusTransitionSystem
+        elif lang == 'wikisql':
+            from .lang.sql.sql_transition_system import SqlTransitionSystem
+            return SqlTransitionSystem
 
         raise ValueError

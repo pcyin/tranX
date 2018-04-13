@@ -15,7 +15,7 @@ class VocabEntry(object):
         self.word2id['</s>'] = 2
         self.word2id['<unk>'] = 3
 
-        self.id2word = {v: k for k, v in self.word2id.iteritems()}
+        self.id2word = {v: k for k, v in self.word2id.items()}
 
     def __getitem__(self, word):
         return self.word2id.get(word, self.unk_id)
@@ -68,7 +68,7 @@ class VocabEntry(object):
 class Vocab(object):
     def __init__(self, **kwargs):
         self.entries = []
-        for key, item in kwargs.iteritems():
+        for key, item in kwargs.items():
             assert isinstance(item, VocabEntry)
             self.__setattr__(key, item)
 

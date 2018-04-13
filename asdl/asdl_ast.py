@@ -1,9 +1,11 @@
 # coding=utf-8
 
-from cStringIO import StringIO
+try:
+    from cStringIO import StringIO
+except:
+    from io import StringIO
 
-from asdl import *
-from asdl import Field
+from asdl.asdl import *
 
 
 class AbstractSyntaxTree(object):
@@ -116,7 +118,7 @@ class AbstractSyntaxTree(object):
         if len(self.fields) != len(other.fields):
             return False
 
-        for i in xrange(len(self.fields)):
+        for i in range(len(self.fields)):
             if self.fields[i] != other.fields[i]: return False
 
         return True
@@ -153,12 +155,13 @@ class RealizedField(Field):
         # initialize value to correct type
         if self.cardinality == 'multiple':
             self.value = []
-            if value:
+            if value is not None:
                 for child_node in value:
                     self.add_value(child_node)
         else:
             self.value = None
-            if value: self.add_value(value)
+            # note the value could be 0!
+            if value is not None: self.add_value(value)
 
         # properties only used in decoding, record if the field is finished generating
         # when card in [optional, multiple]

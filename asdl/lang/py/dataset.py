@@ -3,7 +3,7 @@
 from __future__ import print_function
 
 import re
-import cPickle as pickle
+import pickle
 import ast
 import astor
 import nltk
@@ -29,7 +29,7 @@ p_decorator = re.compile(r'^@.*')
 QUOTED_STRING_RE = re.compile(r"(?P<quote>['\"])(?P<string>.*?)(?<!\\)(?P=quote)")
 
 
-def get_action_infos(src_query, tgt_actions):
+def get_action_infos(src_query, tgt_actions, force_copy=False):
     action_infos = []
     hyp = Hypothesis()
     for t, action in enumerate(tgt_actions):
@@ -46,7 +46,7 @@ def get_action_infos(src_query, tgt_actions):
                 action_info.copy_from_src = True
                 action_info.src_token_position = tok_src_idx
             except ValueError:
-                pass
+                if force_copy: raise ValueError('cannot copy primitive token %s from source' % action.token)
 
         hyp.apply_action(action)
         action_infos.append(action_info)
@@ -274,7 +274,7 @@ class Django(object):
         # pickle.dump(train, open('data/django/train.bin', 'w'))
         # pickle.dump(dev, open('data/django/dev.bin', 'w'))
         # pickle.dump(test, open('data/django/test.bin', 'w'))
-        pickle.dump(vocab, open('data/django/vocab.freq10.bin', 'w'))
+        # pickle.dump(vocab, open('data/django/vocab.freq10.bin', 'w'))
 
     @staticmethod
     def run():

@@ -1,7 +1,7 @@
 # coding=utf-8
 from itertools import chain
 
-import utils
+import asdl.utils as utils
 
 
 class ASDLGrammar(object):
@@ -20,7 +20,7 @@ class ASDLGrammar(object):
 
         self.root_type = productions[0].type
         # number of constructors
-        self.size = sum(len(head) for head in self._productions.itervalues())
+        self.size = sum(len(head) for head in self._productions.values())
 
         # get entities to their ids map
         self.prod2id = {prod: i for i, prod in enumerate(self.productions)}
@@ -36,7 +36,7 @@ class ASDLGrammar(object):
 
     @property
     def productions(self):
-        return sorted(chain.from_iterable(self._productions.itervalues()), key=lambda x: repr(x))
+        return sorted(chain.from_iterable(self._productions.values()), key=lambda x: repr(x))
 
     def __getitem__(self, datum):
         if isinstance(datum, str):
@@ -118,12 +118,12 @@ class ASDLGrammar(object):
             return ASDLConstructor(name, fields)
 
         lines = utils.remove_comment(text).split('\n')
-        lines = map(lambda l: l.strip(), lines)
-        lines = filter(lambda l: l, lines)
+        lines = list(map(lambda l: l.strip(), lines))
+        lines = list(filter(lambda l: l, lines))
         line_no = 0
 
         # first line is always the primitive types
-        primitive_type_names = map(lambda x: x.strip(), lines[line_no].split(','))
+        primitive_type_names = list(map(lambda x: x.strip(), lines[line_no].split(',')))
         line_no += 1
 
         all_productions = list()
@@ -146,7 +146,7 @@ class ASDLGrammar(object):
             new_type = ASDLPrimitiveType(type_name) if type_name in primitive_type_names else ASDLCompositeType(type_name)
             constructors = map(_parse_constructor_from_text, constructors_blocks)
 
-            productions = map(lambda c: ASDLProduction(new_type, c), constructors)
+            productions = list(map(lambda c: ASDLProduction(new_type, c), constructors))
             all_productions.extend(productions)
 
             line_no = i
@@ -154,7 +154,6 @@ class ASDLGrammar(object):
                 break
 
         grammar = ASDLGrammar(all_productions)
-        grammar.primitive_types
 
         return grammar
 

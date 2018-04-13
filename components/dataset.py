@@ -2,7 +2,11 @@
 
 import torch
 import numpy as np
-import cPickle as pickle
+try:
+    import cPickle as pickle
+except:
+    import pickle
+
 from torch.autograd import Variable
 
 from asdl.transition_system import ApplyRuleAction, ReduceAction
@@ -34,7 +38,7 @@ class Dataset(object):
             np.random.shuffle(index_arr)
 
         batch_num = int(np.ceil(len(self.examples) / float(batch_size)))
-        for batch_id in xrange(batch_num):
+        for batch_id in range(batch_num):
             batch_ids = index_arr[batch_size * batch_id: batch_size * (batch_id + 1)]
             batch_examples = [self.examples[i] for i in batch_ids]
             batch_examples.sort(key=lambda e: -len(e.src_sent))
@@ -117,7 +121,7 @@ class Batch(object):
         self.primitive_copy_pos_matrix = []
         self.primitive_copy_mask = []
 
-        for t in xrange(self.max_action_num):
+        for t in range(self.max_action_num):
             app_rule_idx_row = []
             app_rule_mask_row = []
             token_row = []

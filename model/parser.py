@@ -46,7 +46,7 @@ class Parser(nn.Module):
 
         # LSTMs
         if args.lstm == 'lstm':
-            self.encoder_lstm = nn.LSTM(args.embed_size, args.hidden_size / 2, bidirectional=True)
+            self.encoder_lstm = nn.LSTM(args.embed_size, int(args.hidden_size / 2), bidirectional=True)
             self.decoder_lstm = nn.LSTMCell(args.action_embed_size +  # previous action
                                             args.action_embed_size + args.field_embed_size + args.type_embed_size +  # frontier info
                                             args.hidden_size +  # parent hidden state

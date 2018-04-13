@@ -16,7 +16,7 @@ from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 from components.dataset import Example
 from model.prior import UniformPrior
 from parser import *
-from reconstruction_model import *
+from model.reconstruction_model import *
 
 
 class StructVAE(nn.Module):

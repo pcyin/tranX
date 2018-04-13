@@ -1,6 +1,10 @@
 # coding=utf-8
 
-from cStringIO import StringIO
+try:
+    from cStringIO import StringIO
+except:
+    from io import StringIO
+
 from collections import Iterable
 
 from asdl.asdl import *
@@ -349,4 +353,5 @@ if __name__ == '__main__':
         new_lf = ast_to_logical_form(ast_tree)
         assert lf == new_lf
         ast_tree.sanity_check()
+        print(lf.to_string())
     pass

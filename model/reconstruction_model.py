@@ -14,7 +14,7 @@ from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
 from model.pointer_net import PointerNet
 from model.seq2seq import Seq2SeqModel
-import nn_utils
+import model.nn_utils
 from model.seq2seq_copy import Seq2SeqWithCopy
 
 

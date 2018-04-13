@@ -8,6 +8,8 @@ import torch
 from torch.autograd import Variable
 import numpy as np
 
+from six.moves import xrange
+
 
 def dot_prod_attention(h_t, src_encoding, src_encoding_att_linear, mask=None):
     """

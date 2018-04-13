@@ -1,0 +1,12 @@
+# define primitive fields
+column_idx, string
+
+# select $agg? $col_name where ($colname $op $value)*
+
+stmt = Select(agg_op? agg, column_idx col_idx, cond_expr* conditions)
+
+cond_expr = Condition(cmp_op op, column_idx col_idx, string value)
+
+agg_op = Max | Min | Count | Sum | Avg
+
+cmp_op = Equal | GreaterThan | LessThan | Other

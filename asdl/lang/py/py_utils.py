@@ -3,7 +3,10 @@
 from __future__ import print_function
 
 import token as tk
-from cStringIO import StringIO
+try:
+    from cStringIO import StringIO
+except:
+    from io import StringIO
 from tokenize import generate_tokens
 
 

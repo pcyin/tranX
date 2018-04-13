@@ -15,7 +15,7 @@ def decode(examples, model, args, verbose=False):
     decode_results = []
     count = 0
     for example in examples:
-        hyps = model.parse(example.src_sent, beam_size=args.beam_size)
+        hyps = model.parse(example.src_sent, context=example.table, beam_size=args.beam_size)
         decoded_hyps = []
         for hyp_id, hyp in enumerate(hyps):
             try:
@@ -47,6 +47,7 @@ def evaluate(examples, parser, args, verbose=False, return_decode_result=False):
         if hyps:
             cur_oracle = 0.
             hyp_code_set = set()
+            print('Reference: %s' % example.tgt_code)
             for hyp_id, hyp in enumerate(hyps):
                 try:
                     result = parser.transition_system.hyp_correct(hyp, example)
@@ -57,14 +58,16 @@ def evaluate(examples, parser, args, verbose=False, return_decode_result=False):
                         cur_oracle = 1.
 
                     hyp.correct = result
+                    print('Hyp %d: %s' % (hyp_id, hyp.code))
                 except:
                     print('Hyp Id [%d] error in evluating [%s]' % (hyp_id, hyp.code), file=sys.stderr)
                     hyp.correct = False
                     continue
 
-                if hyp.code in hyp_code_set:
-                    print('Duplicate Hyp Example [%d], Code %s' % (example.idx, hyp.code), file=sys.stdout)
-                hyp_code_set.add(hyp.code)
+                if args.lang in ['lambda_dcs', 'python']:
+                    if hyp.code in hyp_code_set:
+                        print('Duplicate Hyp Example [%d], Code %s' % (example.idx, hyp.code), file=sys.stdout)
+                    hyp_code_set.add(hyp.code)
 
             cum_oracle_acc += cur_oracle
 

@@ -2,16 +2,13 @@
 from __future__ import print_function
 
 import argparse
-import cPickle as pickle
+import six.moves.cPickle as pickle
 import traceback
-from itertools import ifilter
 
 import numpy as np
 import time
-import math
 import os
 import sys
-import cPickle as pkl
 
 import torch
 from torch.autograd import Variable
@@ -27,13 +24,15 @@ from model.parser import Parser
 from model.prior import UniformPrior, LSTMPrior
 from model.reconstruction_model import Reconstructor
 from model.struct_vae import StructVAE, StructVAE_LMBaseline, StructVAE_SrcLmAndLinearBaseline
+from model.wikisql.parser import WikiSqlParser
+from model.wikisql.dataset import WikiSqlExample, WikiSqlTable, TableColumn
 
 
 def init_config():
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', default=5783287, type=int, help='random seed')
     parser.add_argument('--cuda', action='store_true', default=False, help='use gpu')
-    parser.add_argument('--lang', choices=['python', 'lambda_dcs'], default='python')
+    parser.add_argument('--lang', choices=['python', 'lambda_dcs', 'wikisql'], default='python')
     parser.add_argument('--mode', choices=['train', 'self_train', 'train_decoder', 'train_semi', 'log_semi', 'test', 'sample'], default='train', help='run mode')
 
     parser.add_argument('--lstm', choices=['lstm', 'lstm_with_dropout'], default='lstm')
@@ -108,19 +107,29 @@ def init_config():
     torch.manual_seed(args.seed)
     if args.cuda:
         torch.cuda.manual_seed(args.seed)
-    np.random.seed(args.seed * 13 / 7)
+    np.random.seed(int(args.seed * 13 / 7))
 
     return args
+
+
+def get_parser_class(lang):
+    if lang in ['python', 'lambda_dcs']:
+        return Parser
+    elif lang == 'wikisql':
+        return WikiSqlParser
 
 
 def train(args):
     grammar = ASDLGrammar.from_text(open(args.asdl_file).read())
     transition_system = TransitionSystem.get_class_by_lang(args.lang)(grammar)
     train_set = Dataset.from_bin_file(args.train_file)
+    train_set.examples = train_set.examples[:100]
     dev_set = Dataset.from_bin_file(args.dev_file)
-    vocab = pickle.load(open(args.vocab))
+    dev_set = train_set
+    vocab = pickle.load(open(args.vocab, 'rb'))
 
-    model = Parser(args, vocab, transition_system)
+    parser_cls = get_parser_class(args.lang)
+    model = parser_cls(args, vocab, transition_system)
     model.train()
     if args.cuda: model.cuda()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -386,7 +395,7 @@ def self_training(args):
     unlabeled_data = Dataset.from_bin_file(args.unlabeled_file)
 
     print('load decoding results of unlabeled data [%s]' % args.load_decode_results, file=sys.stderr)
-    decode_results = pkl.load(open(args.load_decode_results))
+    decode_results = pickle.load(open(args.load_decode_results))
 
     labeled_data = Dataset.from_bin_file(args.train_file)
     dev_set = Dataset.from_bin_file(args.dev_file)
@@ -553,7 +562,7 @@ def train_semi(args):
     dev_set = Dataset.from_bin_file(args.dev_file)
     # dev_set.examples = dev_set.examples[:10]
 
-    optimizer = torch.optim.Adam(ifilter(lambda p: p.requires_grad, structVAE.parameters()), lr=args.lr)
+    optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, structVAE.parameters()), lr=args.lr)
 
     print('*** begin semi-supervised training %d labeled examples, %d unlabeled examples ***' %
           (len(labeled_data), len(unlabeled_data)), file=sys.stderr)
@@ -838,7 +847,7 @@ def log_semi(args):
             log_entries.append(log_entry)
 
     print('done! took %d s' % (time.time() - start_time), file=sys.stderr)
-    pkl.dump(log_entries, open(args.save_to, 'wb'))
+    pickle.dump(log_entries, open(args.save_to, 'wb'))
 
 
 def sample(args):
@@ -923,7 +932,7 @@ def test(args):
                                                        verbose=True, return_decode_result=True)
     print(eval_results, file=sys.stderr)
     if args.save_decode_to:
-        pkl.dump(decode_results, open(args.save_decode_to, 'wb'))
+        pickle.dump(decode_results, open(args.save_decode_to, 'wb'))
 
 
 if __name__ == '__main__':
