@@ -99,7 +99,7 @@ class SqlTransitionSystem(TransitionSystem):
     def hyp_correct(self, hyp, example):
         hyp_query = asdl_ast_to_sql_query(hyp.tree)
         ref_query = Query.from_tokenized_dict(example.meta['query'])
-        detokenized_hyp_query = detokenize_query(hyp_query, example.meta)
+        detokenized_hyp_query = detokenize_query(hyp_query, example.meta, example.table)
 
         result = detokenized_hyp_query == ref_query
 

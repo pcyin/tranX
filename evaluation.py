@@ -47,7 +47,7 @@ def evaluate(examples, parser, args, verbose=False, return_decode_result=False):
         if hyps:
             cur_oracle = 0.
             hyp_code_set = set()
-            print('Reference: %s' % example.tgt_code)
+            print('Reference: %s' % example.tgt_code, file=sys.stderr)
             for hyp_id, hyp in enumerate(hyps):
                 try:
                     result = parser.transition_system.hyp_correct(hyp, example)
@@ -58,7 +58,8 @@ def evaluate(examples, parser, args, verbose=False, return_decode_result=False):
                         cur_oracle = 1.
 
                     hyp.correct = result
-                    print('Hyp %d: %s' % (hyp_id, hyp.code))
+                    from asdl.lang.sql.utils import detokenize_query
+                    print('Hyp %d: %s' % (hyp_id, detokenize_query(hyp.code, example.meta, example.table)), file=sys.stderr)
                 except:
                     print('Hyp Id [%d] error in evluating [%s]' % (hyp_id, hyp.code), file=sys.stderr)
                     hyp.correct = False
