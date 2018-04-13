@@ -24,6 +24,7 @@ from model.parser import Parser
 from model.prior import UniformPrior, LSTMPrior
 from model.reconstruction_model import Reconstructor
 from model.struct_vae import StructVAE, StructVAE_LMBaseline, StructVAE_SrcLmAndLinearBaseline
+from model.utils import GloveHelper
 from model.wikisql.parser import WikiSqlParser
 from model.wikisql.dataset import WikiSqlExample, WikiSqlTable, TableColumn
 
@@ -38,6 +39,7 @@ def init_config():
     parser.add_argument('--lstm', choices=['lstm', 'lstm_with_dropout'], default='lstm')
 
     parser.add_argument('--load_model', default=None, type=str, help='load a pre-trained model')
+    parser.add_argument('--glove_embed_path', default=None, type=str)
 
     parser.add_argument('--batch_size', default=10, type=int, help='batch size')
     parser.add_argument('--unsup_batch_size', default=10, type=int)
@@ -133,6 +135,12 @@ def train(args):
     model.train()
     if args.cuda: model.cuda()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+
+    # load pre-trained word embedding (optional)
+    if args.glove_embed_path:
+        print('load glove embedding from: %s' % args.glove_embed_path, file=sys.stderr)
+        glove_embedding = GloveHelper(args.glove_embed_path)
+        glove_embedding.load_to(model.src_embed, vocab.source)
 
     print('begin training, %d training examples, %d dev examples' % (len(train_set), len(dev_set)), file=sys.stderr)
     print('vocab: %s' % repr(vocab), file=sys.stderr)

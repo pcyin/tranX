@@ -26,8 +26,8 @@ class WikiSqlParser(Parser):
     def __init__(self, args, vocab, transition_system):
         super(WikiSqlParser, self).__init__(args, vocab, transition_system)
 
-        self.table_header_lstm = nn.LSTM(args.embed_size, int(args.hidden_size / 2), bidirectional=True, batch_first=True)
-        self.column_pointer_net = PointerNet(args.hidden_size, args.hidden_size)
+        self.table_header_lstm = nn.LSTM(args.embed_size, int(args.embed_size / 2), bidirectional=True, batch_first=True)
+        self.column_pointer_net = PointerNet(args.hidden_size, args.embed_size)
 
     def encode_table_header(self, tables):
         # input, ids of table word: (batch_size, max_column_num)
