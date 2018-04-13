@@ -1,7 +1,7 @@
 # coding=utf-8
 from itertools import chain
 
-import asdl.utils as utils
+from .utils import remove_comment
 
 
 class ASDLGrammar(object):
@@ -117,7 +117,7 @@ class ASDLGrammar(object):
 
             return ASDLConstructor(name, fields)
 
-        lines = utils.remove_comment(text).split('\n')
+        lines = remove_comment(text).split('\n')
         lines = list(map(lambda l: l.strip(), lines))
         lines = list(filter(lambda l: l, lines))
         line_no = 0
