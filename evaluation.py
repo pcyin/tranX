@@ -61,6 +61,9 @@ def evaluate(examples, parser, args, verbose=False, return_decode_result=False):
                             execution_engine = DBEngine(table_file)
 
                         result = parser.transition_system.hyp_correct(hyp, example, execution_engine)
+
+                        from asdl.lang.sql.utils import detokenize_query
+                        print('Hyp %d: %s ||| %s' % (hyp_id, detokenize_query(hyp.code, example.meta, example.table), result), file=sys.stderr)
                     else:
                         result = parser.transition_system.hyp_correct(hyp, example)
 
@@ -70,8 +73,6 @@ def evaluate(examples, parser, args, verbose=False, return_decode_result=False):
                         cur_oracle = 1.
 
                     hyp.correct = result
-                    from asdl.lang.sql.utils import detokenize_query
-                    print('Hyp %d: %s ||| %s' % (hyp_id, detokenize_query(hyp.code, example.meta, example.table), result), file=sys.stderr)
                 except:
                     print('Hyp Id [%d] error in evluating [%s]' % (hyp_id, hyp.code), file=sys.stderr)
                     hyp.correct = False
