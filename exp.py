@@ -927,6 +927,8 @@ def test(args):
     saved_args = params['args']
     saved_state = params['state_dict']
     saved_args.cuda = args.cuda
+    # set the correct domain from saved arg
+    args.lang = saved_args.lang
 
     parser_cls = get_parser_class(saved_args.lang)
     parser = parser_cls(saved_args, vocab, transition_system)
