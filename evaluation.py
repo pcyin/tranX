@@ -44,6 +44,17 @@ def decode(examples, model, args, verbose=False):
 def evaluate(examples, parser, args, verbose=False, return_decode_result=False):
     cum_oracle_acc = cum_acc = 0.0
     decode_results = decode(examples, parser, args, verbose=verbose)
+
+    if args.lang == 'wikisql':
+        from asdl.lang.sql.lib.dbengine import DBEngine
+        from asdl.lang.sql.utils import detokenize_query
+
+        if args.mode == 'train':
+            table_file = os.path.splitext(args.dev_file)[0] + '.db'
+        else:
+            table_file = os.path.splitext(args.test_file)[0] + '.db'
+        execution_engine = DBEngine(table_file)
+
     for example, hyps in zip(examples, decode_results):
         if hyps:
             cur_oracle = 0.
@@ -52,18 +63,9 @@ def evaluate(examples, parser, args, verbose=False, return_decode_result=False):
             for hyp_id, hyp in enumerate(hyps):
                 try:
                     if args.lang == 'wikisql':
-                        if 'execution_engine' not in globals():
-                            from asdl.lang.sql.lib.dbengine import DBEngine
-                            if args.mode == 'train':
-                                table_file = os.path.splitext(args.dev_file)[0] + '.db'
-                            else:
-                                table_file = os.path.splitext(args.test_file)[0] + '.db'
-                            execution_engine = DBEngine(table_file)
-
                         result = parser.transition_system.hyp_correct(hyp, example, execution_engine)
-
-                        from asdl.lang.sql.utils import detokenize_query
-                        print('Hyp %d: %s ||| %s' % (hyp_id, detokenize_query(hyp.code, example.meta, example.table), result), file=sys.stderr)
+                        print('Hyp %d: %s ||| %s' % (hyp_id, detokenize_query(hyp.code, example.meta, example.table), result),
+                              file=sys.stderr)
                     else:
                         result = parser.transition_system.hyp_correct(hyp, example)
 
