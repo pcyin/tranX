@@ -928,7 +928,9 @@ def test(args):
     saved_state = params['state_dict']
     saved_args.cuda = args.cuda
 
-    parser = Parser(saved_args, vocab, transition_system)
+    parser_cls = get_parser_class(args.lang)
+    parser = parser_cls(args, vocab, transition_system)
+
     parser.load_state_dict(saved_state)
 
     if args.cuda: parser = parser.cuda()
