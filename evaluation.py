@@ -3,6 +3,7 @@ from __future__ import print_function
 
 import sys
 import traceback
+import os
 
 
 def decode(examples, model, args, verbose=False):
@@ -50,7 +51,18 @@ def evaluate(examples, parser, args, verbose=False, return_decode_result=False):
             print('Reference: %s' % example.tgt_code, file=sys.stderr)
             for hyp_id, hyp in enumerate(hyps):
                 try:
-                    result = parser.transition_system.hyp_correct(hyp, example)
+                    if args.lang == 'wikisql':
+                        if 'execution_engine' not in globals():
+                            from asdl.lang.sql.lib.dbengine import DBEngine
+                            if args.mode == 'train':
+                                table_file = os.path.splitext(args.dev_file)[0] + '.db'
+                            else:
+                                table_file = os.path.splitext(args.test_file)[0] + '.db'
+                            execution_engine = DBEngine(table_file)
+
+                        result = parser.transition_system.hyp_correct(hyp, example, execution_engine)
+                    else:
+                        result = parser.transition_system.hyp_correct(hyp, example)
 
                     if hyp_id == 0 and result:
                         cum_acc += 1
@@ -59,7 +71,7 @@ def evaluate(examples, parser, args, verbose=False, return_decode_result=False):
 
                     hyp.correct = result
                     from asdl.lang.sql.utils import detokenize_query
-                    print('Hyp %d: %s' % (hyp_id, detokenize_query(hyp.code, example.meta, example.table)), file=sys.stderr)
+                    print('Hyp %d: %s ||| %s' % (hyp_id, detokenize_query(hyp.code, example.meta, example.table), result), file=sys.stderr)
                 except:
                     print('Hyp Id [%d] error in evluating [%s]' % (hyp_id, hyp.code), file=sys.stderr)
                     hyp.correct = False

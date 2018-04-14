@@ -125,7 +125,9 @@ def train(args):
     grammar = ASDLGrammar.from_text(open(args.asdl_file).read())
     transition_system = TransitionSystem.get_class_by_lang(args.lang)(grammar)
     train_set = Dataset.from_bin_file(args.train_file)
+    train_set.examples = train_set.examples[:10]
     dev_set = Dataset.from_bin_file(args.dev_file)
+    dev_set = train_set
     vocab = pickle.load(open(args.vocab, 'rb'))
 
     parser_cls = get_parser_class(args.lang)
