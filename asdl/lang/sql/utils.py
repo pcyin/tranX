@@ -32,11 +32,12 @@ def detokenize_query(query, example_dict, table):
         detokenized_cond_val = my_detokenize(val_tokens, example_dict['question'])
 
         if table.header[col].type == 'real' and not isinstance(detokenized_cond_val, (int, float)):
-            try:
-                detokenized_cond_val = float(parse_decimal(val))
-            except NumberFormatError as e:
-                try: detokenized_cond_val = float(num_re.findall(val)[0])
-                except: pass
+            if ',' not in detokenized_cond_val:
+                try:
+                    detokenized_cond_val = float(parse_decimal(val))
+                except NumberFormatError as e:
+                    try: detokenized_cond_val = float(num_re.findall(val)[0])
+                    except: pass
 
         detokenized_conds.append((col, op, detokenized_cond_val))
 
