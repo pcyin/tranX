@@ -929,7 +929,7 @@ def test(args):
     saved_args.cuda = args.cuda
 
     parser_cls = get_parser_class(args.lang)
-    parser = parser_cls(args, vocab, transition_system)
+    parser = parser_cls(saved_args, vocab, transition_system)
 
     parser.load_state_dict(saved_state)
 
