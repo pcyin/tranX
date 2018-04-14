@@ -2,6 +2,7 @@
 from __future__ import print_function
 
 import os
+from six.moves import xrange
 
 import torch
 import torch.nn as nn
@@ -458,7 +459,7 @@ class Parser(nn.Module):
                     # it's a GenToken action
                     token_id = (new_hyp_pos - len(applyrule_new_hyp_scores)) % primitive_prob.size(1)
 
-                    k = (new_hyp_pos - len(applyrule_new_hyp_scores)) / primitive_prob.size(1)
+                    k = (new_hyp_pos - len(applyrule_new_hyp_scores)) // primitive_prob.size(1)
                     # try:
                     copy_info = gentoken_copy_infos[k]
                     prev_hyp_id = gentoken_prev_hyp_ids[k]

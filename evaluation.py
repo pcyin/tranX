@@ -16,7 +16,10 @@ def decode(examples, model, args, verbose=False):
     decode_results = []
     count = 0
     for example in examples:
-        hyps = model.parse(example.src_sent, context=example.table, beam_size=args.beam_size)
+        if args.lang == 'wikisql':
+            hyps = model.parse(example.src_sent, context=example.table, beam_size=args.beam_size)
+        else:
+            hyps = model.parse(example.src_sent, context=None, beam_size=args.beam_size)
         decoded_hyps = []
         for hyp_id, hyp in enumerate(hyps):
             try:
@@ -59,13 +62,13 @@ def evaluate(examples, parser, args, verbose=False, return_decode_result=False):
         if hyps:
             cur_oracle = 0.
             hyp_code_set = set()
-            print('Reference: %s' % example.tgt_code, file=sys.stderr)
+            # print('Reference: %s' % example.tgt_code, file=sys.stderr)
             for hyp_id, hyp in enumerate(hyps):
                 try:
                     if args.lang == 'wikisql':
                         result = parser.transition_system.hyp_correct(hyp, example, execution_engine)
-                        print('Hyp %d: %s ||| %s' % (hyp_id, detokenize_query(hyp.code, example.meta, example.table), result),
-                              file=sys.stderr)
+                        # print('Hyp %d: %s ||| %s' % (hyp_id, detokenize_query(hyp.code, example.meta, example.table), result),
+                        #       file=sys.stderr)
                     else:
                         result = parser.transition_system.hyp_correct(hyp, example)
 

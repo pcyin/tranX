@@ -4,7 +4,7 @@ from asdl.transition_system import TransitionSystem, GenTokenAction, ReduceActio
 from asdl.asdl import *
 from asdl.asdl_ast import *
 
-from logical_form import ast_to_logical_form, logical_form_to_ast, Node, parse_lambda_expr
+from .logical_form import ast_to_logical_form, logical_form_to_ast, Node, parse_lambda_expr
 
 
 class LambdaCalculusTransitionSystem(TransitionSystem):
