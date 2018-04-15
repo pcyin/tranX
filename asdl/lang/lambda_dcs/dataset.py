@@ -3,15 +3,16 @@ from __future__ import print_function
 
 import sys
 import numpy as np
-import cPickle as pickle
+try: import cPickle as pickle
+except: import pickle
 
 from asdl.hypothesis import Hypothesis
 from asdl.lang.py.dataset import get_action_infos
 from asdl.transition_system import *
 from components.dataset import Example
 from components.vocab import VocabEntry, Vocab
-from lambda_dcs_transition_system import *
-from logical_form import *
+from asdl.lang.lambda_dcs.lambda_dcs_transition_system import *
+from asdl.lang.lambda_dcs.logical_form import *
 
 
 def load_dataset(transition_system, dataset_file):
@@ -58,7 +59,7 @@ def load_dataset(transition_system, dataset_file):
     return examples
 
 
-def prepare_dataset():
+def prepare_atis_dataset():
     vocab_freq_cutoff = 1
     grammar = ASDLGrammar.from_text(open('asdl/lang/lambda_dcs/lambda_asdl.txt').read())
     transition_system = LambdaCalculusTransitionSystem(grammar)
@@ -94,8 +95,43 @@ def prepare_dataset():
     pickle.dump(vocab, open('data/atis/vocab.bin', 'w'))
 
 
+def prepare_geo_dataset():
+    vocab_freq_cutoff = 1
+    grammar = ASDLGrammar.from_text(open('asdl/lang/lambda_dcs/lambda_asdl.txt').read())
+    transition_system = LambdaCalculusTransitionSystem(grammar)
+
+    train_set = load_dataset(transition_system, 'data/geo/train.txt')
+    test_set = load_dataset(transition_system, 'data/geo/test.txt')
+
+    # generate vocabulary
+    src_vocab = VocabEntry.from_corpus([e.src_sent for e in train_set], size=5000, freq_cutoff=vocab_freq_cutoff)
+
+    primitive_tokens = [map(lambda a: a.action.token,
+                            filter(lambda a: isinstance(a.action, GenTokenAction), e.tgt_actions))
+                        for e in train_set]
+
+    primitive_vocab = VocabEntry.from_corpus(primitive_tokens, size=5000, freq_cutoff=0)
+
+    # generate vocabulary for the code tokens!
+    code_tokens = [transition_system.tokenize_code(e.tgt_code, mode='decoder') for e in train_set]
+    code_vocab = VocabEntry.from_corpus(code_tokens, size=5000, freq_cutoff=0)
+
+    vocab = Vocab(source=src_vocab, primitive=primitive_vocab, code=code_vocab)
+    print('generated vocabulary %s' % repr(vocab), file=sys.stderr)
+
+    action_len = [len(e.tgt_actions) for e in chain(train_set, test_set)]
+    print('Max action len: %d' % max(action_len), file=sys.stderr)
+    print('Avg action len: %d' % np.average(action_len), file=sys.stderr)
+    print('Actions larger than 100: %d' % len(list(filter(lambda x: x > 100, action_len))), file=sys.stderr)
+
+    pickle.dump(train_set, open('data/geo/train.bin', 'wb'))
+    pickle.dump(test_set, open('data/geo/test.bin', 'wb'))
+    pickle.dump(vocab, open('data/geo/vocab.bin', 'wb'))
+
+
 if __name__ == '__main__':
     grammar = ASDLGrammar.from_text(open('asdl/lang/lambda_dcs/lambda_asdl.txt').read())
     transition_system = LambdaCalculusTransitionSystem(grammar)
     # load_dataset(transition_system, 'data/atis/train.txt')
-    prepare_dataset()
+    # prepare_atis_dataset()
+    prepare_geo_dataset()

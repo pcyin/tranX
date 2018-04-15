@@ -211,7 +211,11 @@ def logical_form_to_ast(grammar, lf_node):
                           'fare', 'services', 'fare_basis_code', 'rental_car', 'city', 'stop', 'day_number',
                           'days_from_today', 'after_day', 'before_day',
                           'airline:e', 'stops', 'month_arrival', 'day_number_arrival', 'day_arrival', 'taxi',
-                          'next_days', 'restriction_code', 'tomorrow_arrival', 'tonight']:
+                          'next_days', 'restriction_code', 'tomorrow_arrival', 'tonight',
+                          'population:i', 'state:t', 'next_to:t', 'elevation:i', 'size:i', 'capital:t',
+                          'len:i', 'city:t', 'named:t', 'river:t', 'place:t', 'capital:c', 'major:t', 'town:t',
+                          'mountain:t', 'lake:t', 'area:i', 'density:i', 'high_point:t', 'elevation:t', 'population:t',
+                          'in:t']:
         # expr -> Apply(pred predicate, expr* arguments)
         prod = grammar.get_prod_by_ctr_name('Apply')
 
@@ -233,7 +237,9 @@ def logical_form_to_ast(grammar, lf_node):
                     ':dc' in lf_node.name or ':al' in lf_node.name or \
                     lf_node.name in ['yr0', 'do0', 'fb1', 'rc0', 'ci0', 'fn0', 'ap0', 'al1', 'al2', 'ap1', 'ci1',
                                      'ci2', 'ci3', 'st0', 'ti0', 'ti1', 'da0', 'da1', 'da2', 'da3', 'da4', 'al0',
-                                     'fb0', 'dn0', 'dn1', 'mn0', 'ac0', 'fn1', 'st1', 'st2']:
+                                     'fb0', 'dn0', 'dn1', 'mn0', 'ac0', 'fn1', 'st1', 'st2',
+                                     'c0', 'm0', 's0', 'r0', 'n0', 'co0', 'usa:co', 'death_valley:lo', 's1',
+                                     'colorado:n']:
         prod = grammar.get_prod_by_ctr_name('Entity')
         ast_node = AbstractSyntaxTree(prod,
                                       [RealizedField(prod['entity'], value=lf_node.name)])
