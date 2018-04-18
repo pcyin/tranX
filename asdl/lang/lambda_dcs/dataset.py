@@ -96,7 +96,8 @@ def prepare_atis_dataset():
 
 
 def prepare_geo_dataset():
-    vocab_freq_cutoff = 1
+    # vocab_freq_cutoff = 1 for atis
+    vocab_freq_cutoff = 2 # for geo query
     grammar = ASDLGrammar.from_text(open('asdl/lang/lambda_dcs/lambda_asdl.txt').read())
     transition_system = LambdaCalculusTransitionSystem(grammar)
 
@@ -126,7 +127,7 @@ def prepare_geo_dataset():
 
     pickle.dump(train_set, open('data/geo/train.bin', 'wb'))
     pickle.dump(test_set, open('data/geo/test.bin', 'wb'))
-    pickle.dump(vocab, open('data/geo/vocab.bin', 'wb'))
+    pickle.dump(vocab, open('data/geo/vocab.freq2.bin', 'wb'))
 
 
 if __name__ == '__main__':
