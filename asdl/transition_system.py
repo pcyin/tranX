@@ -138,6 +138,9 @@ class TransitionSystem(object):
         elif lang == 'lambda_dcs':
             from .lang.lambda_dcs.lambda_dcs_transition_system import LambdaCalculusTransitionSystem
             return LambdaCalculusTransitionSystem
+        elif lang == 'prolog':
+            from .lang.prolog.prolog_transition_system import PrologTransitionSystem
+            return PrologTransitionSystem
         elif lang == 'wikisql':
             from .lang.sql.sql_transition_system import SqlTransitionSystem
             return SqlTransitionSystem

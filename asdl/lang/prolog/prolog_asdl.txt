@@ -1,0 +1,10 @@
+# define primitive fields
+var, lit, pred
+
+expr = Apply(pred predicate, arg* arguments)
+    | Not(expr argument)
+    | Or(expr left, expr right)
+    | And(expr* arguments)
+
+arg = Literal(lit literal)
+    | Variable(var variable)
