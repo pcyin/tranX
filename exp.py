@@ -25,9 +25,6 @@ from model.prior import UniformPrior, LSTMPrior
 from model.reconstruction_model import Reconstructor
 from model.struct_vae import StructVAE, StructVAE_LMBaseline, StructVAE_SrcLmAndLinearBaseline
 from model.utils import GloveHelper
-from model.wikisql.parser import WikiSqlParser
-from model.wikisql.dataset import WikiSqlExample, WikiSqlTable, TableColumn
-
 
 def init_config():
     parser = argparse.ArgumentParser()
@@ -127,6 +124,10 @@ def train(args):
     train_set = Dataset.from_bin_file(args.train_file)
     dev_set = Dataset.from_bin_file(args.dev_file)
     vocab = pickle.load(open(args.vocab, 'rb'))
+    
+    if args.lang == 'wikisql':
+        from model.wikisql.parser import WikiSqlParser
+        from model.wikisql.dataset import WikiSqlExample, WikiSqlTable, TableColumn
 
     parser_cls = get_parser_class(args.lang)
     model = parser_cls(args, vocab, transition_system)
