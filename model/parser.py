@@ -173,6 +173,11 @@ class Parser(nn.Module):
 
         scores = torch.sum(action_prob, dim=0)
 
+        # torch.save(apply_rule_prob, open('data/jobs/debug.apply_rule_prob.train.bin', 'wb'))
+        # torch.save(gen_from_vocab_prob, open('data/jobs/debug.gen_from_vocab_prob.train.bin', 'wb'))
+        # torch.save(primitive_copy_prob, open('data/jobs/debug.primitive_copy_prob.train.bin', 'wb'))
+        # torch.save(primitive_predictor_prob, open('data/jobs/debug.primitive_predictor_prob.train.bin', 'wb'))
+
         if return_enc_state:
             return scores, last_state
         else: return scores
@@ -349,9 +354,19 @@ class Parser(nn.Module):
                 frontier_field_type_embeds = self.type_embed(Variable(self.new_long_tensor([
                     self.grammar.type2id[type] for type in frontier_field_types])))
 
+                if args.no_parent_production_embed:
+                    frontier_prod_embeds = frontier_prod_embeds * 0.
+                if args.no_parent_field_embed:
+                    frontier_field_embeds = frontier_field_embeds * 0.
+                if args.no_parent_field_type_embed:
+                    frontier_field_type_embeds = frontier_field_type_embeds * 0.
+
                 # parent states
-                p_ts = [hyp.frontier_node.created_time for hyp in hypotheses]
-                hist_states = torch.stack([hyp_states[hyp_id][p_t] for hyp_id, p_t in enumerate(p_ts)])
+                if args.no_parent_state:
+                    hist_states = Variable(self.new_tensor(hyp_num, args.hidden_size).zero_())
+                else:
+                    p_ts = [hyp.frontier_node.created_time for hyp in hypotheses]
+                    hist_states = torch.stack([hyp_states[hyp_id][p_t] for hyp_id, p_t in enumerate(p_ts)])
 
                 x = torch.cat([a_tm1_embeds,
                                att_tm1,
@@ -368,6 +383,7 @@ class Parser(nn.Module):
                                              src_token_mask=None)
 
             # Variable(batch_size, grammar_size)
+            # apply_rule_log_prob = torch.log(F.softmax(self.production_readout(att_t), dim=-1))
             apply_rule_log_prob = F.log_softmax(self.production_readout(att_t), dim=-1)
 
             # Variable(batch_size, src_sent_len)
