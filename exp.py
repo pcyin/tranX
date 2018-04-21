@@ -53,6 +53,12 @@ def init_config():
     parser.add_argument('--kl_anneal', default=False, action='store_true')
     parser.add_argument('--alpha', default=0.1, type=float)
 
+    # parent information switch
+    parser.add_argument('--no_parent_production_embed', default=False, action='store_true')
+    parser.add_argument('--no_parent_field_embed', default=False, action='store_true')
+    parser.add_argument('--no_parent_field_type_embed', default=False, action='store_true')
+    parser.add_argument('--no_parent_state', default=False, action='store_true')
+
     parser.add_argument('--asdl_file', type=str)
     parser.add_argument('--vocab', type=str, help='path of the serialized vocabulary')
     parser.add_argument('--train_src', type=str, help='path to the training source file')

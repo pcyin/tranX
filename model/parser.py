@@ -232,16 +232,31 @@ class Parser(nn.Module):
                         a_tm1_embeds.append(zero_action_embed)
                 a_tm1_embeds = torch.stack(a_tm1_embeds)
 
+                parent_production_embed = self.production_embed(batch.get_frontier_prod_idx(t))
+                parent_field_embed = self.field_embed(batch.get_frontier_field_idx(t))
+                parent_field_type_embed = self.type_embed(batch.get_frontier_field_type_idx(t))
+
+                if args.no_parent_production_embed:
+                    parent_production_embed = parent_production_embed * 0.
+                if args.no_parent_field_embed:
+                    parent_field_embed = parent_field_embed * 0.
+                if args.no_parent_field_type_embed:
+                    parent_field_type_embed = parent_field_type_embed * 0.
+
                 x = torch.cat([a_tm1_embeds,
                                att_tm1,
-                               self.production_embed(batch.get_frontier_prod_idx(t)),
-                               self.field_embed(batch.get_frontier_field_idx(t)),
-                               self.type_embed(batch.get_frontier_field_type_idx(t))], dim=-1)
+                               parent_production_embed,
+                               parent_field_embed,
+                               parent_field_type_embed], dim=-1)
 
                 # append history states
-                parent_states = torch.stack([history_states[p_t][batch_id]
-                                             for batch_id, p_t in
-                                             enumerate(a_t.parent_t if a_t else 0 for a_t in actions_t)])
+                if args.no_parent_state:
+                    parent_states = Variable(self.new_tensor(batch_size, args.hidden_size).zero_())
+                else:
+                    parent_states = torch.stack([history_states[p_t][batch_id]
+                                                 for batch_id, p_t in
+                                                 enumerate(a_t.parent_t if a_t else 0 for a_t in actions_t)])
+
 
                 x = torch.cat([x, parent_states], dim=-1)
 
