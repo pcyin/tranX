@@ -33,7 +33,7 @@ def init_config():
     parser.add_argument('--lang', choices=['python', 'lambda_dcs', 'wikisql', 'prolog'], default='python')
     parser.add_argument('--mode', choices=['train', 'self_train', 'train_decoder', 'train_semi', 'log_semi', 'test', 'sample'], default='train', help='run mode')
 
-    parser.add_argument('--lstm', choices=['lstm', 'lstm_with_dropout'], default='lstm')
+    parser.add_argument('--lstm', choices=['lstm', 'lstm_with_dropout', 'parent_feed'], default='lstm')
 
     parser.add_argument('--load_model', default=None, type=str, help='load a pre-trained model')
     parser.add_argument('--glove_embed_path', default=None, type=str)

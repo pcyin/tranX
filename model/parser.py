@@ -51,6 +51,13 @@ class Parser(nn.Module):
                                             args.hidden_size +  # parent hidden state
                                             args.hidden_size,   # input feeding
                                             args.hidden_size)
+        elif args.lstm == 'parent_feed':
+            self.encoder_lstm = nn.LSTM(args.embed_size, int(args.hidden_size / 2), bidirectional=True)
+            from .lstm import ParentFeedingLSTMCell
+            self.decoder_lstm = ParentFeedingLSTMCell(args.action_embed_size +  # previous action
+                                                      args.action_embed_size + args.field_embed_size + args.type_embed_size +  # frontier info
+                                                      args.hidden_size,  # input feeding
+                                                      args.hidden_size)
         else:
             from lstm import LSTM, LSTMCell
             self.encoder_lstm = LSTM(args.embed_size, args.hidden_size / 2, bidirectional=True, dropout=args.dropout)
@@ -199,7 +206,13 @@ class Parser(nn.Module):
         batch_size = len(batch)
         args = self.args
 
-        h_tm1 = dec_init_vec
+        if args.lstm == 'parent_feed':
+            h_tm1 = dec_init_vec[0], dec_init_vec[1], \
+                    Variable(self.new_tensor(batch_size, args.hidden_size).zero_()), \
+                    Variable(self.new_tensor(batch_size, args.hidden_size).zero_())
+        else:
+            h_tm1 = dec_init_vec
+
         # (batch_size, query_len, hidden_size)
         src_encodings_att_linear = self.att_src_linear(src_encodings)
 
@@ -256,20 +269,26 @@ class Parser(nn.Module):
 
                 # append history states
                 if args.no_parent_state:
-                    parent_states = Variable(self.new_tensor(batch_size, args.hidden_size).zero_())
+                    parent_cells = parent_states = Variable(self.new_tensor(batch_size, args.hidden_size).zero_())
                 else:
-                    parent_states = torch.stack([history_states[p_t][batch_id]
+                    parent_states = torch.stack([history_states[p_t][0][batch_id]
                                                  for batch_id, p_t in
                                                  enumerate(a_t.parent_t if a_t else 0 for a_t in actions_t)])
 
+                    parent_cells = torch.stack([history_states[p_t][1][batch_id]
+                                                for batch_id, p_t in
+                                                enumerate(a_t.parent_t if a_t else 0 for a_t in actions_t)])
 
-                x = torch.cat([x, parent_states], dim=-1)
+                if args.lstm == 'parent_feed':
+                    h_tm1 = (h_tm1[0], h_tm1[1], parent_states, parent_cells)
+                else:
+                    x = torch.cat([x, parent_states], dim=-1)
 
             (h_t, cell_t), att_t = self.step(x, h_tm1, src_encodings,
                                              src_encodings_att_linear,
                                              src_token_mask=batch.src_token_mask)
 
-            history_states.append(h_t)
+            history_states.append((h_t, cell_t))
             att_vecs.append(att_t)
             h_tm1 = (h_t, cell_t)
             att_tm1 = att_t
@@ -288,7 +307,14 @@ class Parser(nn.Module):
         # (1, src_sent_len, hidden_size)
         src_encodings_att_linear = self.att_src_linear(src_encodings)
 
-        h_tm1 = self.init_decoder_state(last_state, last_cell)
+        dec_init_vec = self.init_decoder_state(last_state, last_cell)
+        if args.lstm == 'parent_feed':
+            h_tm1 = dec_init_vec[0], dec_init_vec[1], \
+                    Variable(self.new_tensor(args.hidden_size).zero_()), \
+                    Variable(self.new_tensor(args.hidden_size).zero_())
+        else:
+            h_tm1 = dec_init_vec
+
         zero_action_embed = Variable(self.new_tensor(args.action_embed_size).zero_())
 
         hyp_scores = Variable(self.new_tensor([0.]), volatile=True)
@@ -363,17 +389,23 @@ class Parser(nn.Module):
 
                 # parent states
                 if args.no_parent_state:
-                    hist_states = Variable(self.new_tensor(hyp_num, args.hidden_size).zero_())
+                    parent_states = parent_cells = Variable(self.new_tensor(hyp_num, args.hidden_size).zero_())
                 else:
                     p_ts = [hyp.frontier_node.created_time for hyp in hypotheses]
-                    hist_states = torch.stack([hyp_states[hyp_id][p_t] for hyp_id, p_t in enumerate(p_ts)])
+                    parent_states = torch.stack([hyp_states[hyp_id][p_t][0] for hyp_id, p_t in enumerate(p_ts)])
+                    parent_cells = torch.stack([hyp_states[hyp_id][p_t][1] for hyp_id, p_t in enumerate(p_ts)])
 
-                x = torch.cat([a_tm1_embeds,
-                               att_tm1,
-                               frontier_prod_embeds,
-                               frontier_field_embeds,
-                               frontier_field_type_embeds,
-                               hist_states], dim=-1)
+                if args.lstm == 'parent_feed':
+                    h_tm1 = (h_tm1[0], h_tm1[1], parent_states, parent_cells)
+                    x = torch.cat([a_tm1_embeds, att_tm1,
+                                   frontier_prod_embeds, frontier_field_embeds, frontier_field_type_embeds], dim=-1)
+                else:
+                    x = torch.cat([a_tm1_embeds,
+                                   att_tm1,
+                                   frontier_prod_embeds,
+                                   frontier_field_embeds,
+                                   frontier_field_type_embeds,
+                                   parent_states], dim=-1)
 
             if args.lstm == 'lstm_with_dropout':
                 self.decoder_lstm.set_dropout_masks(hyp_num)
@@ -543,7 +575,7 @@ class Parser(nn.Module):
                     live_hyp_ids.append(prev_hyp_id)
 
             if live_hyp_ids:
-                hyp_states = [hyp_states[i] + [h_t[i]] for i in live_hyp_ids]
+                hyp_states = [hyp_states[i] + [(h_t[i], cell_t[i])] for i in live_hyp_ids]
                 h_tm1 = (h_t[live_hyp_ids], cell_t[live_hyp_ids])
                 att_tm1 = att_t[live_hyp_ids]
                 hypotheses = new_hypotheses
