@@ -224,12 +224,14 @@ def train(args):
             history_dev_scores.append(dev_acc)
         else:
             is_better = True
-            lr = optimizer.param_groups[0]['lr'] * args.lr_decay
-            print('decay learning rate to %f' % lr, file=sys.stderr)
 
-            # set new lr
-            for param_group in optimizer.param_groups:
-                param_group['lr'] = lr
+            if epoch > args.lr_decay_after_epoch:
+                lr = optimizer.param_groups[0]['lr'] * args.lr_decay
+                print('decay learning rate to %f' % lr, file=sys.stderr)
+
+                # set new lr
+                for param_group in optimizer.param_groups:
+                    param_group['lr'] = lr
 
         if is_better:
             patience = 0
@@ -239,13 +241,13 @@ def train(args):
             model.save(model_file)
             # also save the optimizers' state
             torch.save(optimizer.state_dict(), args.save_to + '.optim.bin')
+        elif patience < args.patience:
+            patience += 1
+            print('hit patience %d' % patience, file=sys.stderr)
 
         if epoch == args.max_epoch:
             print('reached max epoch, stop!', file=sys.stderr)
             exit(0)
-        elif patience < args.patience:
-            patience += 1
-            print('hit patience %d' % patience, file=sys.stderr)
 
         if patience >= args.patience and epoch >= args.lr_decay_after_epoch:
             num_trial += 1
