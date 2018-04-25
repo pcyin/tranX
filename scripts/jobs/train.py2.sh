@@ -1,19 +1,17 @@
 #!/bin/bash
 
-source activate python3
-
 vocab="vocab.bin"
 train_file="train.bin"
 dropout=0.3
 hidden_size=256
-embed_size=100
-action_embed_size=100
+embed_size=128
+action_embed_size=128
 field_embed_size=32
 type_embed_size=32
 lr_decay=0.5
 beam_size=5
 lstm='lstm'
-model_name=model.atis.sup.${lstm}.hidden${hidden_size}.embed${embed_size}.action${action_embed_size}.field${field_embed_size}.type${type_embed_size}.dropout${dropout}.lr_decay${lr_decay}.beam${beam_size}.${vocab}.${train_file}
+model_name=model.atis.sup.${lstm}.hidden${hidden_size}.embed${embed_size}.action${action_embed_size}.field${field_embed_size}.type${type_embed_size}.dropout${dropout}.lr_decay${lr_decay}.beam${beam_size}.${vocab}.${train_file}.py2
 
 python -u exp.py \
     --cuda \
