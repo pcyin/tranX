@@ -104,7 +104,7 @@ def init_arg_parser():
     arg_parser.add_argument('--lr', default=0.001, type=float, help='learning rate')
     arg_parser.add_argument('--lr_decay', default=0.5, type=float,
                             help='decay learning rate if the validation performance drops')
-    arg_parser.add_argument('--lr_decay_after_epoch', default=5, type=int)
+    arg_parser.add_argument('--lr_decay_after_epoch', default=0, type=int)
     arg_parser.add_argument('--reset_optimizer', action='store_true', default=False)
 
     arg_parser.add_argument('--train_opt', default="reinforce", type=str, choices=['reinforce', 'st_gumbel'])
@@ -234,19 +234,20 @@ def train(args):
         if is_better:
             patience = 0
             model_file = args.save_to + '.bin'
-            print('save currently the best model ..', file=sys.stderr)
+            print('save the current model ..', file=sys.stderr)
             print('save model to [%s]' % model_file, file=sys.stderr)
             model.save(model_file)
             # also save the optimizers' state
             torch.save(optimizer.state_dict(), args.save_to + '.optim.bin')
-        elif epoch == args.max_epoch:
+
+        if epoch == args.max_epoch:
             print('reached max epoch, stop!', file=sys.stderr)
             exit(0)
         elif patience < args.patience:
             patience += 1
             print('hit patience %d' % patience, file=sys.stderr)
 
-        if patience == args.patience:
+        if patience >= args.patience and epoch >= args.lr_decay_after_epoch:
             num_trial += 1
             print('hit #%d trial' % num_trial, file=sys.stderr)
             if num_trial == args.max_num_trial:
