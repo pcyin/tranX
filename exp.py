@@ -144,7 +144,12 @@ def train(args):
     grammar = ASDLGrammar.from_text(open(args.asdl_file).read())
     transition_system = TransitionSystem.get_class_by_lang(args.lang)(grammar)
     train_set = Dataset.from_bin_file(args.train_file)
-    dev_set = Dataset.from_bin_file(args.dev_file)
+
+    if args.dev_file:
+        dev_set = Dataset.from_bin_file(args.dev_file)
+    else:
+        dev_set = Dataset(examples=[])
+
     vocab = pickle.load(open(args.vocab, 'rb'))
     
     if args.lang == 'wikisql':
@@ -211,11 +216,20 @@ def train(args):
         # perform validation
         print('[Epoch %d] begin validation' % epoch, file=sys.stderr)
         eval_start = time.time()
-        eval_results = evaluation.evaluate(dev_set.examples, model, args, verbose=True)
-        dev_acc = eval_results['accuracy']
-        print('[Epoch %d] code generation accuracy=%.5f took %ds' % (epoch, dev_acc, time.time() - eval_start), file=sys.stderr)
-        is_better = history_dev_scores == [] or dev_acc > max(history_dev_scores)
-        history_dev_scores.append(dev_acc)
+        if args.dev_file:
+            eval_results = evaluation.evaluate(dev_set.examples, model, args, verbose=True)
+            dev_acc = eval_results['accuracy']
+            print('[Epoch %d] code generation accuracy=%.5f took %ds' % (epoch, dev_acc, time.time() - eval_start), file=sys.stderr)
+            is_better = history_dev_scores == [] or dev_acc > max(history_dev_scores)
+            history_dev_scores.append(dev_acc)
+        else:
+            is_better = True
+            lr = optimizer.param_groups[0]['lr'] * args.lr_decay
+            print('decay learning rate to %f' % lr, file=sys.stderr)
+
+            # set new lr
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = lr
 
         if is_better:
             patience = 0
