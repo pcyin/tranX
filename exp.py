@@ -163,6 +163,11 @@ def train(args):
     if args.cuda: model.cuda()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
+    if args.uniform_init:
+        print('uniformly initialize parameters [-%f, +%f]' % (args.uniform_init, args.uniform_init), file=sys.stderr)
+        for p in model.parameters():
+            p.data.uniform_(-args.uniform_init, args.uniform_init)
+
     # load pre-trained word embedding (optional)
     if args.glove_embed_path:
         print('load glove embedding from: %s' % args.glove_embed_path, file=sys.stderr)
