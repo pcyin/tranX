@@ -46,18 +46,29 @@ class Parser(nn.Module):
         # LSTMs
         if args.lstm == 'lstm':
             self.encoder_lstm = nn.LSTM(args.embed_size, int(args.hidden_size / 2), bidirectional=True)
-            self.decoder_lstm = nn.LSTMCell(args.action_embed_size +  # previous action
-                                            args.action_embed_size + args.field_embed_size + args.type_embed_size +  # frontier info
-                                            args.hidden_size +  # parent hidden state
-                                            args.hidden_size,   # input feeding
-                                            args.hidden_size)
+
+            input_dim = args.action_embed_size  # previous action
+            # frontier info
+            input_dim += args.action_embed_size * (not args.no_parent_production_embed)
+            input_dim += args.field_embed_size * (not args.no_parent_field_embed)
+            input_dim += args.type_embed_size * (not args.no_parent_field_type_embed)
+            input_dim += args.hidden_size * (not args.no_parent_state)
+
+            input_dim += args.hidden_size * (not args.no_input_feed)  # input feeding
+
+            self.decoder_lstm = nn.LSTMCell(input_dim, args.hidden_size)
         elif args.lstm == 'parent_feed':
             self.encoder_lstm = nn.LSTM(args.embed_size, int(args.hidden_size / 2), bidirectional=True)
             from .lstm import ParentFeedingLSTMCell
-            self.decoder_lstm = ParentFeedingLSTMCell(args.action_embed_size +  # previous action
-                                                      args.action_embed_size + args.field_embed_size + args.type_embed_size +  # frontier info
-                                                      args.hidden_size,  # input feeding
-                                                      args.hidden_size)
+
+            input_dim = args.action_embed_size  # previous action
+            # frontier info
+            input_dim += args.action_embed_size * (not args.no_parent_production_embed)
+            input_dim += args.field_embed_size * (not args.no_parent_field_embed)
+            input_dim += args.type_embed_size * (not args.no_parent_field_type_embed)
+            input_dim += args.hidden_size * (not args.no_input_feed)  # input feeding
+
+            self.decoder_lstm = ParentFeedingLSTMCell(input_dim, args.hidden_size)
         else:
             from lstm import LSTM, LSTMCell
             self.encoder_lstm = LSTM(args.embed_size, args.hidden_size / 2, bidirectional=True, dropout=args.dropout)
@@ -225,12 +236,16 @@ class Parser(nn.Module):
             self.decoder_lstm.set_dropout_masks(batch_size)
 
         for t in xrange(batch.max_action_num):
-            # x: [prev_action, parent_production_embed, parent_field_embed, parent_field_type_embed, parent_action_state]
+            # x: [prev_action, att_tm1, parent_production_embed, parent_field_embed, parent_field_type_embed, parent_action_state]
             if t == 0:
                 x = Variable(self.new_tensor(batch_size, self.decoder_lstm.input_size).zero_(), requires_grad=False)
-                offset = args.action_embed_size * 2 + args.field_embed_size
-                x[:, offset: offset + args.type_embed_size] = self.type_embed(Variable(self.new_long_tensor(
-                    [self.grammar.type2id[self.grammar.root_type] for e in batch.examples])))
+                if args.no_parent_field_type_embed is False:
+                    offset = args.action_embed_size  # prev_action
+                    offset += args.action_embed_size * (not args.no_parent_production_embed)
+                    offset += args.field_embed_size * (not args.no_parent_field_embed)
+
+                    x[:, offset: offset + args.type_embed_size] = self.type_embed(Variable(self.new_long_tensor(
+                        [self.grammar.type2id[self.grammar.root_type] for e in batch.examples])))
             else:
                 actions_tm1 = [e.tgt_actions[t - 1] if t < len(e.tgt_actions) else None for e in batch.examples]
                 actions_t = [e.tgt_actions[t] if t < len(e.tgt_actions) else None for e in batch.examples]
@@ -250,27 +265,21 @@ class Parser(nn.Module):
                         a_tm1_embeds.append(zero_action_embed)
                 a_tm1_embeds = torch.stack(a_tm1_embeds)
 
-                parent_production_embed = self.production_embed(batch.get_frontier_prod_idx(t))
-                parent_field_embed = self.field_embed(batch.get_frontier_field_idx(t))
-                parent_field_type_embed = self.type_embed(batch.get_frontier_field_type_idx(t))
-
-                if args.no_parent_production_embed:
-                    parent_production_embed = parent_production_embed * 0.
-                if args.no_parent_field_embed:
-                    parent_field_embed = parent_field_embed * 0.
-                if args.no_parent_field_type_embed:
-                    parent_field_type_embed = parent_field_type_embed * 0.
-
-                x = torch.cat([a_tm1_embeds,
-                               att_tm1,
-                               parent_production_embed,
-                               parent_field_embed,
-                               parent_field_type_embed], dim=-1)
+                inputs = [a_tm1_embeds]
+                if args.no_input_feed is False:
+                    inputs.append(att_tm1)
+                if args.no_parent_production_embed is False:
+                    parent_production_embed = self.production_embed(batch.get_frontier_prod_idx(t))
+                    inputs.append(parent_production_embed)
+                if args.no_parent_field_embed is False:
+                    parent_field_embed = self.field_embed(batch.get_frontier_field_idx(t))
+                    inputs.append(parent_field_embed)
+                if args.no_parent_field_type_embed is False:
+                    parent_field_type_embed = self.type_embed(batch.get_frontier_field_type_idx(t))
+                    inputs.append(parent_field_type_embed)
 
                 # append history states
-                if args.no_parent_state:
-                    parent_cells = parent_states = Variable(self.new_tensor(batch_size, args.hidden_size).zero_())
-                else:
+                if args.no_parent_state is False:
                     parent_states = torch.stack([history_states[p_t][0][batch_id]
                                                  for batch_id, p_t in
                                                  enumerate(a_t.parent_t if a_t else 0 for a_t in actions_t)])
@@ -279,10 +288,12 @@ class Parser(nn.Module):
                                                 for batch_id, p_t in
                                                 enumerate(a_t.parent_t if a_t else 0 for a_t in actions_t)])
 
-                if args.lstm == 'parent_feed':
-                    h_tm1 = (h_tm1[0], h_tm1[1], parent_states, parent_cells)
-                else:
-                    x = torch.cat([x, parent_states], dim=-1)
+                    if args.lstm == 'parent_feed':
+                        h_tm1 = (h_tm1[0], h_tm1[1], parent_states, parent_cells)
+                    else:
+                        inputs.append(parent_states)
+
+                x = torch.cat(inputs, dim=-1)
 
             (h_t, cell_t), att_t = self.step(x, h_tm1, src_encodings,
                                              src_encodings_att_linear,
@@ -345,8 +356,13 @@ class Parser(nn.Module):
 
             if t == 0:
                 x = Variable(self.new_tensor(1, self.decoder_lstm.input_size).zero_(), volatile=True)
-                offset = args.action_embed_size * 2 + args.field_embed_size
-                x[0, offset: offset + args.type_embed_size] = self.type_embed.weight[self.grammar.type2id[self.grammar.root_type]]
+                if args.no_parent_field_type_embed is False:
+                    offset = args.action_embed_size  # prev_action
+                    offset += args.action_embed_size * (not args.no_parent_production_embed)
+                    offset += args.field_embed_size * (not args.no_parent_field_embed)
+
+                    x[0, offset: offset + args.type_embed_size] = \
+                        self.type_embed.weight[self.grammar.type2id[self.grammar.root_type]]
             else:
                 actions_tm1 = [hyp.actions[-1] for hyp in hypotheses]
 
@@ -365,47 +381,41 @@ class Parser(nn.Module):
                         a_tm1_embeds.append(zero_action_embed)
                 a_tm1_embeds = torch.stack(a_tm1_embeds)
 
-                # frontier production
-                frontier_prods = [hyp.frontier_node.production for hyp in hypotheses]
-                frontier_prod_embeds = self.production_embed(Variable(self.new_long_tensor(
-                    [self.grammar.prod2id[prod] for prod in frontier_prods])))
+                inputs = [a_tm1_embeds]
+                if args.no_input_feed is False:
+                    inputs.append(att_tm1)
+                if args.no_parent_production_embed is False:
+                    # frontier production
+                    frontier_prods = [hyp.frontier_node.production for hyp in hypotheses]
+                    frontier_prod_embeds = self.production_embed(Variable(self.new_long_tensor(
+                        [self.grammar.prod2id[prod] for prod in frontier_prods])))
+                    inputs.append(frontier_prods)
+                if args.no_parent_field_embed is False:
+                    # frontier field
+                    frontier_fields = [hyp.frontier_field.field for hyp in hypotheses]
+                    frontier_field_embeds = self.field_embed(Variable(self.new_long_tensor([
+                        self.grammar.field2id[field] for field in frontier_fields])))
 
-                # frontier field
-                frontier_fields = [hyp.frontier_field.field for hyp in hypotheses]
-                frontier_field_embeds = self.field_embed(Variable(self.new_long_tensor([
-                    self.grammar.field2id[field] for field in frontier_fields])))
-
-                # frontier field type
-                frontier_field_types = [hyp.frontier_field.type for hyp in hypotheses]
-                frontier_field_type_embeds = self.type_embed(Variable(self.new_long_tensor([
-                    self.grammar.type2id[type] for type in frontier_field_types])))
-
-                if args.no_parent_production_embed:
-                    frontier_prod_embeds = frontier_prod_embeds * 0.
-                if args.no_parent_field_embed:
-                    frontier_field_embeds = frontier_field_embeds * 0.
-                if args.no_parent_field_type_embed:
-                    frontier_field_type_embeds = frontier_field_type_embeds * 0.
+                    inputs.append(frontier_field_embeds)
+                if args.no_parent_field_type_embed is False:
+                    # frontier field type
+                    frontier_field_types = [hyp.frontier_field.type for hyp in hypotheses]
+                    frontier_field_type_embeds = self.type_embed(Variable(self.new_long_tensor([
+                        self.grammar.type2id[type] for type in frontier_field_types])))
+                    inputs.append(frontier_field_type_embeds)
 
                 # parent states
-                if args.no_parent_state:
-                    parent_states = parent_cells = Variable(self.new_tensor(hyp_num, args.hidden_size).zero_())
-                else:
+                if args.no_parent_state is False:
                     p_ts = [hyp.frontier_node.created_time for hyp in hypotheses]
                     parent_states = torch.stack([hyp_states[hyp_id][p_t][0] for hyp_id, p_t in enumerate(p_ts)])
                     parent_cells = torch.stack([hyp_states[hyp_id][p_t][1] for hyp_id, p_t in enumerate(p_ts)])
 
-                if args.lstm == 'parent_feed':
-                    h_tm1 = (h_tm1[0], h_tm1[1], parent_states, parent_cells)
-                    x = torch.cat([a_tm1_embeds, att_tm1,
-                                   frontier_prod_embeds, frontier_field_embeds, frontier_field_type_embeds], dim=-1)
-                else:
-                    x = torch.cat([a_tm1_embeds,
-                                   att_tm1,
-                                   frontier_prod_embeds,
-                                   frontier_field_embeds,
-                                   frontier_field_type_embeds,
-                                   parent_states], dim=-1)
+                    if args.lstm == 'parent_feed':
+                        h_tm1 = (h_tm1[0], h_tm1[1], parent_states, parent_cells)
+                    else:
+                        inputs.append(parent_states)
+
+                x = torch.cat(inputs, dim=-1)
 
             if args.lstm == 'lstm_with_dropout':
                 self.decoder_lstm.set_dropout_masks(hyp_num)
