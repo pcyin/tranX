@@ -389,7 +389,7 @@ class Parser(nn.Module):
                     frontier_prods = [hyp.frontier_node.production for hyp in hypotheses]
                     frontier_prod_embeds = self.production_embed(Variable(self.new_long_tensor(
                         [self.grammar.prod2id[prod] for prod in frontier_prods])))
-                    inputs.append(frontier_prods)
+                    inputs.append(frontier_prod_embeds)
                 if args.no_parent_field_embed is False:
                     # frontier field
                     frontier_fields = [hyp.frontier_field.field for hyp in hypotheses]
