@@ -102,6 +102,7 @@ def init_arg_parser():
                             help='if specified, use uniform initialization for all parameters')
     arg_parser.add_argument('--clip_grad', default=5., type=float, help='clip gradients')
     arg_parser.add_argument('--max_epoch', default=-1, type=int, help='maximum number of training epoches')
+    arg_parser.add_argument('--optimizer', default='Adam', type=str, help='optimizer')
     arg_parser.add_argument('--lr', default=0.001, type=float, help='learning rate')
     arg_parser.add_argument('--lr_decay', default=0.5, type=float,
                             help='decay learning rate if the validation performance drops')
@@ -161,7 +162,8 @@ def train(args):
     model = parser_cls(args, vocab, transition_system)
     model.train()
     if args.cuda: model.cuda()
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    optimizer_cls = eval('torch.optim.%s' % args.optimizer)  # FIXME: this is evil!
+    optimizer = optimizer_cls(model.parameters(), lr=args.lr)
 
     if args.uniform_init:
         print('uniformly initialize parameters [-%f, +%f]' % (args.uniform_init, args.uniform_init), file=sys.stderr)
