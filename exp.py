@@ -110,7 +110,7 @@ def init_arg_parser():
                             help='decay learning rate if the validation performance drops')
     arg_parser.add_argument('--lr_decay_after_epoch', default=0, type=int)
     arg_parser.add_argument('--reset_optimizer', action='store_true', default=False)
-
+    arg_parser.add_argument('--verbose', action='store_true', default=False)
 
     arg_parser.add_argument('--train_opt', default="reinforce", type=str, choices=['reinforce', 'st_gumbel'])
 
