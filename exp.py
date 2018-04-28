@@ -228,7 +228,7 @@ def train(args):
 
         # perform validation
         if args.dev_file:
-            if args.valid_every_epoch % epoch == 0:
+            if epoch % args.valid_every_epoch == 0:
                 print('[Epoch %d] begin validation' % epoch, file=sys.stderr)
                 eval_start = time.time()
                 eval_results = evaluation.evaluate(dev_set.examples, model, args, verbose=True)
