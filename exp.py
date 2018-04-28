@@ -92,9 +92,11 @@ def init_arg_parser():
 
     arg_parser.add_argument('--valid_metric', default='sp_acc', choices=['nlg_bleu', 'sp_acc'],
                             help='metric used for validation')
+    arg_parser.add_argument('--valid_every_epoch', default=1, type=int)
     arg_parser.add_argument('--log_every', default=10, type=int, help='every n iterations to log training statistics')
 
     arg_parser.add_argument('--save_to', default='model', type=str, help='save trained model to')
+    arg_parser.add_argument('--save_all_models', default=False, action='store_true')
     arg_parser.add_argument('--save_decode_to', default=None, type=str, help='save decoding results to file')
     arg_parser.add_argument('--patience', default=5, type=int, help='training patience')
     arg_parser.add_argument('--max_num_trial', default=10, type=int)
@@ -108,6 +110,7 @@ def init_arg_parser():
                             help='decay learning rate if the validation performance drops')
     arg_parser.add_argument('--lr_decay_after_epoch', default=0, type=int)
     arg_parser.add_argument('--reset_optimizer', action='store_true', default=False)
+
 
     arg_parser.add_argument('--train_opt', default="reinforce", type=str, choices=['reinforce', 'st_gumbel'])
 
@@ -217,19 +220,22 @@ def train(args):
                 report_loss = report_examples = 0.
 
         print('[Epoch %d] epoch elapsed %ds' % (epoch, time.time() - epoch_begin), file=sys.stderr)
-        # model_file = args.save_to + '.iter%d.bin' % train_iter
-        # print('save model to [%s]' % model_file, file=sys.stderr)
-        # model.save(model_file)
+
+        if args.save_all_models:
+            model_file = args.save_to + '.iter%d.bin' % train_iter
+            print('save model to [%s]' % model_file, file=sys.stderr)
+            model.save(model_file)
 
         # perform validation
         if args.dev_file:
-            print('[Epoch %d] begin validation' % epoch, file=sys.stderr)
-            eval_start = time.time()
-            eval_results = evaluation.evaluate(dev_set.examples, model, args, verbose=True)
-            dev_acc = eval_results['accuracy']
-            print('[Epoch %d] code generation accuracy=%.5f took %ds' % (epoch, dev_acc, time.time() - eval_start), file=sys.stderr)
-            is_better = history_dev_scores == [] or dev_acc > max(history_dev_scores)
-            history_dev_scores.append(dev_acc)
+            if args.valid_every_epoch % epoch == 0:
+                print('[Epoch %d] begin validation' % epoch, file=sys.stderr)
+                eval_start = time.time()
+                eval_results = evaluation.evaluate(dev_set.examples, model, args, verbose=True)
+                dev_acc = eval_results['accuracy']
+                print('[Epoch %d] code generation accuracy=%.5f took %ds' % (epoch, dev_acc, time.time() - eval_start), file=sys.stderr)
+                is_better = history_dev_scores == [] or dev_acc > max(history_dev_scores)
+                history_dev_scores.append(dev_acc)
         else:
             is_better = True
 
@@ -994,7 +1000,7 @@ def test(args):
     parser.eval()
 
     eval_results, decode_results = evaluation.evaluate(test_set.examples, parser, args,
-                                                       verbose=True, return_decode_result=True)
+                                                       verbose=args.verbose, return_decode_result=True)
     print(eval_results, file=sys.stderr)
     if args.save_decode_to:
         pickle.dump(decode_results, open(args.save_decode_to, 'wb'))
