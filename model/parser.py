@@ -17,6 +17,7 @@ from components.decode_hypothesis import DecodeHypothesis
 from components.action_info import ActionInfo
 from components.dataset import Batch
 from model import nn_utils
+from model.attention_util import AttentionUtil
 from model.pointer_net import PointerNet
 
 
@@ -154,8 +155,11 @@ class Parser(nn.Module):
         src_encodings, (last_state, last_cell) = self.encode(batch.src_sents_var, batch.src_sents_len)
         dec_init_vec = self.init_decoder_state(last_state, last_cell)
 
-        # Variable(tgt_action_len, batch_size, hidden_size)
-        query_vectors = self.decode(batch, src_encodings, dec_init_vec)
+        if self.args.sup_attention:
+            # Variable(tgt_action_len, batch_size, hidden_size)
+            query_vectors, att_probs = self.decode(batch, src_encodings, dec_init_vec)
+        else:
+            query_vectors = self.decode(batch, src_encodings, dec_init_vec)
 
         # ApplyRule action probability
         # (tgt_action_len, batch_size, grammar_size)
@@ -196,11 +200,14 @@ class Parser(nn.Module):
         # torch.save(primitive_copy_prob, open('data/jobs/debug.primitive_copy_prob.train.bin', 'wb'))
         # torch.save(primitive_predictor_prob, open('data/jobs/debug.primitive_predictor_prob.train.bin', 'wb'))
 
-        if return_enc_state:
-            return scores, last_state
-        else: return scores
+        returns = [scores]
+        if self.args.sup_attention and att_probs:
+            returns.append(att_probs)
+        if return_enc_state: returns.append(last_state)
 
-    def step(self, x, h_tm1, src_encodings, src_encodings_att_linear, src_token_mask=None):
+        return returns
+
+    def step(self, x, h_tm1, src_encodings, src_encodings_att_linear, src_token_mask=None, return_att_weight=False):
         # h_t: (batch_size, hidden_size)
         h_t, cell_t = self.decoder_lstm(x, h_tm1)
 
@@ -211,7 +218,9 @@ class Parser(nn.Module):
         att_t = F.tanh(self.att_vec_linear(torch.cat([h_t, ctx_t], 1)))  # E.q. (5)
         att_t = self.dropout(att_t)
 
-        return (h_t, cell_t), att_t
+        if return_att_weight:
+            return (h_t, cell_t), att_t, alpha_t
+        else: return (h_t, cell_t), att_t
 
     def decode(self, batch, src_encodings, dec_init_vec):
         batch_size = len(batch)
@@ -231,6 +240,7 @@ class Parser(nn.Module):
 
         att_vecs = []
         history_states = []
+        att_probs = []
 
         if args.lstm == 'lstm_with_dropout':
             self.decoder_lstm.set_dropout_masks(batch_size)
@@ -295,9 +305,20 @@ class Parser(nn.Module):
 
                 x = torch.cat(inputs, dim=-1)
 
-            (h_t, cell_t), att_t = self.step(x, h_tm1, src_encodings,
-                                             src_encodings_att_linear,
-                                             src_token_mask=batch.src_token_mask)
+            (h_t, cell_t), att_t, att_weight = self.step(x, h_tm1, src_encodings,
+                                                         src_encodings_att_linear,
+                                                         src_token_mask=batch.src_token_mask,
+                                                         return_att_weight=True)
+
+            if args.sup_attention:
+                for e_id, example in enumerate(batch.examples):
+                    if t < len(example.tgt_actions):
+                        action_t = example.tgt_actions[t].action
+                        cand_src_tokens = AttentionUtil.get_candidate_tokens_to_attend(example.src_sent, action_t)
+                        if cand_src_tokens:
+                            att_prob = [att_weight[e_id, token_id] for token_id in cand_src_tokens]
+                            if len(att_prob) > 1: att_prob = torch.cat(att_prob).sum()
+                            att_probs.append(att_prob)
 
             history_states.append((h_t, cell_t))
             att_vecs.append(att_t)
@@ -305,7 +326,10 @@ class Parser(nn.Module):
             att_tm1 = att_t
 
         att_vecs = torch.stack(att_vecs)
-        return att_vecs
+
+        if args.sup_attention:
+            return att_vecs, att_probs
+        else: return att_vecs
 
     def parse(self, src_sent, context=None, beam_size=5):
         args = self.args

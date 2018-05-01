@@ -55,6 +55,9 @@ def init_arg_parser():
     arg_parser.add_argument('--kl_anneal', default=False, action='store_true')
     arg_parser.add_argument('--alpha', default=0.1, type=float)
 
+    # supervised attention
+    arg_parser.add_argument('--sup_attention', default=False, action='store_true')
+
     # parent information switch and input feeding
     arg_parser.add_argument('--no_parent_production_embed', default=False, action='store_true')
     arg_parser.add_argument('--no_parent_field_embed', default=False, action='store_true')
@@ -183,7 +186,7 @@ def train(args):
     print('vocab: %s' % repr(vocab), file=sys.stderr)
 
     epoch = train_iter = 0
-    report_loss = report_examples = 0.
+    report_loss = report_examples = report_sup_att_loss = 0.
     history_dev_scores = []
     num_trial = patience = 0
     while True:
@@ -196,12 +199,23 @@ def train(args):
             train_iter += 1
             optimizer.zero_grad()
 
-            loss = -model.score(batch_examples)
+            ret_val = model.score(batch_examples)
+            loss = -ret_val[0]
+
             # print(loss.data)
             loss_val = torch.sum(loss).data[0]
             report_loss += loss_val
             report_examples += len(batch_examples)
             loss = torch.mean(loss)
+
+            if args.sup_attention:
+                att_probs = ret_val[1]
+                if att_probs:
+                    sup_att_loss = -torch.log(torch.cat(att_probs)).mean()
+                    sup_att_loss_val = sup_att_loss.data[0]
+                    report_sup_att_loss += sup_att_loss_val
+
+                    loss += sup_att_loss
 
             loss.backward()
 
@@ -212,11 +226,12 @@ def train(args):
             optimizer.step()
 
             if train_iter % args.log_every == 0:
-                print('[Iter %d] encoder loss=%.5f' %
-                      (train_iter,
-                       report_loss / report_examples),
-                      file=sys.stderr)
+                log_str = '[Iter %d] encoder loss=%.5f' % (train_iter, report_loss / report_examples)
+                if args.sup_attention:
+                    log_str += ' supervised attention loss=%.5f' % (report_sup_att_loss / report_examples)
+                    report_sup_att_loss = 0.
 
+                print(log_str, file=sys.stderr)
                 report_loss = report_examples = 0.
 
         print('[Epoch %d] epoch elapsed %ds' % (epoch, time.time() - epoch_begin), file=sys.stderr)
