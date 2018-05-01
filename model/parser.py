@@ -318,6 +318,7 @@ class Parser(nn.Module):
                         if cand_src_tokens:
                             att_prob = [att_weight[e_id, token_id] for token_id in cand_src_tokens]
                             if len(att_prob) > 1: att_prob = torch.cat(att_prob).sum()
+                            else: att_prob = att_prob[0]
                             att_probs.append(att_prob)
 
             history_states.append((h_t, cell_t))
