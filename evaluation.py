@@ -62,13 +62,15 @@ def evaluate(examples, parser, args, verbose=False, return_decode_result=False):
         if hyps:
             cur_oracle = 0.
             hyp_code_set = set()
-            # print('Reference: %s' % example.tgt_code, file=sys.stderr)
+            if args.lang == 'wikisql':  # FIXME: this is not elegant
+                print('Source: %s' % ' '.join(example.src_sent), file=sys.stderr)
+                print('Reference: %s' % example.tgt_code, file=sys.stderr)
             for hyp_id, hyp in enumerate(hyps):
                 try:
                     if args.lang == 'wikisql':
                         result = parser.transition_system.hyp_correct(hyp, example, execution_engine)
-                        # print('Hyp %d: %s ||| %s' % (hyp_id, detokenize_query(hyp.code, example.meta, example.table), result),
-                        #       file=sys.stderr)
+                        print('Hyp %d: %s ||| %s' % (hyp_id, detokenize_query(hyp.code, example.meta, example.table), result),
+                              file=sys.stderr)
                     else:
                         result = parser.transition_system.hyp_correct(hyp, example)
 
@@ -83,10 +85,15 @@ def evaluate(examples, parser, args, verbose=False, return_decode_result=False):
                     hyp.correct = False
                     continue
 
-                if args.lang in ['lambda_dcs', 'python']:
+                if args.lang in ['lambda_dcs', 'python', 'prolog']:
                     if hyp.code in hyp_code_set:
                         print('Duplicate Hyp Example [%d], Code %s' % (example.idx, hyp.code), file=sys.stdout)
                     hyp_code_set.add(hyp.code)
+
+                # if verbose:
+                #     if hyp_id == 0 and hyp.correct:
+                #         print('', file=sys.stderr)
+                #     print('Hyp %d: %s ||| %s' % (hyp_id, hyp.code, hyp.correct), file=sys.stderr)
 
             cum_oracle_acc += cur_oracle
 

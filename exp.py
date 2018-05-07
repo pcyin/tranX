@@ -145,6 +145,7 @@ def get_parser_class(lang):
     if lang in ['python', 'lambda_dcs', 'prolog']:
         return Parser
     elif lang == 'wikisql':
+        from model.wikisql.parser import WikiSqlParser
         return WikiSqlParser
     else:
         raise ValueError('unknown parser class for %s' % lang)
@@ -157,13 +158,12 @@ def train(args):
 
     if args.dev_file:
         dev_set = Dataset.from_bin_file(args.dev_file)
-    else:
-        dev_set = Dataset(examples=[])
+    else: dev_set = Dataset(examples=[])
 
     vocab = pickle.load(open(args.vocab, 'rb'))
     
     if args.lang == 'wikisql':
-        from model.wikisql.parser import WikiSqlParser
+        # import additional packages for wikisql dataset
         from model.wikisql.dataset import WikiSqlExample, WikiSqlTable, TableColumn
 
     parser_cls = get_parser_class(args.lang)
