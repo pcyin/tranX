@@ -399,6 +399,7 @@ class Parser(nn.Module):
                 x = Variable(self.new_tensor(1, self.decoder_lstm.input_size).zero_(), volatile=True)
                 if args.no_parent_field_type_embed is False:
                     offset = args.action_embed_size  # prev_action
+                    offset += args.hidden_size * (not args.no_input_feed)
                     offset += args.action_embed_size * (not args.no_parent_production_embed)
                     offset += args.field_embed_size * (not args.no_parent_field_embed)
 
