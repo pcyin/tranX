@@ -64,6 +64,7 @@ def init_arg_parser():
     arg_parser.add_argument('--no_parent_field_type_embed', default=False, action='store_true')
     arg_parser.add_argument('--no_parent_state', default=False, action='store_true')
     arg_parser.add_argument('--no_input_feed', default=False, action='store_true')
+    arg_parser.add_argument('--no_copy', default=False, action='store_true')
 
     arg_parser.add_argument('--asdl_file', type=str)
     arg_parser.add_argument('--vocab', type=str, help='path of the serialized vocabulary')
@@ -105,6 +106,7 @@ def init_arg_parser():
     arg_parser.add_argument('--max_num_trial', default=10, type=int)
     arg_parser.add_argument('--uniform_init', default=None, type=float,
                             help='if specified, use uniform initialization for all parameters')
+    arg_parser.add_argument('--glorot_init', default=False, action='store_true')
     arg_parser.add_argument('--clip_grad', default=5., type=float, help='clip gradients')
     arg_parser.add_argument('--max_epoch', default=-1, type=int, help='maximum number of training epoches')
     arg_parser.add_argument('--optimizer', default='Adam', type=str, help='optimizer')
@@ -168,13 +170,16 @@ def train(args):
     model = parser_cls(args, vocab, transition_system)
     model.train()
     if args.cuda: model.cuda()
+
     optimizer_cls = eval('torch.optim.%s' % args.optimizer)  # FIXME: this is evil!
     optimizer = optimizer_cls(model.parameters(), lr=args.lr)
 
     if args.uniform_init:
         print('uniformly initialize parameters [-%f, +%f]' % (args.uniform_init, args.uniform_init), file=sys.stderr)
-        for p in model.parameters():
-            p.data.uniform_(-args.uniform_init, args.uniform_init)
+        nn_utils.uniform_init(-args.uniform_init, args.uniform_init, model.parameters())
+    elif args.glorot_init:
+        print('use glorot initialization', file=sys.stderr)
+        nn_utils.glorot_init(model.parameters())
 
     # load pre-trained word embedding (optional)
     if args.glove_embed_path:
