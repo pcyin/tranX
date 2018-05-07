@@ -244,7 +244,7 @@ class WikiSqlParser(Parser):
         # sum all the action probabilities
         action_prob_var = torch.cat([torch.cat(action_probs_i).log().sum() for action_probs_i in action_probs])
 
-        return action_prob_var
+        return [action_prob_var]   # TODO: supervised attention not implemented yet!
 
     def parse(self, question, context, beam_size=5):
         table = context
