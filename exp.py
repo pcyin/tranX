@@ -58,6 +58,9 @@ def init_arg_parser():
     # supervised attention
     arg_parser.add_argument('--sup_attention', default=False, action='store_true')
 
+    # wikisql
+    arg_parser.add_argument('--column_att', choices=['dot_prod', 'affine'], default='affine')
+
     # parent information switch and input feeding
     arg_parser.add_argument('--no_parent_production_embed', default=False, action='store_true')
     arg_parser.add_argument('--no_parent_field_embed', default=False, action='store_true')

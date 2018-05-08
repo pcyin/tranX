@@ -9,10 +9,14 @@ from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
 
 class PointerNet(nn.Module):
-    def __init__(self, query_vec_size, src_encoding_size):
+    def __init__(self, query_vec_size, src_encoding_size, attention_type='affine'):
         super(PointerNet, self).__init__()
 
-        self.src_encoding_linear = nn.Linear(src_encoding_size, query_vec_size, bias=False)
+        assert attention_type in ('affine', 'dot_prod')
+        if attention_type == 'affine':
+            self.src_encoding_linear = nn.Linear(src_encoding_size, query_vec_size, bias=False)
+
+        self.attention_type = attention_type
 
     def forward(self, src_encodings, src_token_mask, query_vec):
         """
@@ -23,12 +27,15 @@ class PointerNet(nn.Module):
         """
 
         # (batch_size, 1, src_sent_len, query_vec_size)
-        src_trans = self.src_encoding_linear(src_encodings).unsqueeze(1)
+        if self.attention_type == 'affine':
+            src_encodings = self.src_encoding_linear(src_encodings)
+        src_encodings = src_encodings.unsqueeze(1)
+
         # (batch_size, tgt_action_num, query_vec_size, 1)
         q = query_vec.permute(1, 0, 2).unsqueeze(3)
 
         # (batch_size, tgt_action_num, src_sent_len)
-        weights = torch.matmul(src_trans, q).squeeze(3)
+        weights = torch.matmul(src_encodings, q).squeeze(3)
 
         # (tgt_action_num, batch_size, src_sent_len)
         weights = weights.permute(1, 0, 2)

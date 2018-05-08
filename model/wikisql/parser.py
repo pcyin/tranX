@@ -27,7 +27,7 @@ class WikiSqlParser(Parser):
         super(WikiSqlParser, self).__init__(args, vocab, transition_system)
 
         self.table_header_lstm = nn.LSTM(args.embed_size, int(args.hidden_size / 2), bidirectional=True, batch_first=True)
-        self.column_pointer_net = PointerNet(args.hidden_size, args.hidden_size)
+        self.column_pointer_net = PointerNet(args.hidden_size, args.hidden_size, attention_type=args.column_att)
 
         self.column_rnn_input = nn.Linear(args.hidden_size, args.embed_size, bias=False)
 
