@@ -29,12 +29,12 @@ def decode(examples, model, args, verbose=False, **kwargs):
             try:
                 hyp.code = model.transition_system.ast_to_surface_code(hyp.tree)
 
-                if args.lang == 'wikisql':
-                    # try execute the code, if fails, skip this example!
-                    detokenized_hyp_query = detokenize_query(hyp.code, example.meta, example.table)
-                    hyp_answer = kwargs['execution_engine'].execute_query(example.meta['table_id'],
-                                                                          detokenized_hyp_query,
-                                                                          lower=True)
+                # if args.lang == 'wikisql':
+                #     # try execute the code, if fails, skip this example!
+                #     detokenized_hyp_query = detokenize_query(hyp.code, example.meta, example.table)
+                #     hyp_answer = kwargs['execution_engine'].execute_query(example.meta['table_id'],
+                #                                                           detokenized_hyp_query,
+                #                                                           lower=True)
 
                 decoded_hyps.append(hyp)
             except:
@@ -77,15 +77,15 @@ def evaluate(examples, parser, args, verbose=False, return_decode_result=False):
         if hyps:
             cur_oracle = 0.
             hyp_code_set = set()
-            if args.lang == 'wikisql':  # FIXME: this is not elegant
-                print('Source: %s' % ' '.join(example.src_sent), file=sys.stderr)
-                print('Reference: %s' % example.tgt_code, file=sys.stderr)
+            # if args.lang == 'wikisql':  # FIXME: this is not elegant
+            #     print('Source: %s' % ' '.join(example.src_sent), file=sys.stderr)
+            #     print('Reference: %s' % example.tgt_code, file=sys.stderr)
             for hyp_id, hyp in enumerate(hyps):
                 try:
                     if args.lang == 'wikisql':
                         result = parser.transition_system.hyp_correct(hyp, example, execution_engine)
-                        print('Hyp %d: %s ||| %s' % (hyp_id, detokenize_query(hyp.code, example.meta, example.table), result),
-                              file=sys.stderr)
+                        # print('Hyp %d: %s ||| %s' % (hyp_id, detokenize_query(hyp.code, example.meta, example.table), result),
+                        #       file=sys.stderr)
                     else:
                         result = parser.transition_system.hyp_correct(hyp, example)
 
