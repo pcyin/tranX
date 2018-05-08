@@ -6,12 +6,16 @@ import traceback
 import os
 
 
-def decode(examples, model, args, verbose=False):
+def decode(examples, model, args, verbose=False, **kwargs):
     if verbose:
         print('evaluating %d examples' % len(examples))
 
     was_training = model.training
     model.eval()
+
+    if args.lang == 'wikisql':
+        from asdl.lang.sql.lib.dbengine import DBEngine
+        from asdl.lang.sql.utils import detokenize_query
 
     decode_results = []
     count = 0
@@ -24,6 +28,14 @@ def decode(examples, model, args, verbose=False):
         for hyp_id, hyp in enumerate(hyps):
             try:
                 hyp.code = model.transition_system.ast_to_surface_code(hyp.tree)
+
+                if args.lang == 'wikisql':
+                    # try execute the code, if fails, skip this example!
+                    detokenized_hyp_query = detokenize_query(hyp.code, example.meta, example.table)
+                    hyp_answer = kwargs['execution_engine'].execute_query(example.meta['table_id'],
+                                                                          detokenized_hyp_query,
+                                                                          lower=True)
+
                 decoded_hyps.append(hyp)
             except:
                 if verbose:
@@ -46,8 +58,8 @@ def decode(examples, model, args, verbose=False):
 
 def evaluate(examples, parser, args, verbose=False, return_decode_result=False):
     cum_oracle_acc = cum_acc = 0.0
-    decode_results = decode(examples, parser, args, verbose=verbose)
 
+    kwargs = dict()
     if args.lang == 'wikisql':
         from asdl.lang.sql.lib.dbengine import DBEngine
         from asdl.lang.sql.utils import detokenize_query
@@ -57,6 +69,9 @@ def evaluate(examples, parser, args, verbose=False, return_decode_result=False):
         else:
             table_file = os.path.splitext(args.test_file)[0] + '.db'
         execution_engine = DBEngine(table_file)
+
+        kwargs['execution_engine'] = execution_engine
+    decode_results = decode(examples, parser, args, verbose=verbose, **kwargs)
 
     for example, hyps in zip(examples, decode_results):
         if hyps:
