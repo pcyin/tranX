@@ -4,50 +4,98 @@ from __future__ import print_function
 import json
 import os
 import pickle
-
 import sys
 from itertools import chain
 
 import numpy as np
 
-from asdl.lang.sql.lib.common import detokenize
-
-from asdl.asdl_ast import RealizedField, AbstractSyntaxTree
-from asdl.lang.sql.utils import my_detokenize
-from asdl.transition_system import GenTokenAction, TransitionSystem, Action
-from asdl.lang.sql.lib.query import Query
-from asdl.lang.sql.lib.dbengine import DBEngine
 from asdl.asdl import ASDLGrammar
-from asdl.lang.sql.sql_transition_system import SqlTransitionSystem, sql_query_to_asdl_ast, asdl_ast_to_sql_query
 from asdl.hypothesis import Hypothesis
+from asdl.lang.sql.lib.common import detokenize
+from asdl.lang.sql.lib.dbengine import DBEngine
+from asdl.lang.sql.lib.query import Query
+from asdl.lang.sql.sql_transition_system import SqlTransitionSystem, sql_query_to_asdl_ast, asdl_ast_to_sql_query
+from asdl.lang.sql.utils import my_detokenize, find_sub_sequence
+from asdl.transition_system import GenTokenAction
 from components.action_info import ActionInfo
 from components.vocab import VocabEntry, Vocab
-
 from model.wikisql.dataset import WikiSqlExample, WikiSqlTable, TableColumn
 
 
-def get_action_infos(src_query, tgt_actions, force_copy=False):
+def get_action_infos(src_query, tgt_actions, force_copy=False, copy_method='token'):
     action_infos = []
     hyp = Hypothesis()
-    for t, action in enumerate(tgt_actions):
-        action_info = ActionInfo(action)
-        action_info.t = t
-        if hyp.frontier_node:
-            action_info.parent_t = hyp.frontier_node.created_time
-            action_info.frontier_prod = hyp.frontier_node.production
-            action_info.frontier_field = hyp.frontier_field.field
+    t = 0
+    while t < len(tgt_actions):
+        action = tgt_actions[t]
 
         if type(action) is GenTokenAction:
-            try:
-                tok_src_idx = src_query.index(str(action.token))
-                action_info.copy_from_src = True
-                action_info.src_token_position = tok_src_idx
-            except ValueError:
-                if force_copy and not action.is_stop_signal():
-                    raise ValueError('cannot copy primitive token %s from source' % action.token)
+            begin_t = t
+            t += 1
+            while t < len(tgt_actions) and type(tgt_actions[t]) is GenTokenAction:
+                t += 1
+            end_t = t
 
-        hyp.apply_action(action)
-        action_infos.append(action_info)
+            gen_token_actions = tgt_actions[begin_t: end_t]
+            assert gen_token_actions[-1].is_stop_signal()
+
+            tokens = [action.token for action in gen_token_actions[:-1]]
+
+            try:
+                tok_src_start_idx, tok_src_end_idx = find_sub_sequence(src_query, tokens)
+                tok_src_idxs = list(range(tok_src_start_idx, tok_src_end_idx))
+            except IndexError:
+                print('\tCannot find [%s] in [%s]' % (' '.join(tokens), ' '.join(src_query)), file=sys.stderr)
+                tok_src_idxs = [src_query.index(token) for token in tokens]
+
+            tok_src_idxs.append(-1)  # for </primitive>
+
+            for tok_src_idx, gen_token_action in zip(tok_src_idxs, gen_token_actions):
+                action_info = ActionInfo(gen_token_action)
+
+                if not gen_token_action.is_stop_signal():
+                    action_info.copy_from_src = True
+                    action_info.src_token_position = tok_src_idx
+
+                    assert src_query[tok_src_idx] == gen_token_action.token
+
+                if hyp.frontier_node:
+                    action_info.parent_t = hyp.frontier_node.created_time
+                    action_info.frontier_prod = hyp.frontier_node.production
+                    action_info.frontier_field = hyp.frontier_field.field
+
+                hyp.apply_action(gen_token_action)
+                action_infos.append(action_info)
+        else:
+            action_info = ActionInfo(action)
+            if hyp.frontier_node:
+                action_info.parent_t = hyp.frontier_node.created_time
+                action_info.frontier_prod = hyp.frontier_node.production
+                action_info.frontier_field = hyp.frontier_field.field
+
+            hyp.apply_action(action)
+            action_infos.append(action_info)
+            t += 1
+
+    # for t, action in enumerate(tgt_actions):
+    #     action_info = ActionInfo(action)
+    #     action_info.t = t
+    #     if hyp.frontier_node:
+    #         action_info.parent_t = hyp.frontier_node.created_time
+    #         action_info.frontier_prod = hyp.frontier_node.production
+    #         action_info.frontier_field = hyp.frontier_field.field
+    #
+    #     if type(action) is GenTokenAction:
+    #         try:
+    #             tok_src_idx = src_query.index(str(action.token))
+    #             action_info.copy_from_src = True
+    #             action_info.src_token_position = tok_src_idx
+    #         except ValueError:
+    #             if force_copy and not action.is_stop_signal():
+    #                 raise ValueError('cannot copy primitive token %s from source' % action.token)
+    #
+    #     hyp.apply_action(action)
+    #     action_infos.append(action_info)
 
     return action_infos
 
@@ -86,7 +134,11 @@ def load_dataset(transition_system, dataset_file, table_file):
         actions = transition_system.get_actions(asdl_ast)
         hyp = Hypothesis()
 
-        for action in actions:
+        question_tokens = entry['question']['words']
+        tgt_action_infos = get_action_infos(question_tokens, actions, force_copy=True)
+
+        for action, action_info in zip(actions, tgt_action_infos):
+            assert action == action_info.action
             hyp.apply_action(action)
 
         reconstructed_query_from_hyp = asdl_ast_to_sql_query(hyp.tree)
@@ -127,9 +179,6 @@ def load_dataset(transition_system, dataset_file, table_file):
         header = [TableColumn(name=detokenize(col_name), tokens=col_name['words'], type=col_type) for (col_name, col_type) in
                   zip(entry['table']['header'], tables[entry['table_id']]['types'])]
         table = WikiSqlTable(header=header)
-
-        question_tokens = entry['question']['words']
-        tgt_action_infos = get_action_infos(question_tokens, actions, force_copy=True)
 
         example = WikiSqlExample(idx=idx,
                                  question=question_tokens,
