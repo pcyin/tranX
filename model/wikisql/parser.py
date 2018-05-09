@@ -422,6 +422,12 @@ class WikiSqlParser(Parser):
                         else:
                             valid_token_pos_list = list(range(len(question)))
 
+                        col_id = hyp.frontier_node['col_idx'].value
+                        if table.header[col_id].type == 'real':
+                            valid_token_pos_list = [i for i in valid_token_pos_list
+                                                    if any(c.isdigit() for c in question[i]) or
+                                                    hyp._value_buffer and question[i] in (',', '.', '-', '%')]
+
                         p_copies = primitive_predictor_prob[hyp_id, 1] * primitive_copy_prob[hyp_id]
                         for token_pos in valid_token_pos_list:
                             token = question[token_pos]
@@ -435,15 +441,18 @@ class WikiSqlParser(Parser):
                             new_hyp_meta.append(meta_entry)
 
                         # add generation probability for </primitive>
-                        eos_prob = primitive_predictor_prob[hyp_id, 0] * \
-                                   primitive_gen_from_vocab_prob[hyp_id, self.vocab.primitive['</primitive>']]
-                        eos_score = torch.log(eos_prob)
+                        if hyp._value_buffer:
+                            eos_prob = primitive_predictor_prob[hyp_id, 0] * \
+                                       primitive_gen_from_vocab_prob[hyp_id, self.vocab.primitive['</primitive>']]
+                            eos_score = torch.log(eos_prob)
 
-                        meta_entry = {'action_type': 'gen_token',
-                                      'token': '</primitive>',
-                                      'score': eos_score, 'new_hyp_score': eos_score + hyp.score,
-                                      'prev_hyp_id': hyp_id}
-                        new_hyp_meta.append(meta_entry)
+                            meta_entry = {'action_type': 'gen_token',
+                                          'token': '</primitive>',
+                                          'score': eos_score, 'new_hyp_score': eos_score + hyp.score,
+                                          'prev_hyp_id': hyp_id}
+                            new_hyp_meta.append(meta_entry)
+
+            if not new_hyp_meta: break
 
             new_hyp_scores = torch.cat([x['new_hyp_score'] for x in new_hyp_meta])
             top_new_hyp_scores, meta_ids = torch.topk(new_hyp_scores,
