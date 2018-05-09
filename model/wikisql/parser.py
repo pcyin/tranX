@@ -410,8 +410,21 @@ class WikiSqlParser(Parser):
                             new_hyp_meta.append(meta_entry)
                     elif action_type == GenTokenAction:
                         # remember that we can only copy stuff from the input!
+                        # we only copy tokens sequentially!!
+                        prev_action = hyp.action_infos[-1].action
+
+                        valid_token_pos_list = []
+                        if type(prev_action) is GenTokenAction and \
+                                not prev_action.is_stop_signal():
+                            token_pos = hyp.action_infos[-1].src_token_position + 1
+                            if token_pos < len(question):
+                                valid_token_pos_list = [token_pos]
+                        else:
+                            valid_token_pos_list = list(range(len(question)))
+
                         p_copies = primitive_predictor_prob[hyp_id, 1] * primitive_copy_prob[hyp_id]
-                        for token_pos, token in enumerate(question):
+                        for token_pos in valid_token_pos_list:
+                            token = question[token_pos]
                             p_copy = p_copies[token_pos]
                             score_copy = torch.log(p_copy)
 
