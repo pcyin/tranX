@@ -119,6 +119,7 @@ def init_arg_parser():
     arg_parser.add_argument('--lr_decay_after_epoch', default=0, type=int)
     arg_parser.add_argument('--reset_optimizer', action='store_true', default=False)
     arg_parser.add_argument('--verbose', action='store_true', default=False)
+    arg_parser.add_argument('--eval_top_pred_only', action='store_true', default=False, help='only evaluate the top prediction in validation')
 
     arg_parser.add_argument('--train_opt', default="reinforce", type=str, choices=['reinforce', 'st_gumbel'])
 
@@ -254,7 +255,8 @@ def train(args):
             if epoch % args.valid_every_epoch == 0:
                 print('[Epoch %d] begin validation' % epoch, file=sys.stderr)
                 eval_start = time.time()
-                eval_results = evaluation.evaluate(dev_set.examples, model, args, verbose=True)
+                eval_results = evaluation.evaluate(dev_set.examples, model, args,
+                                                   verbose=True, eval_top_pred_only=args.eval_top_pred_only)
                 dev_acc = eval_results['accuracy']
                 print('[Epoch %d] code generation accuracy=%.5f took %ds' % (epoch, dev_acc, time.time() - eval_start), file=sys.stderr)
                 is_better = history_dev_scores == [] or dev_acc > max(history_dev_scores)

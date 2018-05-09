@@ -56,7 +56,7 @@ def decode(examples, model, args, verbose=False, **kwargs):
     return decode_results
 
 
-def evaluate(examples, parser, args, verbose=False, return_decode_result=False):
+def evaluate(examples, parser, args, verbose=False, return_decode_result=False, eval_top_pred_only=False):
     cum_oracle_acc = cum_acc = 0.0
 
     kwargs = dict()
@@ -96,14 +96,22 @@ def evaluate(examples, parser, args, verbose=False, return_decode_result=False):
 
                     hyp.correct = result
                 except:
-                    print('Hyp Id [%d] error in evluating [%s]' % (hyp_id, hyp.code), file=sys.stderr)
+                    print('Error in evaluating Example %s, hyp %d [%s]' % (example.idx, hyp_id, hyp.code), file=sys.stderr)
                     hyp.correct = False
+
+                    print('-' * 60, file=sys.stderr)
+                    print('example id: %d, hypothesis id: %d' % (example.idx, hyp_id), file=sys.stderr)
+                    traceback.print_exc(file=sys.stderr)
+                    print('-' * 60, file=sys.stderr)
+
                     continue
 
                 if args.lang in ['lambda_dcs', 'python', 'prolog']:
                     if hyp.code in hyp_code_set:
                         print('Duplicate Hyp Example [%d], Code %s' % (example.idx, hyp.code), file=sys.stdout)
                     hyp_code_set.add(hyp.code)
+
+                if eval_top_pred_only: break
 
                 # if verbose:
                 #     if hyp_id == 0 and hyp.correct:
