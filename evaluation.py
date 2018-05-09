@@ -29,12 +29,14 @@ def decode(examples, model, args, verbose=False, **kwargs):
             try:
                 hyp.code = model.transition_system.ast_to_surface_code(hyp.tree)
 
-                # if args.lang == 'wikisql':
-                #     # try execute the code, if fails, skip this example!
-                #     detokenized_hyp_query = detokenize_query(hyp.code, example.meta, example.table)
-                #     hyp_answer = kwargs['execution_engine'].execute_query(example.meta['table_id'],
-                #                                                           detokenized_hyp_query,
-                #                                                           lower=True)
+                if args.lang == 'wikisql':
+                    # try execute the code, if fails, skip this example!
+                    # if the execution returns null, also skip this example!
+                    detokenized_hyp_query = detokenize_query(hyp.code, example.meta, example.table)
+                    hyp_answer = kwargs['execution_engine'].execute_query(example.meta['table_id'],
+                                                                          detokenized_hyp_query,
+                                                                          lower=True)
+                    if len(hyp_answer) == 0: continue
 
                 decoded_hyps.append(hyp)
             except:
