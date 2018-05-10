@@ -98,13 +98,13 @@ def evaluate(examples, parser, args, verbose=False, return_decode_result=False, 
 
                     hyp.correct = result
                 except:
-                    print('Error in evaluating Example %s, hyp %d [%s]' % (example.idx, hyp_id, hyp.code), file=sys.stderr)
+                    print('-' * 60, file=sys.stdout)
+                    print('Error in evaluating Example %s, hyp %d {{ %s }}' % (example.idx, hyp_id, hyp.code), file=sys.stdout)
                     hyp.correct = False
 
-                    print('-' * 60, file=sys.stderr)
-                    print('example id: %d, hypothesis id: %d' % (example.idx, hyp_id), file=sys.stderr)
-                    traceback.print_exc(file=sys.stderr)
-                    print('-' * 60, file=sys.stderr)
+                    print('example id: %d, hypothesis id: %d' % (example.idx, hyp_id), file=sys.stdout)
+                    traceback.print_exc(file=sys.stdout)
+                    print('-' * 60, file=sys.stdout)
 
                     continue
 
