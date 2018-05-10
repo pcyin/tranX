@@ -280,7 +280,7 @@ def train(args):
             model.save(model_file)
             # also save the optimizers' state
             torch.save(optimizer.state_dict(), args.save_to + '.optim.bin')
-        elif patience < args.patience:
+        elif patience < args.patience and epoch >= args.lr_decay_after_epoch:
             patience += 1
             print('hit patience %d' % patience, file=sys.stderr)
 
