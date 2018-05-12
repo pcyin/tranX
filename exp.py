@@ -307,7 +307,7 @@ def train(args):
             # load optimizers
             if args.reset_optimizer:
                 print('reset optimizer', file=sys.stderr)
-                optimizer = torch.optim.Adam(model.inference_model.parameters(), lr=lr)
+                optimizer = torch.optim.Adam(model.parameters(), lr=lr)
             else:
                 print('restore parameters of the optimizers', file=sys.stderr)
                 optimizer.load_state_dict(torch.load(args.save_to + '.optim.bin'))
