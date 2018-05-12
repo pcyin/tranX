@@ -55,6 +55,10 @@ def init_arg_parser():
     arg_parser.add_argument('--kl_anneal', default=False, action='store_true')
     arg_parser.add_argument('--alpha', default=0.1, type=float)
 
+    # readout layer
+    arg_parser.add_argument('--readout', default='identity', choices=['identity', 'non_linear'])
+    arg_parser.add_argument('--query_vec_to_action_diff_map', default=False, action='store_true')
+
     # supervised attention
     arg_parser.add_argument('--sup_attention', default=False, action='store_true')
 

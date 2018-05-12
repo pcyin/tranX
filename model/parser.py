@@ -97,13 +97,21 @@ class Parser(nn.Module):
         self.att_vec_linear = nn.Linear(args.hidden_size + args.hidden_size, args.hidden_size, bias=False)
 
         # embedding layers
-        self.query_vec_to_embed = nn.Linear(args.hidden_size, args.embed_size, bias=False)
+        self.query_vec_to_action_embed = nn.Linear(args.hidden_size, args.embed_size, bias=args.readout == 'non_linear')
+        if args.query_vec_to_action_diff_map:
+            self.query_vec_to_primitive_embed = nn.Linear(args.hidden_size, args.embed_size, bias=args.readout == 'non_linear')
+        else:
+            self.query_vec_to_primitive_embed = self.query_vec_to_action_embed
+
         self.production_readout_b = nn.Parameter(torch.FloatTensor(len(transition_system.grammar) + 1).zero_())
         self.tgt_token_readout_b = nn.Parameter(torch.FloatTensor(len(vocab.primitive)).zero_())
-        self.production_readout = lambda q: F.linear(self.query_vec_to_embed(q),
+        self.read_out_act = F.tanh if args.readout == 'non_linear' else nn_utils.identity
+
+        self.production_readout = lambda q: F.linear(self.read_out_act(self.query_vec_to_action_embed(q)),
                                                      self.production_embed.weight, self.production_readout_b)
-        self.tgt_token_readout = lambda q: F.linear(self.query_vec_to_embed(q),
+        self.tgt_token_readout = lambda q: F.linear(self.read_out_act(self.query_vec_to_primitive_embed(q)),
                                                     self.primitive_embed.weight, self.tgt_token_readout_b)
+
         # self.production_readout = nn.Linear(args.hidden_size, len(transition_system.grammar) + 1)
         # self.tgt_token_readout = nn.Linear(args.hidden_size, len(vocab.primitive))
 

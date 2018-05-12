@@ -150,3 +150,7 @@ def glorot_init(params):
     for p in params:
         if len(p.data.size()) > 1:
             init.xavier_normal(p.data)
+
+
+def identity(x):
+    return x
