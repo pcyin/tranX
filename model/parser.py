@@ -165,18 +165,57 @@ class Parser(nn.Module):
         dec_init_vec = self.init_decoder_state(last_state, last_cell)
 
         if self.args.sup_attention:
-            scores, att_probs = self.decode(batch, src_encodings, dec_init_vec)
+            # query_vectors: (tgt_action_len, batch_size, hidden_size)
+            query_vectors, att_prob = self.decode(batch, src_encodings, dec_init_vec)
         else:
-            scores = self.decode(batch, src_encodings, dec_init_vec)
+            query_vectors = self.decode(batch, src_encodings, dec_init_vec)
 
-        # torch.save(apply_rule_prob, open('data/jobs/debug.apply_rule_prob.train.bin', 'wb'))
-        # torch.save(gen_from_vocab_prob, open('data/jobs/debug.gen_from_vocab_prob.train.bin', 'wb'))
-        # torch.save(primitive_copy_prob, open('data/jobs/debug.primitive_copy_prob.train.bin', 'wb'))
-        # torch.save(primitive_predictor_prob, open('data/jobs/debug.primitive_predictor_prob.train.bin', 'wb'))
+        # ApplyRule action probability
+        # (tgt_action_len, batch_size, grammar_size)
+        apply_rule_prob = F.softmax(self.production_readout(query_vectors), dim=-1)
+
+        # (tgt_action_len, batch_size)
+        tgt_apply_rule_prob = torch.gather(apply_rule_prob, dim=2,
+                                           index=batch.apply_rule_idx_matrix.unsqueeze(2)).squeeze(2)
+
+        # (tgt_action_len, batch_size, 2)
+        primitive_predictor = F.softmax(self.primitive_predictor(query_vectors), dim=-1)
+
+        # pointer network scores over source tokens
+        # (tgt_action_len, batch_size, src_sent_len)
+        primitive_copy_prob = self.src_pointer_net(src_encodings, batch.src_token_mask, query_vectors)
+
+        # (tgt_action_len, batch_size)
+        tgt_primitive_copy_prob = torch.gather(primitive_copy_prob, dim=2,
+                                               index=batch.primitive_copy_pos_matrix.unsqueeze(2)).squeeze(2)
+
+        # (tgt_action_len, batch_size, primitive_vocab_size)
+        gen_from_vocab_prob = F.softmax(self.tgt_token_readout(query_vectors), dim=-1)
+
+        # (tgt_action_len, batch_size)
+        tgt_primitive_gen_from_vocab_prob = torch.gather(gen_from_vocab_prob, dim=2,
+                                                         index=batch.primitive_idx_matrix.unsqueeze(2)).squeeze(2)
+
+        # (tgt_action_len, batch_size)
+        # positions in action_prob that are not used
+        action_mask = 1. - torch.eq(batch.apply_rule_mask + batch.gen_token_mask + batch.primitive_copy_mask,
+                                    0.).float()
+
+        # (tgt_action_len, batch_size)
+        action_prob = tgt_apply_rule_prob * batch.apply_rule_mask + \
+                      primitive_predictor[:, :, 0] * tgt_primitive_gen_from_vocab_prob * batch.gen_token_mask + \
+                      primitive_predictor[:, :, 1] * tgt_primitive_copy_prob * batch.primitive_copy_mask
+
+        # avoid nan in log
+        action_prob.data.masked_fill_(torch.eq(action_prob, 0.).data, 1.e-7)
+
+        action_prob = action_prob.log() * action_mask
+
+        scores = torch.sum(action_prob, dim=0)
 
         returns = [scores]
-        if self.args.sup_attention and att_probs:
-            returns.append(att_probs)
+        if self.args.sup_attention:
+            returns.append(att_prob)
         if return_enc_state: returns.append(last_state)
 
         return returns
@@ -218,8 +257,6 @@ class Parser(nn.Module):
 
         if args.lstm == 'lstm_with_dropout':
             self.decoder_lstm.set_dropout_masks(batch_size)
-
-        action_probs = [[] for example in batch.examples]
 
         for t in xrange(batch.max_action_num):
             # x: [prev_action, att_tm1, parent_production_embed, parent_field_embed, parent_field_type_embed, parent_action_state]
@@ -288,50 +325,6 @@ class Parser(nn.Module):
                                                          src_token_mask=batch.src_token_mask,
                                                          return_att_weight=True)
 
-            # ApplyRule action probability
-
-            # Variable(batch_size, grammar_size)
-            apply_rule_log_prob = F.log_softmax(self.production_readout(att_t), dim=-1)
-
-            if any(type(e.tgt_actions[t].action) is GenTokenAction for e in batch.examples if t < len(e.tgt_actions)):
-                # Variable(batch_size, 2)
-                primitive_predictor_prob = F.softmax(self.primitive_predictor(att_t), dim=-1)
-
-                # Variable(batch_size, src_sent_len)
-                primitive_copy_prob = self.src_pointer_net(src_encodings, None, att_t.unsqueeze(0)).squeeze(0)
-
-                # Variable(batch_size, primitive_vocab_size)
-                primitive_gen_from_vocab_prob = F.softmax(self.tgt_token_readout(att_t), dim=-1)
-
-            for e_id, example in enumerate(batch.examples):
-                if t < len(example.tgt_actions):
-                    action_info_t = example.tgt_actions[t]
-                    action_t = action_info_t.action
-
-                    if isinstance(action_t, ApplyRuleAction):
-                        act_prob_t_i = apply_rule_log_prob[e_id, self.grammar.prod2id[action_t.production]]
-                    elif isinstance(action_t, ReduceAction):
-                        act_prob_t_i = apply_rule_log_prob[e_id, len(self.grammar)]
-                    elif isinstance(action_t, GenTokenAction):
-                        token_id = self.vocab.primitive[action_t.token]
-                        if args.no_copy:
-                            act_prob_t_i = primitive_gen_from_vocab_prob[e_id, token_id]
-                        else:
-                            if action_info_t.copy_from_src:
-                                if action_t.token in self.vocab.primitive:
-                                    act_prob_t_i = primitive_predictor_prob[e_id, 0] * primitive_gen_from_vocab_prob[e_id, token_id] + \
-                                                   primitive_predictor_prob[e_id, 1] * primitive_copy_prob[e_id, action_info_t.src_token_position]
-                                else:
-                                    act_prob_t_i = primitive_predictor_prob[e_id, 1] * primitive_copy_prob[e_id, action_info_t.src_token_position]
-                            else:
-                                act_prob_t_i = primitive_predictor_prob[e_id, 0] * primitive_gen_from_vocab_prob[e_id, token_id]
-
-                        act_prob_t_i = act_prob_t_i.log()
-                    else:
-                        raise ValueError('unknown action %s' % action_t)
-
-                    action_probs[e_id].append(act_prob_t_i)
-
             if args.sup_attention:
                 for e_id, example in enumerate(batch.examples):
                     if t < len(example.tgt_actions):
@@ -349,12 +342,10 @@ class Parser(nn.Module):
             h_tm1 = (h_t, cell_t)
             att_tm1 = att_t
 
-        # sum all the action probabilities
-        action_prob_var = torch.cat([torch.cat(action_probs_i).sum() for action_probs_i in action_probs])
-
+        att_vecs = torch.stack(att_vecs, dim=0)
         if args.sup_attention:
-            return action_prob_var, att_probs
-        else: return action_prob_var
+            return att_vecs, att_probs
+        else: return att_vecs
 
     def parse(self, src_sent, context=None, beam_size=5):
         args = self.args
