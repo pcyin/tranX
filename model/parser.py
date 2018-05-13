@@ -198,8 +198,8 @@ class Parser(nn.Module):
 
         # (tgt_action_len, batch_size)
         # positions in action_prob that are not used
-        action_mask = 1. - torch.eq(batch.apply_rule_mask + batch.gen_token_mask + batch.primitive_copy_mask,
-                                    0.).float()
+        action_mask_pad = torch.eq(batch.apply_rule_mask + batch.gen_token_mask + batch.primitive_copy_mask, 0.)
+        action_mask = 1. - action_mask_pad.float()
 
         # (tgt_action_len, batch_size)
         action_prob = tgt_apply_rule_prob * batch.apply_rule_mask + \
@@ -207,7 +207,7 @@ class Parser(nn.Module):
                       primitive_predictor[:, :, 1] * tgt_primitive_copy_prob * batch.primitive_copy_mask
 
         # avoid nan in log
-        action_prob.data.masked_fill_(torch.eq(action_prob, 0.).data, 1.e-7)
+        action_prob.data.masked_fill_(action_mask_pad.data, 1.e-7)
 
         action_prob = action_prob.log() * action_mask
 
@@ -254,6 +254,7 @@ class Parser(nn.Module):
         att_vecs = []
         history_states = []
         att_probs = []
+        att_weights = []
 
         if args.lstm == 'lstm_with_dropout':
             self.decoder_lstm.set_dropout_masks(batch_size)
@@ -338,6 +339,7 @@ class Parser(nn.Module):
 
             history_states.append((h_t, cell_t))
             att_vecs.append(att_t)
+            att_weights.append(att_weight)
 
             h_tm1 = (h_t, cell_t)
             att_tm1 = att_t
