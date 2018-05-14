@@ -56,7 +56,7 @@ class Parser(nn.Module):
             input_dim += args.type_embed_size * (not args.no_parent_field_type_embed)
             input_dim += args.hidden_size * (not args.no_parent_state)
 
-            input_dim += args.hidden_size * (not args.no_input_feed)  # input feeding
+            input_dim += args.att_vec_size * (not args.no_input_feed)  # input feeding
 
             self.decoder_lstm = nn.LSTMCell(input_dim, args.hidden_size)
         elif args.lstm == 'parent_feed':
@@ -68,7 +68,7 @@ class Parser(nn.Module):
             input_dim += args.action_embed_size * (not args.no_parent_production_embed)
             input_dim += args.field_embed_size * (not args.no_parent_field_embed)
             input_dim += args.type_embed_size * (not args.no_parent_field_type_embed)
-            input_dim += args.hidden_size * (not args.no_input_feed)  # input feeding
+            input_dim += args.att_vec_size * (not args.no_input_feed)  # input feeding
 
             self.decoder_lstm = ParentFeedingLSTMCell(input_dim, args.hidden_size)
         else:
@@ -81,9 +81,9 @@ class Parser(nn.Module):
                                          dropout=args.dropout)
 
         # pointer net
-        self.src_pointer_net = PointerNet(args.hidden_size, args.hidden_size)
+        self.src_pointer_net = PointerNet(query_vec_size=args.att_vec_size, src_encoding_size=args.hidden_size)
 
-        self.primitive_predictor = nn.Linear(args.hidden_size, 2)
+        self.primitive_predictor = nn.Linear(args.att_vec_size, 2)
 
         # initialize the decoder's state and cells with encoder hidden states
         self.decoder_cell_init = nn.Linear(args.hidden_size, args.hidden_size)
@@ -94,26 +94,29 @@ class Parser(nn.Module):
 
         # transformation of decoder hidden states and context vectors before reading out target words
         # this produces the `attentional vector` in (Luong et al., 2015)
-        self.att_vec_linear = nn.Linear(args.hidden_size + args.hidden_size, args.hidden_size, bias=False)
+        self.att_vec_linear = nn.Linear(args.hidden_size + args.hidden_size, args.att_vec_size, bias=False)
 
         # embedding layers
-        self.query_vec_to_action_embed = nn.Linear(args.hidden_size, args.embed_size, bias=args.readout == 'non_linear')
-        if args.query_vec_to_action_diff_map:
-            self.query_vec_to_primitive_embed = nn.Linear(args.hidden_size, args.embed_size, bias=args.readout == 'non_linear')
-        else:
-            self.query_vec_to_primitive_embed = self.query_vec_to_action_embed
-
         self.production_readout_b = nn.Parameter(torch.FloatTensor(len(transition_system.grammar) + 1).zero_())
         self.tgt_token_readout_b = nn.Parameter(torch.FloatTensor(len(vocab.primitive)).zero_())
-        self.read_out_act = F.tanh if args.readout == 'non_linear' else nn_utils.identity
 
-        self.production_readout = lambda q: F.linear(self.read_out_act(self.query_vec_to_action_embed(q)),
-                                                     self.production_embed.weight, self.production_readout_b)
-        self.tgt_token_readout = lambda q: F.linear(self.read_out_act(self.query_vec_to_primitive_embed(q)),
-                                                    self.primitive_embed.weight, self.tgt_token_readout_b)
+        if args.no_query_vec_to_action_map:
+            assert args.att_vec_size == args.action_embed_size
+            self.production_readout = lambda q: F.linear(q, self.production_embed.weight, self.production_readout_b)
+            self.tgt_token_readout = lambda q: F.linear(q, self.primitive_embed.weight, self.tgt_token_readout_b)
+        else:
+            self.query_vec_to_action_embed = nn.Linear(args.att_vec_size, args.embed_size, bias=args.readout == 'non_linear')
+            if args.query_vec_to_action_diff_map:
+                self.query_vec_to_primitive_embed = nn.Linear(args.att_vec_size, args.embed_size, bias=args.readout == 'non_linear')
+            else:
+                self.query_vec_to_primitive_embed = self.query_vec_to_action_embed
 
-        # self.production_readout = nn.Linear(args.hidden_size, len(transition_system.grammar) + 1)
-        # self.tgt_token_readout = nn.Linear(args.hidden_size, len(vocab.primitive))
+            self.read_out_act = F.tanh if args.readout == 'non_linear' else nn_utils.identity
+
+            self.production_readout = lambda q: F.linear(self.read_out_act(self.query_vec_to_action_embed(q)),
+                                                         self.production_embed.weight, self.production_readout_b)
+            self.tgt_token_readout = lambda q: F.linear(self.read_out_act(self.query_vec_to_primitive_embed(q)),
+                                                        self.primitive_embed.weight, self.tgt_token_readout_b)
 
         # dropout layer
         self.dropout = nn.Dropout(args.dropout)
@@ -134,6 +137,11 @@ class Parser(nn.Module):
         """
 
         # (tgt_query_len, batch_size, embed_size)
+        # apply word dropout
+        if self.training and self.args.word_dropout:
+            mask = Variable(self.new_tensor(src_sents_var.size()).fill_(1. - self.args.word_dropout).bernoulli().long())
+            src_sents_var = src_sents_var * mask + (1 - mask) * self.vocab.source.unk_id
+
         src_token_embed = self.src_embed(src_sents_var)
         packed_src_token_embed = pack_padded_sequence(src_token_embed, src_sents_len)
 
@@ -265,7 +273,7 @@ class Parser(nn.Module):
                 x = Variable(self.new_tensor(batch_size, self.decoder_lstm.input_size).zero_(), requires_grad=False)
                 if args.no_parent_field_type_embed is False:
                     offset = args.action_embed_size  # prev_action
-                    offset += args.hidden_size * (not args.no_input_feed)
+                    offset += args.att_vec_size * (not args.no_input_feed)
                     offset += args.action_embed_size * (not args.no_parent_production_embed)
                     offset += args.field_embed_size * (not args.no_parent_field_embed)
 
@@ -400,7 +408,7 @@ class Parser(nn.Module):
                 x = Variable(self.new_tensor(1, self.decoder_lstm.input_size).zero_(), volatile=True)
                 if args.no_parent_field_type_embed is False:
                     offset = args.action_embed_size  # prev_action
-                    offset += args.hidden_size * (not args.no_input_feed)
+                    offset += args.att_vec_size * (not args.no_input_feed)
                     offset += args.action_embed_size * (not args.no_parent_production_embed)
                     offset += args.field_embed_size * (not args.no_parent_field_embed)
 

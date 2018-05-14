@@ -50,12 +50,15 @@ def init_arg_parser():
     arg_parser.add_argument('--type_embed_size', default=64, type=int, help='size of word embeddings')
     arg_parser.add_argument('--ptrnet_hidden_dim', default=32, type=int)
     arg_parser.add_argument('--hidden_size', default=256, type=int, help='size of LSTM hidden states')
+    arg_parser.add_argument('--att_vec_size', default=256, type=int, help='size of attentional vector')
     arg_parser.add_argument('--dropout', default=0., type=float, help='dropout rate')
+    arg_parser.add_argument('--word_dropout', default=0., type=float, help='word dropout rate')
     arg_parser.add_argument('--decoder_word_dropout', default=0.3, type=float, help='word dropout on decoder')
     arg_parser.add_argument('--kl_anneal', default=False, action='store_true')
     arg_parser.add_argument('--alpha', default=0.1, type=float)
 
     # readout layer
+    arg_parser.add_argument('--no_query_vec_to_action_map', default=False, action='store_true')
     arg_parser.add_argument('--readout', default='identity', choices=['identity', 'non_linear'])
     arg_parser.add_argument('--query_vec_to_action_diff_map', default=False, action='store_true')
 
