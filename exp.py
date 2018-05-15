@@ -67,6 +67,9 @@ def init_arg_parser():
 
     # wikisql
     arg_parser.add_argument('--column_att', choices=['dot_prod', 'affine'], default='affine')
+    arg_parser.add_argument('--answer_prune', dest='answer_prune', action='store_true')
+    arg_parser.add_argument('--no_answer_prune', dest='answer_prune', action='store_false')
+    arg_parser.set_defaults(answer_prune=True)
 
     # parent information switch and input feeding
     arg_parser.add_argument('--no_parent_production_embed', default=False, action='store_true')

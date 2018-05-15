@@ -29,7 +29,7 @@ def decode(examples, model, args, verbose=False, **kwargs):
             try:
                 hyp.code = model.transition_system.ast_to_surface_code(hyp.tree)
 
-                if args.lang == 'wikisql':
+                if args.lang == 'wikisql' and args.answer_prune:
                     # try execute the code, if fails, skip this example!
                     # if the execution returns null, also skip this example!
                     detokenized_hyp_query = detokenize_query(hyp.code, example.meta, example.table)
