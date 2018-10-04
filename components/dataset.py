@@ -179,6 +179,10 @@ class Batch(object):
         self.primitive_copy_pos_matrix = Variable(T.LongTensor(self.primitive_copy_pos_matrix))
         self.primitive_copy_mask = Variable(T.FloatTensor(self.primitive_copy_mask))
 
+    @property
+    def primitive_mask(self):
+        return 1. - torch.eq(self.gen_token_mask + self.primitive_copy_mask, 0).float()
+
     @cached_property
     def src_sents_var(self):
         return nn_utils.to_input_variable(self.src_sents, self.vocab.source,
