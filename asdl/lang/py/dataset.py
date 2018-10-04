@@ -28,7 +28,6 @@ p_decorator = re.compile(r'^@.*')
 
 QUOTED_STRING_RE = re.compile(r"(?P<quote>['\"])(?P<string>.*?)(?<!\\)(?P=quote)")
 
-
 def get_action_infos(src_query, tgt_actions, force_copy=False):
     action_infos = []
     hyp = Hypothesis()
@@ -79,6 +78,21 @@ class Django(object):
         return code
 
     @staticmethod
+    def canonicalize_str_nodes(py_ast, str_map):
+        for node in ast.walk(py_ast):
+            if isinstance(node, ast.Str):
+                str_val = node.s
+
+                if str_val in str_map:
+                    node.s = str_map[str_val]
+                else:
+                    # handle cases like `\n\t` in string literals
+                    for str_literal, slot_id in str_map.items():
+                        str_literal_decoded = str_literal.decode('string_escape')
+                        if str_literal_decoded == str_val:
+                            node.s = slot_id
+
+    @staticmethod
     def canonicalize_query(query):
         """
         canonicalize the query, replace strings to a special place holder
@@ -93,19 +107,22 @@ class Django(object):
             # If one or more groups are present in the pattern,
             # it returns a list of groups
             quote = match[0]
-            str_literal = quote + match[1] + quote
+            str_literal = match[1]
+            quoted_str_literal = quote + str_literal + quote
 
             if str_literal in cur_replaced_strs:
+                # replace the string with new quote with slot id
+                query = query.replace(quoted_str_literal, str_map[str_literal])
                 continue
 
             # FIXME: substitute the ' % s ' with
-            if str_literal in ['\'%s\'', '\"%s\"']:
+            if str_literal in ['%s']:
                 continue
 
             str_repr = '_STR:%d_' % str_count
             str_map[str_literal] = str_repr
 
-            query = query.replace(str_literal, str_repr)
+            query = query.replace(quoted_str_literal, str_repr)
 
             str_count += 1
             cur_replaced_strs.add(str_literal)
@@ -123,6 +140,7 @@ class Django(object):
                 new_query_tokens.extend(new_tokens)
 
         query = ' '.join(new_query_tokens)
+        query = query.replace('\' % s \'', '%s').replace('\" %s \"', '%s')
 
         return query, str_map
 
@@ -131,21 +149,24 @@ class Django(object):
 
         canonical_query, str_map = Django.canonicalize_query(query)
         query_tokens = canonical_query.split(' ')
-        canonical_code = code
 
-        for str_literal, str_repr in str_map.iteritems():
-            canonical_code = canonical_code.replace(str_literal, '\'' + str_repr + '\'')
+        canonical_code = Django.canonicalize_code(code)
+        ast_tree = ast.parse(canonical_code)
 
-        canonical_code = Django.canonicalize_code(canonical_code)
+        Django.canonicalize_str_nodes(ast_tree, str_map)
+        canonical_code = astor.to_source(ast_tree)
+
+        # for str_literal, str_repr in str_map.items():
+        #     canonical_code = canonical_code.replace(str_literal, '\'' + str_repr + '\'')
 
         # sanity check
-        try:
-            gold_ast_tree = ast.parse(canonical_code).body[0]
-        except:
-            print('error!')
-            canonical_code = Django.canonicalize_code(code)
-            gold_ast_tree = ast.parse(canonical_code).body[0]
-            str_map = {}
+        # try:
+        #     ast_tree = ast.parse(canonical_code).body[0]
+        # except:
+        #     print('error!')
+        #     canonical_code = Django.canonicalize_code(code)
+        #     gold_ast_tree = ast.parse(canonical_code).body[0]
+        #     str_map = {}
 
         # parse_tree = python_ast_to_asdl_ast(gold_ast_tree, grammar)
         # gold_source = astor.to_source(gold_ast_tree)
@@ -191,12 +212,30 @@ class Django(object):
             tgt_ast = python_ast_to_asdl_ast(python_ast, grammar)
             tgt_actions = transition_system.get_actions(tgt_ast)
 
+            print('+' * 60)
+            print('Example: %d' % idx)
+            print('Source: %s' % ' '.join(src_query_tokens))
+            if str_map:
+                print('Original String Map:')
+                for str_literal, str_repr in str_map.items():
+                    print('\t%s: %s' % (str_literal, str_repr))
+            print('Code:\n%s' % gold_source)
+            print('Actions:')
+
             # sanity check
             hyp = Hypothesis()
-            for action in tgt_actions:
+            for t, action in enumerate(tgt_actions):
                 assert action.__class__ in transition_system.get_valid_continuation_types(hyp)
                 if isinstance(action, ApplyRuleAction):
                     assert action.production in transition_system.get_valid_continuating_productions(hyp)
+
+                p_t = -1
+                f_t = None
+                if hyp.frontier_node:
+                    p_t = hyp.frontier_node.created_time
+                    f_t = hyp.frontier_field.field.__repr__(plain=True)
+
+                print('\t[%d] %s, frontier field: %s, parent: %d' % (t, action, f_t, p_t))
                 hyp = hyp.clone_and_apply_action(action)
 
             assert hyp.frontier_node is None and hyp.frontier_field is None
@@ -204,18 +243,20 @@ class Django(object):
             src_from_hyp = astor.to_source(asdl_ast_to_python_ast(hyp.tree, grammar)).strip()
             assert src_from_hyp == gold_source
 
+            print('+' * 60)
+
             loaded_examples.append({'src_query_tokens': src_query_tokens,
                                     'tgt_canonical_code': gold_source,
                                     'tgt_ast': tgt_ast,
                                     'tgt_actions': tgt_actions,
                                     'raw_code': tgt_code, 'str_map': str_map})
 
-            print('first pass, processed %d' % idx, file=sys.stderr)
+            # print('first pass, processed %d' % idx, file=sys.stderr)
 
         src_vocab = VocabEntry.from_corpus([e['src_query_tokens'] for e in loaded_examples], size=5000, freq_cutoff=vocab_freq_cutoff)
 
         primitive_tokens = [map(lambda a: a.token,
-                               filter(lambda a: isinstance(a, GenTokenAction), e['tgt_actions']))
+                            filter(lambda a: isinstance(a, GenTokenAction), e['tgt_actions']))
                             for e in loaded_examples]
 
         primitive_vocab = VocabEntry.from_corpus(primitive_tokens, size=5000, freq_cutoff=vocab_freq_cutoff)
@@ -246,7 +287,7 @@ class Django(object):
                               tgt_ast=e['tgt_ast'],
                               meta={'raw_code': e['raw_code'], 'str_map': e['str_map']})
 
-            print('second pass, processed %d' % idx, file=sys.stderr)
+            # print('second pass, processed %d' % idx, file=sys.stderr)
 
             action_len.append(len(tgt_action_infos))
 
@@ -260,21 +301,24 @@ class Django(object):
 
         print('Max action len: %d' % max(action_len), file=sys.stderr)
         print('Avg action len: %d' % np.average(action_len), file=sys.stderr)
-        print('Actions larger than 100: %d' % len(filter(lambda x: x > 100, action_len)), file=sys.stderr)
+        print('Actions larger than 100: %d' % len(list(filter(lambda x: x > 100, action_len))), file=sys.stderr)
 
         return (train_examples, dev_examples, test_examples), vocab
 
     @staticmethod
     def generate_django_dataset():
+        vocab_freq_cutoff = 5
         annot_file = '/Users/yinpengcheng/Research/SemanticParsing/CodeGeneration/en-django/all.anno'
         code_file = '/Users/yinpengcheng/Research/SemanticParsing/CodeGeneration/en-django/all.code'
 
-        (train, dev, test), vocab = Django.parse_django_dataset(annot_file, code_file, 'asdl/lang/py/py_asdl.txt')
+        (train, dev, test), vocab = Django.parse_django_dataset(annot_file, code_file,
+                                                                'asdl/lang/py/py_asdl.txt',
+                                                                vocab_freq_cutoff=vocab_freq_cutoff)
 
-        # pickle.dump(train, open('data/django/train.bin', 'w'))
-        # pickle.dump(dev, open('data/django/dev.bin', 'w'))
-        # pickle.dump(test, open('data/django/test.bin', 'w'))
-        # pickle.dump(vocab, open('data/django/vocab.freq10.bin', 'w'))
+        pickle.dump(train, open('data/django/train.0513.bin', 'w'))
+        pickle.dump(dev, open('data/django/dev.0513.bin', 'w'))
+        pickle.dump(test, open('data/django/test.0513.bin', 'w'))
+        pickle.dump(vocab, open('data/django/vocab.0513.freq%d.bin' % vocab_freq_cutoff, 'w'))
 
     @staticmethod
     def run():
@@ -331,3 +375,12 @@ if __name__ == '__main__':
     # a = {f1: 1}
     # print(a[rf1])
     Django.generate_django_dataset()
+
+
+
+    # py_ast = ast.parse("""sorted(asf, reverse='k' 'k', k='re' % sdf)""")
+    # canonicalize_py_ast(py_ast)
+    # for node in ast.walk(py_ast):
+    #     if isinstance(node, ast.Str):
+    #         print(node.s)
+    # print(astor.to_source(py_ast))

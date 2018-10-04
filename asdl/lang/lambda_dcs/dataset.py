@@ -31,6 +31,9 @@ def load_dataset(transition_system, dataset_file):
 
         tgt_actions = transition_system.get_actions(tgt_ast)
 
+        print('Utterance: %s' % src_query)
+        print('Reference: %s' % tgt_code)
+        print('===== Actions =====')
         # sanity check
         hyp = Hypothesis()
         for action in tgt_actions:
@@ -38,6 +41,7 @@ def load_dataset(transition_system, dataset_file):
             if isinstance(action, ApplyRuleAction):
                 assert action.production in transition_system.get_valid_continuating_productions(hyp)
             hyp = hyp.clone_and_apply_action(action)
+            print(action)
 
         assert hyp.frontier_node is None and hyp.frontier_field is None
 
@@ -126,6 +130,20 @@ def prepare_geo_dataset():
     print('Actions larger than 100: %d' % len(list(filter(lambda x: x > 100, action_len))), file=sys.stderr)
 
     pickle.dump(train_set, open('data/geo/train.bin', 'wb'))
+
+    # randomly sample 20% data as the dev set
+    np.random.seed(1234)
+    dev_example_ids = np.random.choice(list(range(len(train_set))), replace=False, size=int(0.2 * len(train_set)))
+    train_example_ids = [i for i in range(len(train_set)) if i not in dev_example_ids]
+
+    print('# splitted train examples %d, # splitted dev examples %d' % (len(train_example_ids), len(dev_example_ids)), file=sys.stderr)
+
+    dev_set = [train_set[i] for i in dev_example_ids]
+    train_set = [train_set[i] for i in train_example_ids]
+
+    pickle.dump(train_set, open('data/geo/train.split.bin', 'wb'))
+    pickle.dump(dev_set, open('data/geo/dev.bin', 'wb'))
+
     pickle.dump(test_set, open('data/geo/test.bin', 'wb'))
     pickle.dump(vocab, open('data/geo/vocab.freq2.bin', 'wb'))
 
