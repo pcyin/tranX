@@ -43,7 +43,7 @@ conda environments (`data/env/(py2torch3cuda9.yml|py3torch3cuda9.yml)`) for both
 
 ```bash
 git clone https://github.com/pcyin/tranX
-cd TranX
+cd tranX
 
 . pull_data.sh  # get datasets and training scripts for supported languages
 ```
