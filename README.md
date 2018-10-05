@@ -52,7 +52,7 @@ The `scripts` folder contains scripts to train TranX on example datasets. For ex
 ```
 . scripts/django/train.sh  # start training on Django dataset
 ```
-which should give you 73.9% accuracy on testing set.
+Using the provided conda environment, it achieves 73.9% test accuracy on a ubuntu 16.04 machine with GTX1080 GPU.
 
 ## FAQs
 
