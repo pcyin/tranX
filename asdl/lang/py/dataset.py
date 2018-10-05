@@ -308,8 +308,8 @@ class Django(object):
     @staticmethod
     def generate_django_dataset():
         vocab_freq_cutoff = 5
-        annot_file = '/Users/yinpengcheng/Research/SemanticParsing/CodeGeneration/en-django/all.anno'
-        code_file = '/Users/yinpengcheng/Research/SemanticParsing/CodeGeneration/en-django/all.code'
+        annot_file = 'data/django/all.anno'
+        code_file = 'data/django/all.code'
 
         (train, dev, test), vocab = Django.parse_django_dataset(annot_file, code_file,
                                                                 'asdl/lang/py/py_asdl.txt',
@@ -325,8 +325,8 @@ class Django(object):
         asdl_text = open('asdl/lang/py/py_asdl.txt').read()
         grammar = ASDLGrammar.from_text(asdl_text)
 
-        annot_file = '/Users/yinpengcheng/Research/SemanticParsing/CodeGeneration/en-django/all.anno'
-        code_file = '/Users/yinpengcheng/Research/SemanticParsing/CodeGeneration/en-django/all.code'
+        annot_file = 'data/django/all.anno'
+        code_file = 'data/django/all.code'
 
         transition_system = PythonTransitionSystem(grammar)
 
