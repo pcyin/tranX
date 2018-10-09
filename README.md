@@ -22,7 +22,24 @@ Figure 1 gives a brief overview of the system.
 2. The tree-constructing actions produce an intermediate abstract syntax tree. TranX uses ASTs defined under the ASDL formalism as general-purpose, intermediate meaning representations.
 
 3. The intermediate AST is finally transformed to a domain-specific representation (e.g., Python source code) using customly-defined conversion functions.
- 
+
+**File Structure** tranX is mainly composed of two components: 
+
+1. A general-purpose transition system that defines the generation process of an AST `z`
+ using a sequence of tree-constructing actions `a_0, a_1, ..., a_T`.
+2. A neural network that computes the probability distribution over action sequences, conditional on the natural language query `x`, `p(a_0, a_1, ..., a_T | x)`.
+
+These two components are implemented in the following two folders, respectively:
+
+* `asdl` defines a general-purpose transition system based on the ASDL formalism, and its instantiations in different programming languages and datasets.
+The transition system defines how an AST is constructed using a sequence of actions.
+This package can be used as a standalone library independent of tranX.
+See Section 2.2 of the technical report for details.
+* `model` contains the neural network implementation of the transition system defined in `asdl`, which computes action probabilities using neural networks.
+See Section 2.3 of the technical report for details.
+
+Additionally, the `components` folder contains helper functions and classes (e.g., vocabulary). 
+
 ## Supported Language
 
 TranX officially supports the following grammatical formalism and datasets.
