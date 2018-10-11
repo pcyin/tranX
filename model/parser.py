@@ -4,6 +4,8 @@ from __future__ import print_function
 import os
 from six.moves import xrange
 import math
+from collections import OrderedDict
+import numpy as np
 
 import torch
 import torch.nn as nn
@@ -193,9 +195,13 @@ class Parser(nn.Module):
         # (tgt_action_len, batch_size, src_sent_len)
         primitive_copy_prob = self.src_pointer_net(src_encodings, batch.src_token_mask, query_vectors)
 
+        # marginalize over the copy probabilities of tokens that are same
         # (tgt_action_len, batch_size)
-        tgt_primitive_copy_prob = torch.gather(primitive_copy_prob, dim=2,
-                                               index=batch.primitive_copy_pos_matrix.unsqueeze(2)).squeeze(2)
+        tgt_primitive_copy_prob = torch.sum(primitive_copy_prob * batch.primitive_copy_token_idx_mask, dim=-1)
+
+        # (tgt_action_len, batch_size)
+        # tgt_primitive_copy_prob = torch.gather(primitive_copy_prob, dim=2,
+        #                                        index=batch.primitive_copy_pos_matrix.unsqueeze(2)).squeeze(2)
 
         # (tgt_action_len, batch_size, primitive_vocab_size)
         gen_from_vocab_prob = F.softmax(self.tgt_token_readout(query_vectors), dim=-1)
@@ -360,6 +366,7 @@ class Parser(nn.Module):
     def parse(self, src_sent, context=None, beam_size=5):
         args = self.args
         primitive_vocab = self.vocab.primitive
+        T = torch.cuda if args.cuda else torch
 
         src_sent_var = nn_utils.to_input_variable([src_sent], self.vocab.source, cuda=args.cuda, training=False)
 
@@ -380,16 +387,20 @@ class Parser(nn.Module):
 
         hyp_scores = Variable(self.new_tensor([0.]), volatile=True)
 
-        src_token_vocab_ids = [primitive_vocab[token] for token in src_sent]
-        src_unk_pos_list = [pos for pos, token_id in enumerate(src_token_vocab_ids) if token_id == primitive_vocab.unk_id]
+        # src_token_vocab_ids = [primitive_vocab[token] for token in src_sent]
+        # src_unk_pos_list = [pos for pos, token_id in enumerate(src_token_vocab_ids) if token_id == primitive_vocab.unk_id]
         # sometimes a word may appear multi-times in the source, in this case,
         # we just copy its first appearing position. Therefore we mask the words
         # appearing second and onwards to -1
-        token_set = set()
-        for i, tid in enumerate(src_token_vocab_ids):
-            if tid in token_set:
-                src_token_vocab_ids[i] = -1
-            else: token_set.add(tid)
+        # token_set = set()
+        # for i, tid in enumerate(src_token_vocab_ids):
+        #     if tid in token_set:
+        #         src_token_vocab_ids[i] = -1
+        #     else: token_set.add(tid)
+
+        aggregated_primitive_tokens = OrderedDict()
+        for token_pos, token in enumerate(src_sent):
+            aggregated_primitive_tokens.setdefault(token, []).append(token_pos)
 
         t = 0
         hypotheses = [DecodeHypothesis()]
@@ -490,8 +501,8 @@ class Parser(nn.Module):
 
             # Variable(batch_size, primitive_vocab_size)
             primitive_prob = primitive_predictor_prob[:, 0].unsqueeze(1) * gen_from_vocab_prob
-            if src_unk_pos_list:
-                primitive_prob[:, primitive_vocab.unk_id] = 1.e-10
+            # if src_unk_pos_list:
+            #     primitive_prob[:, primitive_vocab.unk_id] = 1.e-10
 
             gentoken_prev_hyp_ids = []
             gentoken_new_hyp_unks = []
@@ -526,28 +537,52 @@ class Parser(nn.Module):
                         # GenToken action
                         gentoken_prev_hyp_ids.append(hyp_id)
                         hyp_copy_info = dict()  # of (token_pos, copy_prob)
-                        # first, we compute copy probabilities for tokens in the source sentence
-                        for token_pos, token_vocab_id in enumerate(src_token_vocab_ids):
-                            if args.no_copy is False and token_vocab_id != -1 and token_vocab_id != primitive_vocab.unk_id:
-                                p_copy = primitive_predictor_prob[hyp_id, 1] * primitive_copy_prob[hyp_id, token_pos]
-                                primitive_prob[hyp_id, token_vocab_id] = primitive_prob[hyp_id, token_vocab_id] + p_copy
+                        hyp_unk_copy_info = []
 
-                                token = src_sent[token_pos]
-                                hyp_copy_info[token] = (token_pos, p_copy.data[0])
+                        if args.no_copy is False:
+                            for token, token_pos_list in aggregated_primitive_tokens.items():
+                                sum_copy_prob = torch.gather(primitive_copy_prob[hyp_id], 0, Variable(T.LongTensor(token_pos_list))).sum()
+                                gated_copy_prob = primitive_predictor_prob[hyp_id, 1] * sum_copy_prob
 
-                        # second, add the probability of copying the most probable unk word
-                        if args.no_copy is False and src_unk_pos_list:
-                            unk_pos = primitive_copy_prob[hyp_id][src_unk_pos_list].data.cpu().numpy().argmax()
-                            unk_pos = src_unk_pos_list[unk_pos]
-                            token = src_sent[unk_pos]
+                                if token in primitive_vocab:
+                                    token_id = primitive_vocab[token]
+                                    primitive_prob[hyp_id, token_id] = primitive_prob[hyp_id, token_id] + gated_copy_prob
+
+                                    hyp_copy_info[token] = (token_pos_list, gated_copy_prob.data[0])
+                                else:
+                                    hyp_unk_copy_info.append({'token': token, 'token_pos_list': token_pos_list,
+                                                              'copy_prob': gated_copy_prob.data[0]})
+
+                        if args.no_copy is False and len(hyp_unk_copy_info) > 0:
+                            unk_i = np.array([x['copy_prob'] for x in hyp_unk_copy_info]).argmax()
+                            token = hyp_unk_copy_info[unk_i]['token']
+                            primitive_prob[hyp_id, primitive_vocab.unk_id] = hyp_unk_copy_info[unk_i]['copy_prob']
                             gentoken_new_hyp_unks.append(token)
 
-                            unk_copy_score = primitive_predictor_prob[hyp_id, 1] * primitive_copy_prob[hyp_id, unk_pos]
-                            primitive_prob[hyp_id, primitive_vocab.unk_id] = unk_copy_score
+                            hyp_copy_info[token] = (hyp_unk_copy_info[unk_i]['token_pos_list'], hyp_unk_copy_info[unk_i]['copy_prob'])
 
-                            hyp_copy_info[token] = (unk_pos, unk_copy_score.data[0])
-
-                        gentoken_copy_infos.append(hyp_copy_info)
+                        # # first, we compute copy probabilities for tokens in the source sentence
+                        # for token_pos, token_vocab_id in enumerate(src_token_vocab_ids):
+                        #     if args.no_copy is False and token_vocab_id != -1 and token_vocab_id != primitive_vocab.unk_id:
+                        #         p_copy = primitive_predictor_prob[hyp_id, 1] * primitive_copy_prob[hyp_id, token_pos]
+                        #         primitive_prob[hyp_id, token_vocab_id] = primitive_prob[hyp_id, token_vocab_id] + p_copy
+                        #
+                        #         token = src_sent[token_pos]
+                        #         hyp_copy_info[token] = (token_pos, p_copy.data[0])
+                        #
+                        # # second, add the probability of copying the most probable unk word
+                        # if args.no_copy is False and src_unk_pos_list:
+                        #     unk_pos = primitive_copy_prob[hyp_id][src_unk_pos_list].data.cpu().numpy().argmax()
+                        #     unk_pos = src_unk_pos_list[unk_pos]
+                        #     token = src_sent[unk_pos]
+                        #     gentoken_new_hyp_unks.append(token)
+                        #
+                        #     unk_copy_score = primitive_predictor_prob[hyp_id, 1] * primitive_copy_prob[hyp_id, unk_pos]
+                        #     primitive_prob[hyp_id, primitive_vocab.unk_id] = unk_copy_score
+                        #
+                        #     hyp_copy_info[token] = (unk_pos, unk_copy_score.data[0])
+                        #
+                        # gentoken_copy_infos.append(hyp_copy_info)
 
             new_hyp_scores = None
             if applyrule_new_hyp_scores:
@@ -585,7 +620,7 @@ class Parser(nn.Module):
 
                     k = (new_hyp_pos - len(applyrule_new_hyp_scores)) // primitive_prob.size(1)
                     # try:
-                    copy_info = gentoken_copy_infos[k]
+                    # copy_info = gentoken_copy_infos[k]
                     prev_hyp_id = gentoken_prev_hyp_ids[k]
                     prev_hyp = hypotheses[prev_hyp_id]
                     # except:
@@ -615,9 +650,9 @@ class Parser(nn.Module):
 
                     action = GenTokenAction(token)
 
-                    if token in copy_info:
-                        action_info.copy_from_src = True
-                        action_info.src_token_position = copy_info[token][0]
+                    # if token in copy_info:
+                    #     action_info.copy_from_src = True
+                    #     action_info.src_token_position = copy_info[token][0]
 
                 action_info.action = action
                 action_info.t = t

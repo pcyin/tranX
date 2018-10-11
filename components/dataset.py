@@ -118,22 +118,22 @@ class Batch(object):
         self.apply_rule_mask = []
         self.primitive_idx_matrix = []
         self.gen_token_mask = []
-        self.primitive_copy_pos_matrix = []
         self.primitive_copy_mask = []
+        self.primitive_copy_token_idx_mask = np.zeros((self.max_action_num, len(self), max(self.src_sents_len)), dtype='float32')
 
         for t in range(self.max_action_num):
             app_rule_idx_row = []
             app_rule_mask_row = []
             token_row = []
             gen_token_mask_row = []
-            copy_pos_row = []
             copy_mask_row = []
 
-            for e in self.examples:
-                app_rule_idx = app_rule_mask = token_idx = gen_token_mask = copy_pos = copy_mask = 0
+            for e_id, e in enumerate(self.examples):
+                app_rule_idx = app_rule_mask = token_idx = gen_token_mask = copy_mask = 0
                 if t < len(e.tgt_actions):
                     action = e.tgt_actions[t].action
                     action_info = e.tgt_actions[t]
+
                     if isinstance(action, ApplyRuleAction):
                         app_rule_idx = self.grammar.prod2id[action.production]
                         # assert self.grammar.id2prod[app_rule_idx] == action.production
@@ -142,24 +142,44 @@ class Batch(object):
                         app_rule_idx = len(self.grammar)
                         app_rule_mask = 1
                     else:
+                        src_sent = self.src_sents[e_id]
+                        token = str(action.token)
                         token_idx = self.vocab.primitive[action.token]
-                        # cannot copy, only generation
-                        # could be unk!
-                        if not action_info.copy_from_src:
-                            gen_token_mask = 1
-                        else:  # copy
+
+                        token_can_copy = False
+
+                        if token in src_sent:
+                            token_pos_list = [idx for idx, _token in enumerate(src_sent) if _token == token]
+                            self.primitive_copy_token_idx_mask[t, e_id, token_pos_list] = 1.
                             copy_mask = 1
-                            copy_pos = action_info.src_token_position
-                            if token_idx != self.vocab.primitive.unk_id:
-                                # both copy and generate from vocabulary
-                                gen_token_mask = 1
+                            token_can_copy = True
+
+                        if token_can_copy is False or token_idx != self.vocab.primitive.unk_id:
+                            # if the token is not copied, we can only generate this token from the vocabulary,
+                            # even if it is a <unk>.
+                            # otherwise, we can still generate it from the vocabulary
+                            gen_token_mask = 1
+
+                        if token_can_copy:
+                            assert action_info.copy_from_src
+                            assert action_info.src_token_position in token_pos_list
+
+                        # # cannot copy, only generation
+                        # # could be unk!
+                        # if not action_info.copy_from_src:
+                        #     gen_token_mask = 1
+                        # else:  # copy
+                        #     copy_mask = 1
+                        #     copy_pos = action_info.src_token_position
+                        #     if token_idx != self.vocab.primitive.unk_id:
+                        #         # both copy and generate from vocabulary
+                        #         gen_token_mask = 1
 
                 app_rule_idx_row.append(app_rule_idx)
                 app_rule_mask_row.append(app_rule_mask)
 
                 token_row.append(token_idx)
                 gen_token_mask_row.append(gen_token_mask)
-                copy_pos_row.append(copy_pos)
                 copy_mask_row.append(copy_mask)
 
             self.apply_rule_idx_matrix.append(app_rule_idx_row)
@@ -168,7 +188,6 @@ class Batch(object):
             self.primitive_idx_matrix.append(token_row)
             self.gen_token_mask.append(gen_token_mask_row)
 
-            self.primitive_copy_pos_matrix.append(copy_pos_row)
             self.primitive_copy_mask.append(copy_mask_row)
 
         T = torch.cuda if self.cuda else torch
@@ -176,8 +195,9 @@ class Batch(object):
         self.apply_rule_mask = Variable(T.FloatTensor(self.apply_rule_mask))
         self.primitive_idx_matrix = Variable(T.LongTensor(self.primitive_idx_matrix))
         self.gen_token_mask = Variable(T.FloatTensor(self.gen_token_mask))
-        self.primitive_copy_pos_matrix = Variable(T.LongTensor(self.primitive_copy_pos_matrix))
         self.primitive_copy_mask = Variable(T.FloatTensor(self.primitive_copy_mask))
+        self.primitive_copy_token_idx_mask = Variable(torch.from_numpy(self.primitive_copy_token_idx_mask))
+        if self.cuda: self.primitive_copy_token_idx_mask = self.primitive_copy_token_idx_mask.cuda()
 
     @property
     def primitive_mask(self):
