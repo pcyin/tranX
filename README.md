@@ -67,7 +67,7 @@ cd tranX
 
 The `scripts` folder contains scripts to train TranX on example datasets. For example, to train on the Django dataset, simply run:
 ```
-. scripts/django/train.sh  # start training on Django dataset
+. scripts/django/train.sh 0  # start training on Django dataset with seed 0
 ```
 Using the provided conda environment, it achieves 73.9% test accuracy on a ubuntu 16.04 machine with GTX1080 GPU.
 
