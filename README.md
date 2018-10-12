@@ -64,7 +64,7 @@ You can export the enviroments using the following command:
 conda env create -f data/env/(py2torch3cuda9.yml|py3torch3cuda9.yml)
 ```
 
-The conda enviroments are generated on a Ubuntu 16.04 machine. If you are unable to import the enviroment with error message like `cannot found package numpy=1.14.3=py36h14a74c5_0`, please try removing the sha after the version number (e.g., `=py36h14a74c5_0`), since it might be different on different platforms. We keep the detailed version number with sha to ensure reproducibility.
+**Note** The conda enviroments are generated on a Ubuntu 16.04 machine. If you are unable to import the enviroment with error message like `cannot found package numpy=1.14.3=py36h14a74c5_0`, please try removing the sha after the version number (e.g., `=py36h14a74c5_0`), since it might be different on different platforms. We keep the detailed version number with sha to ensure reproducibility.
 
 ### Example Training Script
 
