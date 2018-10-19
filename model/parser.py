@@ -398,6 +398,8 @@ class Parser(nn.Module):
         #         src_token_vocab_ids[i] = -1
         #     else: token_set.add(tid)
 
+        # For computing copy probabilities, we marginalize over tokens with the same surface form
+        # `aggregated_primitive_tokens` stores the position of occurrence of each source token
         aggregated_primitive_tokens = OrderedDict()
         for token_pos, token in enumerate(src_sent):
             aggregated_primitive_tokens.setdefault(token, []).append(token_pos)
