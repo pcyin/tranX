@@ -32,7 +32,7 @@ def init_arg_parser():
     arg_parser.add_argument('--seed', default=5783287, type=int, help='random seed')
     arg_parser.add_argument('--cuda', action='store_true', default=False, help='use gpu')
     arg_parser.add_argument('--lang', choices=['python', 'lambda_dcs', 'wikisql', 'prolog'], default='python')
-    arg_parser.add_argument('--mode', choices=['train', 'self_train', 'train_decoder', 'train_semi', 'log_semi', 'test',
+    arg_parser.add_argument('--mode', choices=['train', 'self_train', 'train_reconstructor', 'train_semi', 'log_semi', 'test',
                                                'sample'], default='train', help='run mode')
 
     arg_parser.add_argument('--lstm', choices=['lstm', 'lstm_with_dropout', 'parent_feed'], default='lstm')
@@ -330,7 +330,7 @@ def train(args):
             patience = 0
 
 
-def train_decoder(args):
+def train_reconstruction_model(args):
     train_set = Dataset.from_bin_file(args.train_file)
     dev_set = Dataset.from_bin_file(args.dev_file)
     vocab = pickle.load(open(args.vocab))
@@ -369,7 +369,6 @@ def train_decoder(args):
 
         for batch_examples in train_set.batch_iter(batch_size=args.batch_size, shuffle=True):
             batch_examples = [e for e in batch_examples if len(e.tgt_actions) <= args.decode_max_time_step]
-            # batch_examples = [e for e in train_set.examples if e.idx in [10192, 10894, 9706, 4659, 5609, 1442, 5849, 10644, 4592, 1875]]
 
             train_iter += 1
             optimizer.zero_grad()
@@ -397,9 +396,6 @@ def train_decoder(args):
                 report_loss = report_examples = 0.
 
         print('[Epoch %d] epoch elapsed %ds' % (epoch, time.time() - epoch_begin), file=sys.stderr)
-        # model_file = args.save_to + '.iter%d.bin' % train_iter
-        # print('save model to [%s]' % model_file, file=sys.stderr)
-        # model.save(model_file)
 
         # perform validation
         print('[Epoch %d] begin validation' % epoch, file=sys.stderr)
@@ -1049,8 +1045,8 @@ if __name__ == '__main__':
         train(args)
     elif args.mode == 'self_train':
         self_training(args)
-    elif args.mode == 'train_decoder':
-        train_decoder(args)
+    elif args.mode == 'train_reconstructor':
+        train_reconstruction_model(args)
     elif args.mode == 'train_semi':
         train_semi(args)
     elif args.mode == 'test':

@@ -3,8 +3,10 @@ from __future__ import print_function
 
 import os
 from itertools import chain
+from six.moves import range
 
 import sys
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.utils
@@ -40,12 +42,12 @@ class Reconstructor(nn.Module):
         src_code_var = nn_utils.to_input_variable(src_codes, self.vocab.code, cuda=args.cuda)
         tgt_nl_var = nn_utils.to_input_variable(tgt_nls, self.vocab.source, cuda=args.cuda, append_boundary_sym=True)
 
-        tgt_token_copy_pos, tgt_token_copy_mask, tgt_token_gen_mask = self.get_generate_and_copy_meta_tensor(src_codes, tgt_nls)
+        tgt_token_copy_idx_mask, tgt_token_gen_mask = self.get_generate_and_copy_meta_tensor(src_codes, tgt_nls)
 
         scores = self.seq2seq(src_code_var,
                               [len(c) for c in src_codes],
                               tgt_nl_var,
-                              tgt_token_copy_pos, tgt_token_copy_mask, tgt_token_gen_mask)
+                              tgt_token_copy_idx_mask, tgt_token_gen_mask)
 
         return scores
 
@@ -67,11 +69,6 @@ class Reconstructor(nn.Module):
 
         scores = sorted_scores[example_old_pos_map]
 
-        # if nn_utils.isnan(scores.data):
-        #     print('Decoder encounters Nan: %s' % scores.data, file=sys.stderr)
-        #     torch.save((examples, scores), 'decoder_scores.bin')
-        #     exit(0)
-
         return scores
 
     def sample(self, code, sample_size=5):
@@ -84,49 +81,39 @@ class Reconstructor(nn.Module):
         return self.transition_system.tokenize_code(code, mode='decoder')
 
     def get_generate_and_copy_meta_tensor(self, src_codes, tgt_nls):
-        tgt_token_copy_pos = []
-        tgt_token_copy_mask = []
-        tgt_token_gen_mask = []
-
         tgt_nls = [['<s>'] + x + ['</s>'] for x in tgt_nls]
-
         max_time_step = max(len(tgt_nl) for tgt_nl in tgt_nls)
-        for t in xrange(max_time_step):
-            copy_pos_row = []
-            copy_mask_row = []
-            gen_mask_row = []
+        max_src_len = max(len(src_code) for src_code in src_codes)
+        batch_size = len(src_codes)
 
-            for src_code, tgt_nl in zip(src_codes, tgt_nls):
+        tgt_token_copy_idx_mask = np.zeros((max_time_step, batch_size, max_src_len), dtype='float32')
+        tgt_token_gen_mask = np.zeros((max_time_step, batch_size), dtype='float32')
+
+        for t in range(max_time_step):
+            for example_id, (src_code, tgt_nl) in enumerate(zip(src_codes, tgt_nls)):
                 copy_pos = copy_mask = gen_mask = 0
                 if t < len(tgt_nl):
                     tgt_token = tgt_nl[t]
-                    try:
-                        copy_pos = src_code.index(tgt_token)
-                        copy_mask = 1
-                    except ValueError:
-                        pass
+                    copy_pos_list = [_i for _i, _token in enumerate(src_code) if _token == tgt_token]
+                    tgt_token_copy_idx_mask[t, example_id, copy_pos_list] = 1
 
-                    if copy_mask and tgt_token in self.vocab.code:
+                    gen_mask = 0
+                    # we need to generate this token if (1) it's defined in the dictionary,
+                    # or (2) it is an unknown word and not appear in the source side
+                    if tgt_token in self.vocab.code:
                         gen_mask = 1
-                    elif copy_mask and tgt_token not in self.vocab.code:
-                        gen_mask = 0
-                    elif copy_mask == 0 and tgt_token in self.vocab.code:
-                        gen_mask = 1
-                    else:
+                    elif len(copy_pos_list) == 0:
                         gen_mask = 1
 
-                copy_pos_row.append(copy_pos)
-                copy_mask_row.append(copy_mask)
-                gen_mask_row.append(gen_mask)
+                    tgt_token_gen_mask[t, example_id] = gen_mask
 
-            tgt_token_copy_pos.append(copy_pos_row)
-            tgt_token_copy_mask.append(copy_mask_row)
-            tgt_token_gen_mask.append(gen_mask_row)
+        tgt_token_copy_idx_mask = Variable(torch.from_numpy(tgt_token_copy_idx_mask))
+        tgt_token_gen_mask = Variable(torch.from_numpy(tgt_token_gen_mask))
+        if self.args.cuda:
+            tgt_token_copy_idx_mask = tgt_token_copy_idx_mask.cuda()
+            tgt_token_gen_mask = tgt_token_gen_mask.cuda()
 
-        T = torch.cuda if self.args.cuda else torch
-        return Variable(T.LongTensor(tgt_token_copy_pos)), \
-               Variable(T.FloatTensor(tgt_token_copy_mask)), \
-               Variable(T.FloatTensor(tgt_token_gen_mask))
+        return tgt_token_copy_idx_mask, tgt_token_gen_mask
 
     def save(self, path):
         dir_name = os.path.dirname(path)
