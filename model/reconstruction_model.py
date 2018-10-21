@@ -128,3 +128,16 @@ class Reconstructor(nn.Module):
         }
 
         torch.save(params, path)
+
+    @staticmethod
+    def load(model_path, cuda=False):
+        decoder_params = torch.load(model_path, map_location=lambda storage, loc: storage)
+        decoder_params['args'].cuda = cuda
+
+        model = Reconstructor(decoder_params['args'], decoder_params['vocab'], decoder_params['transition_system'])
+        model.load_state_dict(decoder_params['state_dict'])
+
+        if cuda: model = model.cuda()
+        model.eval()
+
+        return model

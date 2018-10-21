@@ -2,7 +2,10 @@
 from __future__ import print_function
 
 import argparse
+from itertools import chain
+
 import six.moves.cPickle as pickle
+from six.moves import xrange as range
 import traceback
 
 import numpy as np
@@ -17,7 +20,7 @@ import evaluation
 from asdl.asdl import ASDLGrammar
 from asdl.transition_system import TransitionSystem
 from components.dataset import Dataset, Example
-from model import nn_utils
+from model import nn_utils, utils
 from model.neural_lm import LSTMLanguageModel
 
 from model.parser import Parser
@@ -32,7 +35,8 @@ def init_arg_parser():
     arg_parser.add_argument('--seed', default=5783287, type=int, help='random seed')
     arg_parser.add_argument('--cuda', action='store_true', default=False, help='use gpu')
     arg_parser.add_argument('--lang', choices=['python', 'lambda_dcs', 'wikisql', 'prolog'], default='python')
-    arg_parser.add_argument('--mode', choices=['train', 'self_train', 'train_reconstructor', 'train_semi', 'log_semi', 'test',
+    arg_parser.add_argument('--mode', choices=['train', 'self_train', 'train_reconstructor', 'train_semi',
+                                               'log_semi', 'test', 'rerank',
                                                'sample'], default='train', help='run mode')
 
     arg_parser.add_argument('--lstm', choices=['lstm', 'lstm_with_dropout', 'parent_feed'], default='lstm')
@@ -87,6 +91,12 @@ def init_arg_parser():
     arg_parser.add_argument('--dev_file', type=str, help='path to the dev source file')
     arg_parser.add_argument('--test_file', type=str, help='path to the test target file')
     arg_parser.add_argument('--prior_lm_path', type=str, help='path to the prior LM')
+
+    # reranking
+    arg_parser.add_argument('--load_reconstruction_model', type=str, help='load reconstruction model')
+    # arg_parser.add_argument('--rerank', default=False, action='store_true', help='use reranking model in testing')
+    arg_parser.add_argument('--test_decode_file', default=None, type=str, help='decoding results on test set')
+    arg_parser.add_argument('--dev_decode_file', default=None, type=str, help='decoding results on dev set')
 
     # self-training
     arg_parser.add_argument('--load_decode_results', default=None, type=str)
@@ -1037,6 +1047,97 @@ def test(args):
         pickle.dump(decode_results, open(args.save_decode_to, 'wb'))
 
 
+def train_reranker_and_test(args):
+    print('load dataset [test %s], [dev %s]' % (args.test_file, args.dev_file), file=sys.stderr)
+    test_set = Dataset.from_bin_file(args.test_file)
+    dev_set = Dataset.from_bin_file(args.dev_file)
+
+    # print('load parser from [%s]' % args.load_model, file=sys.stderr)
+    # parser_saved_args = torch.load(args.load_model, map_location=lambda storage, loc: storage)['args']
+    # set the correct domain from saved arg
+    # args.lang = parser_saved_args.lang
+
+    # parser = get_parser_class(parser_saved_args.lang).load(args.load_model, cuda=args.cuda)
+    print('load reconstruction model from [%s]' % args.load_reconstruction_model, file=sys.stderr)
+    reconstruction_model = Reconstructor.load(args.load_reconstruction_model, cuda=args.cuda)
+    transition_system = reconstruction_model.transition_system
+
+    # transition_system = parser.transition_system
+    # parser.eval()
+
+    print('load dev decode results [%s]' % args.dev_decode_file, file=sys.stderr)
+    dev_decode_results = pickle.load(open(args.dev_decode_file, 'rb'))
+    beam_size = max(len(hyps) for hyps in dev_decode_results)
+    dev_acc = sum(hyps and hyps[0].correct for hyps in dev_decode_results) / float(len(dev_set))
+    dev_oracle = sum(any(hyp.correct for hyp in hyps) for hyps in dev_decode_results) / float(len(dev_set))
+
+    print('load test decode results [%s]' % args.test_decode_file, file=sys.stderr)
+    test_decode_results = pickle.load(open(args.test_decode_file, 'rb'))
+    test_acc = sum(hyps and hyps[0].correct for hyps in test_decode_results) / float(len(test_set))
+    test_oracle = sum(any(hyp.correct for hyp in hyps) for hyps in test_decode_results) / float(len(test_set))
+
+    print('Dev Acc@1=%.4f, Test Oracle Acc=%.4f' % (dev_acc, dev_oracle), file=sys.stderr)
+
+    def _compute_rerank_feature(_examples, _decode_results):
+        hyp_examples = []
+
+        for example, hyps in zip(_examples, _decode_results):
+            for hyp in hyps:
+                hyp_code = transition_system.ast_to_surface_code(hyp.tree)
+                transition_system.tokenize_code(hyp_code)  # make sure the code is tokenizable!
+                hyp_example = Example(idx=None,
+                                      src_sent=example.src_sent,
+                                      tgt_code=hyp_code,
+                                      tgt_actions=None,
+                                      tgt_ast=None)
+                hyp_examples.append(hyp_example)
+
+        for batch_examples in utils.batch_iter(hyp_examples, batch_size=128):
+            batch_example_scores = reconstruction_model.score(batch_examples).data.cpu().tolist()
+            for i, e in enumerate(batch_examples):
+                e.reconstruction_score = batch_example_scores[i]
+
+        e_ptr = 0
+        for example, hyps in zip(_examples, _decode_results):
+            for hyp in hyps:
+                hyp.reconstruction_score = hyp_examples[e_ptr].reconstruction_score
+                e_ptr += 1
+
+    def _compute_rerank_performance(_examples, _decode_results, _eta):
+        correct_array = []
+        for example, hyps in zip(_examples, _decode_results):
+            if hyps:
+                best_hyp_idx = np.argmax([hyp.score + _eta * hyp.reconstruction_score for hyp in hyps])
+                is_correct = hyps[best_hyp_idx].correct
+                correct_array.append(is_correct)
+
+        acc = sum(correct_array) / float(len(_examples))
+        return acc
+
+    best_eta = eta = 0.
+    delta_eta = 0.01
+    best_dev_score = dev_acc
+
+    _compute_rerank_feature(dev_set.examples, dev_decode_results)
+    while eta <= 1.0:
+        eta += delta_eta
+
+        # compute new dev score using current eta
+        dev_score = _compute_rerank_performance(dev_set.examples, dev_decode_results, eta)
+        if dev_score > best_dev_score:
+            print('New eta=%.4f, dev score=%.4f' % (eta, dev_score), file=sys.stderr)
+            best_eta = eta
+            best_dev_score = dev_score
+
+    # test!
+    _compute_rerank_feature(test_set.examples, test_decode_results)
+    test_score_with_rerank = _compute_rerank_performance(test_set.examples, test_decode_results, best_eta)
+
+    print('Test Acc@1=%.4f, Test Re-rank Acc=%.4f, Test Oracle Acc=%.4f' % (test_acc,
+                                                                            test_score_with_rerank,
+                                                                            test_oracle), file=sys.stderr)
+
+
 if __name__ == '__main__':
     arg_parser = init_arg_parser()
     args = init_config()
@@ -1047,6 +1148,8 @@ if __name__ == '__main__':
         self_training(args)
     elif args.mode == 'train_reconstructor':
         train_reconstruction_model(args)
+    elif args.mode == 'rerank':
+        train_reranker_and_test(args)
     elif args.mode == 'train_semi':
         train_semi(args)
     elif args.mode == 'test':

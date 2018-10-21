@@ -1,6 +1,7 @@
 # coding=utf-8
 
 
+import math
 import numpy as np
 from torch.autograd import Variable
 
@@ -47,3 +48,17 @@ class GloveHelper(object):
             for line in f:
                 tokens = line.split()
                 yield tokens[0]
+
+
+def batch_iter(examples, batch_size, shuffle=False):
+    batch_num = math.ceil(len(examples) / batch_size)
+    index_array = list(range(len(examples)))
+
+    if shuffle:
+        np.random.shuffle(index_array)
+
+    for i in range(batch_num):
+        indices = index_array[i * batch_size: (i + 1) * batch_size]
+        batch_examples = [examples[idx] for idx in indices]
+
+        yield batch_examples
