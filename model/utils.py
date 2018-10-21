@@ -51,7 +51,7 @@ class GloveHelper(object):
 
 
 def batch_iter(examples, batch_size, shuffle=False):
-    batch_num = math.ceil(len(examples) / batch_size)
+    batch_num = int(math.ceil(len(examples) / float(batch_size)))
     index_array = list(range(len(examples)))
 
     if shuffle:

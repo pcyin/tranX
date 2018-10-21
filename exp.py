@@ -1065,14 +1065,27 @@ def train_reranker_and_test(args):
     # transition_system = parser.transition_system
     # parser.eval()
 
+    def _filter_hyps(_decode_results):
+        for i in range(len(_decode_results)):
+            valid_hyps = []
+            for hyp in _decode_results[i]:
+                try: 
+                    transition_system.tokenize_code(hyp.code)
+                    valid_hyps.append(hyp)
+                except: pass
+
+            _decode_results[i] = valid_hyps
+
     print('load dev decode results [%s]' % args.dev_decode_file, file=sys.stderr)
     dev_decode_results = pickle.load(open(args.dev_decode_file, 'rb'))
+    _filter_hyps(dev_decode_results)
     beam_size = max(len(hyps) for hyps in dev_decode_results)
     dev_acc = sum(hyps and hyps[0].correct for hyps in dev_decode_results) / float(len(dev_set))
     dev_oracle = sum(any(hyp.correct for hyp in hyps) for hyps in dev_decode_results) / float(len(dev_set))
 
     print('load test decode results [%s]' % args.test_decode_file, file=sys.stderr)
     test_decode_results = pickle.load(open(args.test_decode_file, 'rb'))
+    _filter_hyps(test_decode_results)
     test_acc = sum(hyps and hyps[0].correct for hyps in test_decode_results) / float(len(test_set))
     test_oracle = sum(any(hyp.correct for hyp in hyps) for hyps in test_decode_results) / float(len(test_set))
 
@@ -1083,11 +1096,9 @@ def train_reranker_and_test(args):
 
         for example, hyps in zip(_examples, _decode_results):
             for hyp in hyps:
-                hyp_code = transition_system.ast_to_surface_code(hyp.tree)
-                transition_system.tokenize_code(hyp_code)  # make sure the code is tokenizable!
                 hyp_example = Example(idx=None,
                                       src_sent=example.src_sent,
-                                      tgt_code=hyp_code,
+                                      tgt_code=hyp.code,
                                       tgt_actions=None,
                                       tgt_ast=None)
                 hyp_examples.append(hyp_example)
