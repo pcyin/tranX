@@ -4,6 +4,7 @@ from __future__ import print_function
 import sys
 import traceback
 import os
+from tqdm import tqdm
 
 
 def decode(examples, model, args, verbose=False, **kwargs):
@@ -19,7 +20,7 @@ def decode(examples, model, args, verbose=False, **kwargs):
 
     decode_results = []
     count = 0
-    for example in examples:
+    for example in tqdm(examples, desc='Decoding', file=sys.stdout, total=len(examples)):
         if args.lang == 'wikisql':
             hyps = model.parse(example.src_sent, context=example.table, beam_size=args.beam_size)
         else:
