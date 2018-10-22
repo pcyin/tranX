@@ -54,9 +54,19 @@ SQL | `asdl/lang/sql/sql_asdl.txt` | WikiSQL (Zhong et al., 2017)
 
 ## Usage
 
-**Conda Environments** TranX supports both Python 2.7 and 3.5. Please note that 
+### Conda Environments
+TranX supports both Python 2.7 and 3.5. Please note that 
 some datasets only support Python 2.7 (e.g., Django) or Python 3+ (e.g., WikiSQL). We provide example
 conda environments (`data/env/(py2torch3cuda9.yml|py3torch3cuda9.yml)`) for both Python versions.
+You can export the enviroments using the following command:
+
+```bash
+conda env create -f data/env/(py2torch3cuda9.yml|py3torch3cuda9.yml)
+```
+
+**Note** The conda enviroments are generated on a Ubuntu 16.04 machine. If you are unable to import the enviroment with error message like `cannot found package numpy=1.14.3=py36h14a74c5_0`, please try removing the sha after the version number (e.g., `=py36h14a74c5_0`), since it might be different on different platforms. We keep the detailed version number with sha to ensure reproducibility.
+
+### Example Training Script
 
 ```bash
 git clone https://github.com/pcyin/tranX
@@ -67,9 +77,9 @@ cd tranX
 
 The `scripts` folder contains scripts to train TranX on example datasets. For example, to train on the Django dataset, simply run:
 ```
-. scripts/django/train.sh  # start training on Django dataset
+. scripts/django/train.sh 0  # start training on Django dataset with seed 0
 ```
-Using the provided conda environment, it achieves 73.9% test accuracy on a ubuntu 16.04 machine with GTX1080 GPU.
+Using the provided conda environment, it achieves 73.9% test accuracy on a Ubuntu 16.04 machine with GTX1080 GPU.
 
 ## FAQs
 
