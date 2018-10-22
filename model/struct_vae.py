@@ -117,7 +117,7 @@ class StructVAE(nn.Module):
                     traceback.print_exc(file=sys.stdout)
                     print('-' * 60, file=sys.stdout)
 
-        sample_scores, enc_states = self.encoder.score(sampled_examples, return_enc_state=True)
+        sample_scores, enc_states = self.encoder.score(sampled_examples, return_encode_state=True)
 
         return sampled_examples, sample_scores, enc_states
 

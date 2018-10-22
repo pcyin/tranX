@@ -92,7 +92,7 @@ class WikiSqlParser(Parser):
 
         return column_word_encodings, table_header_encoding, table_header_mask
 
-    def score(self, examples, return_enc_state=False):
+    def score(self, examples, return_encode_state=False):
         """
         input: a batch of examples
         output: score for each training example: Variable(batch_size)
