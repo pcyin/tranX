@@ -6,7 +6,7 @@ source code (e.g., Python) or logical forms (e.g., lambda calculus).
 
 ## System Architecture
 
-Details could be found in [this](doc/report.pdf) technical report. 
+For technical details please refer to our [ACL '18 paper](https://arxiv.org/abs/1806.07832) and [EMNLP '18 demo paper](https://arxiv.org/abs/1810.02720). 
 To cope with different 
 domain specific logical formalisms (e.g., SQL, Python, lambda-calculus, 
 prolog, etc.), TranX uses abstract syntax trees (ASTs) defined in the 
