@@ -13,9 +13,9 @@ from torch.nn.utils.rnn import PackedSequence
 from torch.nn._functions.thnn import rnnFusedPointwise as fusedBackend
 
 
-class LSTMCell(RNNCellBase):
+class RecurrentDropoutLSTMCell(RNNCellBase):
     def __init__(self, input_size, hidden_size, dropout=0.):
-        super(LSTMCell, self).__init__()
+        super(RecurrentDropoutLSTMCell, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.dropout = dropout
@@ -177,7 +177,7 @@ class ParentFeedingLSTMCell(RNNCellBase):
 
 
 class LSTM(nn.Module):
-    def __init__(self, input_size, hidden_size, bidirectional=False, dropout=0., cell_factory=LSTMCell):
+    def __init__(self, input_size, hidden_size, bidirectional=False, dropout=0., cell_factory=RecurrentDropoutLSTMCell):
         super(LSTM, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size

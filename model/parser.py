@@ -2,7 +2,7 @@
 from __future__ import print_function
 
 import os
-from six.moves import xrange
+from six.moves import xrange as range
 import math
 
 import torch
@@ -23,6 +23,11 @@ from model.pointer_net import PointerNet
 
 
 class Parser(nn.Module):
+    """Implementation of a semantic parser
+
+    The parser translates a natural language utterance into an AST defined under
+    the ASDL specification, using the transition system described in https://arxiv.org/abs/1810.02720
+    """
     def __init__(self, args, vocab, transition_system):
         super(Parser, self).__init__()
 
@@ -33,10 +38,21 @@ class Parser(nn.Module):
         self.grammar = self.transition_system.grammar
 
         # Embedding layers
+
+        # source token embedding
         self.src_embed = nn.Embedding(len(vocab.source), args.embed_size)
+
+        # embedding table of ASDL production rules (constructors), one for each ApplyConstructor action,
+        # the last entry is the embedding for Reduce action
         self.production_embed = nn.Embedding(len(transition_system.grammar) + 1, args.action_embed_size)
+
+        # embedding table for target primitive tokens
         self.primitive_embed = nn.Embedding(len(vocab.primitive), args.action_embed_size)
+
+        # embedding table for ASDL fields in constructors
         self.field_embed = nn.Embedding(len(transition_system.grammar.fields), args.field_embed_size)
+
+        # embedding table for ASDL types
         self.type_embed = nn.Embedding(len(transition_system.grammar.types), args.type_embed_size)
 
         nn.init.xavier_normal(self.src_embed.weight.data)
@@ -72,16 +88,13 @@ class Parser(nn.Module):
 
             self.decoder_lstm = ParentFeedingLSTMCell(input_dim, args.hidden_size)
         else:
-            from lstm import LSTM, LSTMCell
-            self.encoder_lstm = LSTM(args.embed_size, args.hidden_size / 2, bidirectional=True, dropout=args.dropout)
-            self.decoder_lstm = LSTMCell(args.action_embed_size +   # previous action
-                                         args.action_embed_size + args.field_embed_size + args.type_embed_size +  # frontier info
-                                         args.hidden_size,   # parent hidden state
-                                         args.hidden_size,
-                                         dropout=args.dropout)
+            raise ValueError('Unknown LSTM type %s' % args.lstm)
 
-        # pointer net
+        # pointer net for copying tokens from source side
         self.src_pointer_net = PointerNet(query_vec_size=args.att_vec_size, src_encoding_size=args.hidden_size)
+
+        # given the decoder's hidden state, predict whether to copy or generate a target primitive token
+        # output: [p(gen(token)) | s_t, p(copy(token)) | s_t]
 
         self.primitive_predictor = nn.Linear(args.att_vec_size, 2)
 
@@ -89,24 +102,35 @@ class Parser(nn.Module):
         self.decoder_cell_init = nn.Linear(args.hidden_size, args.hidden_size)
 
         # attention: dot product attention
-        # project source encoding to decoder rnn's h space
+        # project source encoding to decoder rnn's hidden space
+
         self.att_src_linear = nn.Linear(args.hidden_size, args.hidden_size, bias=False)
 
         # transformation of decoder hidden states and context vectors before reading out target words
         # this produces the `attentional vector` in (Luong et al., 2015)
+
         self.att_vec_linear = nn.Linear(args.hidden_size + args.hidden_size, args.att_vec_size, bias=False)
 
-        # embedding layers
+        # bias for predicting ApplyConstructor and GenToken actions
         self.production_readout_b = nn.Parameter(torch.FloatTensor(len(transition_system.grammar) + 1).zero_())
         self.tgt_token_readout_b = nn.Parameter(torch.FloatTensor(len(vocab.primitive)).zero_())
 
         if args.no_query_vec_to_action_map:
+            # if there is no additional linear layer between the attentional vector (i.e., the query vector)
+            # and the final softmax layer over target actions, we use the attentional vector to compute action
+            # probabilities
+
             assert args.att_vec_size == args.action_embed_size
             self.production_readout = lambda q: F.linear(q, self.production_embed.weight, self.production_readout_b)
             self.tgt_token_readout = lambda q: F.linear(q, self.primitive_embed.weight, self.tgt_token_readout_b)
         else:
+            # by default, we feed the attentional vector (i.e., the query vector) into a linear layer without bias, and
+            # compute action probabilities by dot-producting the resulting vector and (GenToken, ApplyConstructor) action embeddings
+            # i.e., p(action) = query_vec^T \cdot W \cdot embedding
+
             self.query_vec_to_action_embed = nn.Linear(args.att_vec_size, args.embed_size, bias=args.readout == 'non_linear')
             if args.query_vec_to_action_diff_map:
+                # use different linear transformations for GenToken and ApplyConstructor actions
                 self.query_vec_to_primitive_embed = nn.Linear(args.att_vec_size, args.embed_size, bias=args.readout == 'non_linear')
             else:
                 self.query_vec_to_primitive_embed = self.query_vec_to_action_embed
@@ -129,11 +153,16 @@ class Parser(nn.Module):
             self.new_tensor = torch.FloatTensor
 
     def encode(self, src_sents_var, src_sents_len):
-        """
-        encode the source sequence
-        :return:
-            src_encodings: Variable(batch_size, src_sent_len, hidden_size * 2)
-            last_state, last_cell: Variable(batch_size, hidden_size)
+        """Encode the input natural language utterance
+
+        Args:
+            src_sents_var: a variable of shape (src_sent_len, batch_size), representing word ids of the input
+            src_sents_len: a list of lengths of input source sentences, sorted by descending order
+
+        Returns:
+            src_encodings: source encodings of shape (batch_size, src_sent_len, hidden_size * 2)
+            last_state, last_cell: the last hidden state and cell state of the encoder,
+                                   of shape (batch_size, hidden_size)
         """
 
         # (tgt_query_len, batch_size, embed_size)
@@ -158,38 +187,54 @@ class Parser(nn.Module):
         return src_encodings, (last_state, last_cell)
 
     def init_decoder_state(self, enc_last_state, enc_last_cell):
+        """Compute the initial decoder hidden state and cell state"""
+
         h_0 = self.decoder_cell_init(enc_last_cell)
         h_0 = F.tanh(h_0)
 
         return h_0, Variable(self.new_tensor(h_0.size()).zero_())
 
-    def score(self, examples, return_enc_state=False):
-        """
-        input: a batch of examples
+    def score(self, examples, return_encode_state=False):
+        """Given a list of examples, compute the log-likelihood of generating the target AST
+
+        Args:
+            examples: a batch of examples
+            return_encode_state: return encoding states of input utterances
         output: score for each training example: Variable(batch_size)
         """
+
         batch = Batch(examples, self.grammar, self.vocab, self.args.cuda)
+
+        # src_encodings: (batch_size, src_sent_len, hidden_size * 2)
+        # (last_state, last_cell, dec_init_vec): (batch_size, hidden_size)
         src_encodings, (last_state, last_cell) = self.encode(batch.src_sents_var, batch.src_sents_len)
         dec_init_vec = self.init_decoder_state(last_state, last_cell)
 
+        # query vectors are sufficient statistics used to compute action probabilities
+        # query_vectors: (tgt_action_len, batch_size, hidden_size)
+
+        # if use supervised attention
         if self.args.sup_attention:
-            # query_vectors: (tgt_action_len, batch_size, hidden_size)
             query_vectors, att_prob = self.decode(batch, src_encodings, dec_init_vec)
         else:
             query_vectors = self.decode(batch, src_encodings, dec_init_vec)
 
-        # ApplyRule action probability
+        # ApplyRule (i.e., ApplyConstructor) action probabilities
         # (tgt_action_len, batch_size, grammar_size)
         apply_rule_prob = F.softmax(self.production_readout(query_vectors), dim=-1)
 
+        # probabilities of target (gold-standard) ApplyRule actions
         # (tgt_action_len, batch_size)
         tgt_apply_rule_prob = torch.gather(apply_rule_prob, dim=2,
                                            index=batch.apply_rule_idx_matrix.unsqueeze(2)).squeeze(2)
 
+        # binary gating probabilities between generating or copying a primitive token
         # (tgt_action_len, batch_size, 2)
         primitive_predictor = F.softmax(self.primitive_predictor(query_vectors), dim=-1)
 
-        # pointer network scores over source tokens
+        #### compute generation and copying probabilities
+
+        # pointer network copying scores over source tokens
         # (tgt_action_len, batch_size, src_sent_len)
         primitive_copy_prob = self.src_pointer_net(src_encodings, batch.src_token_mask, query_vectors)
 
@@ -204,8 +249,8 @@ class Parser(nn.Module):
         tgt_primitive_gen_from_vocab_prob = torch.gather(gen_from_vocab_prob, dim=2,
                                                          index=batch.primitive_idx_matrix.unsqueeze(2)).squeeze(2)
 
+        # mask positions in action_prob that are not used
         # (tgt_action_len, batch_size)
-        # positions in action_prob that are not used
         action_mask_pad = torch.eq(batch.apply_rule_mask + batch.gen_token_mask + batch.primitive_copy_mask, 0.)
         action_mask = 1. - action_mask_pad.float()
 
@@ -224,11 +269,26 @@ class Parser(nn.Module):
         returns = [scores]
         if self.args.sup_attention:
             returns.append(att_prob)
-        if return_enc_state: returns.append(last_state)
+        if return_encode_state: returns.append(last_state)
 
         return returns
 
     def step(self, x, h_tm1, src_encodings, src_encodings_att_linear, src_token_mask=None, return_att_weight=False):
+        """Perform a single time-step of computation in decoder LSTM
+
+        Args:
+            x: variable of shape (batch_size, hidden_size), input
+            h_tm1: Tuple[Variable(batch_size, hidden_size), Variable(batch_size, hidden_size)], previous
+                   hidden and cell states
+            src_encodings: variable of shape (batch_size, src_sent_len, hidden_size * 2), encodings of source utterances
+            src_encodings_att_linear: linearly transformed source encodings
+            src_token_mask: mask over source tokens (Note: unused entries are masked to **one**)
+            return_att_weight: return attention weights
+
+        Returns:
+            The new LSTM hidden state and cell state
+        """
+
         # h_t: (batch_size, hidden_size)
         h_t, cell_t = self.decoder_lstm(x, h_tm1)
 
@@ -244,6 +304,20 @@ class Parser(nn.Module):
         else: return (h_t, cell_t), att_t
 
     def decode(self, batch, src_encodings, dec_init_vec):
+        """Given a batch of examples and their encodings of input utterances,
+        compute query vectors at each decoding time step, which are used to compute
+        action probabilities
+
+        Args:
+            batch: a `Batch` object storing input examples
+            src_encodings: variable of shape (batch_size, src_sent_len, hidden_size * 2), encodings of source utterances
+            dec_init_vec: a tuple of variables representing initial decoder states
+
+        Returns:
+            Query vectors, a variable of shape (tgt_action_len, batch_size, hidden_size)
+            Also return the attention weights over candidate tokens if using supervised attention
+        """
+
         batch_size = len(batch)
         args = self.args
 
@@ -264,13 +338,21 @@ class Parser(nn.Module):
         att_probs = []
         att_weights = []
 
-        if args.lstm == 'lstm_with_dropout':
-            self.decoder_lstm.set_dropout_masks(batch_size)
+        for t in range(batch.max_action_num):
+            # the input to the decoder LSTM is a concatenation of multiple signals
+            # [
+            #   embedding of previous action -> `a_tm1_embed`,
+            #   previous attentional vector -> `att_tm1`,
+            #   embedding of the current frontier (parent) constructor (rule) -> `parent_production_embed`,
+            #   embedding of the frontier (parent) field -> `parent_field_embed`,
+            #   embedding of the ASDL type of the frontier field -> `parent_field_type_embed`,
+            #   LSTM state of the parent action -> `parent_states`
+            # ]
 
-        for t in xrange(batch.max_action_num):
-            # x: [prev_action, att_tm1, parent_production_embed, parent_field_embed, parent_field_type_embed, parent_action_state]
             if t == 0:
                 x = Variable(self.new_tensor(batch_size, self.decoder_lstm.input_size).zero_(), requires_grad=False)
+
+                # initialize using the root type embedding
                 if args.no_parent_field_type_embed is False:
                     offset = args.action_embed_size  # prev_action
                     offset += args.att_vec_size * (not args.no_input_feed)
@@ -334,6 +416,7 @@ class Parser(nn.Module):
                                                          src_token_mask=batch.src_token_mask,
                                                          return_att_weight=True)
 
+            # if use supervised attention
             if args.sup_attention:
                 for e_id, example in enumerate(batch.examples):
                     if t < len(example.tgt_actions):
@@ -358,6 +441,17 @@ class Parser(nn.Module):
         else: return att_vecs
 
     def parse(self, src_sent, context=None, beam_size=5):
+        """Perform beam search to infer the target AST given a source utterance
+
+        Args:
+            src_sent: list of source utterance tokens
+            context: other context used for prediction
+            beam_size: beam size
+
+        Returns:
+            A list of `DecodeHypothesis`, each representing an AST
+        """
+
         args = self.args
         primitive_vocab = self.vocab.primitive
 
