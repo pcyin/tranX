@@ -21,6 +21,7 @@ import evaluation
 from asdl.asdl import ASDLGrammar
 from asdl.transition_system import TransitionSystem
 from components.dataset import Dataset, Example
+from components.standalone_parser import StandaloneParser
 from model import nn_utils, utils
 from model.neural_lm import LSTMLanguageModel
 
@@ -141,6 +142,9 @@ def init_arg_parser():
     arg_parser.add_argument('--load_decode_results', default=None, type=str)
     arg_parser.add_argument('--unsup_loss_weight', default=1., type=float, help='loss of unsupervised learning weight')
     arg_parser.add_argument('--unlabeled_file', type=str, help='Path to the training source file used in semi-supervised self-training')
+
+    #### interactive mode ####
+    arg_parser.add_argument('--dataset_name', default=None, type=str)
 
     return arg_parser
 
@@ -648,44 +652,23 @@ def interactive_mode(args):
     """Interactive mode"""
     print('Start interactive mode', file=sys.stderr)
 
-    print('load parser from [%s]' % args.load_model, file=sys.stderr)
-    parser_saved_args = torch.load(args.load_model, map_location=lambda storage, loc: storage)['args']
-    # set the correct domain from saved arg
-    args.lang = parser_saved_args.lang
-    parser = get_parser_class(parser_saved_args.lang).load(args.load_model, cuda=args.cuda)
-    print('Done!', file=sys.stderr)
-
-    parser.eval()
-
-    def load_example_processor(_lang):
-        if _lang == 'python':
-            from datasets.django.example_processor import DjangoExampleProcessor
-            return DjangoExampleProcessor(parser.transition_system)
-        elif _lang == 'lambda_dcs':
-            from datasets.atis.example_processor import ATISExampleProcessor
-            return ATISExampleProcessor(parser.transition_system)
-        else:
-            raise RuntimeError()
-
-    example_processor = load_example_processor(args.lang)
+    parser = StandaloneParser('atis',
+                                 'saved_models/atis/'
+                                 'model.atis.sup.lstm.hidden200.embed128.action128.field32.type32.dropout0.3.lr_decay0.5.beam5.vocab.bin.train.bin.glorot.par_state_w_field_embed.seed0.bin',
+                                 beam_size=5,
+                                 cuda=False)
 
     while True:
         utterance = input('Query:').strip()
-        processed_utterance_tokens, utterance_meta = example_processor.pre_process_utterance(utterance)
-        print(processed_utterance_tokens)
+        hypotheses = parser.parse(utterance, debug=True)
 
-        hypotheses = parser.parse(processed_utterance_tokens, beam_size=args.beam_size)
-        valid_hypotheses = list(filter(lambda hyp: parser.transition_system.is_valid_hypothesis(hyp), hypotheses))
-        for hyp in valid_hypotheses:
-            example_processor.post_process_hypothesis(hyp, utterance_meta)
-
-        for hyp_id, hyp in enumerate(valid_hypotheses):
+        for hyp_id, hyp in enumerate(hypotheses):
             print('------------------ Hypothesis %d ------------------' % hyp_id)
             print(hyp.code)
             print(hyp.tree.to_string())
             print('Actions:')
             for action_t in hyp.action_infos:
-                print(action_t.action)
+                print(action_t.__repr__(True))
 
 
 def train_reranker_and_test(args):

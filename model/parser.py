@@ -446,7 +446,7 @@ class Parser(nn.Module):
             return att_vecs, att_probs
         else: return att_vecs
 
-    def parse(self, src_sent, context=None, beam_size=5):
+    def parse(self, src_sent, context=None, beam_size=5, debug=False):
         """Perform beam search to infer the target AST given a source utterance
 
         Args:
@@ -480,17 +480,6 @@ class Parser(nn.Module):
         zero_action_embed = Variable(self.new_tensor(args.action_embed_size).zero_())
 
         hyp_scores = Variable(self.new_tensor([0.]), volatile=True)
-
-        # src_token_vocab_ids = [primitive_vocab[token] for token in src_sent]
-        # src_unk_pos_list = [pos for pos, token_id in enumerate(src_token_vocab_ids) if token_id == primitive_vocab.unk_id]
-        # sometimes a word may appear multi-times in the source, in this case,
-        # we just copy its first appearing position. Therefore we mask the words
-        # appearing second and onwards to -1
-        # token_set = set()
-        # for i, tid in enumerate(src_token_vocab_ids):
-        #     if tid in token_set:
-        #         src_token_vocab_ids[i] = -1
-        #     else: token_set.add(tid)
 
         # For computing copy probabilities, we marginalize over tokens with the same surface form
         # `aggregated_primitive_tokens` stores the position of occurrence of each source token
@@ -575,9 +564,6 @@ class Parser(nn.Module):
 
                 x = torch.cat(inputs, dim=-1)
 
-            if args.lstm == 'lstm_with_dropout':
-                self.decoder_lstm.set_dropout_masks(hyp_num)
-
             (h_t, cell_t), att_t = self.step(x, h_tm1, exp_src_encodings,
                                              exp_src_encodings_att_linear,
                                              src_token_mask=None)
@@ -602,7 +588,6 @@ class Parser(nn.Module):
 
             gentoken_prev_hyp_ids = []
             gentoken_new_hyp_unks = []
-            gentoken_copy_infos = []
             applyrule_new_hyp_scores = []
             applyrule_new_hyp_prod_ids = []
             applyrule_prev_hyp_ids = []
@@ -656,29 +641,6 @@ class Parser(nn.Module):
                             gentoken_new_hyp_unks.append(token)
 
                             hyp_copy_info[token] = (hyp_unk_copy_info[unk_i]['token_pos_list'], hyp_unk_copy_info[unk_i]['copy_prob'])
-
-                        # # first, we compute copy probabilities for tokens in the source sentence
-                        # for token_pos, token_vocab_id in enumerate(src_token_vocab_ids):
-                        #     if args.no_copy is False and token_vocab_id != -1 and token_vocab_id != primitive_vocab.unk_id:
-                        #         p_copy = primitive_predictor_prob[hyp_id, 1] * primitive_copy_prob[hyp_id, token_pos]
-                        #         primitive_prob[hyp_id, token_vocab_id] = primitive_prob[hyp_id, token_vocab_id] + p_copy
-                        #
-                        #         token = src_sent[token_pos]
-                        #         hyp_copy_info[token] = (token_pos, p_copy.data[0])
-                        #
-                        # # second, add the probability of copying the most probable unk word
-                        # if args.no_copy is False and src_unk_pos_list:
-                        #     unk_pos = primitive_copy_prob[hyp_id][src_unk_pos_list].data.cpu().numpy().argmax()
-                        #     unk_pos = src_unk_pos_list[unk_pos]
-                        #     token = src_sent[unk_pos]
-                        #     gentoken_new_hyp_unks.append(token)
-                        #
-                        #     unk_copy_score = primitive_predictor_prob[hyp_id, 1] * primitive_copy_prob[hyp_id, unk_pos]
-                        #     primitive_prob[hyp_id, primitive_vocab.unk_id] = unk_copy_score
-                        #
-                        #     hyp_copy_info[token] = (unk_pos, unk_copy_score.data[0])
-                        #
-                        # gentoken_copy_infos.append(hyp_copy_info)
 
             new_hyp_scores = None
             if applyrule_new_hyp_scores:
@@ -746,9 +708,19 @@ class Parser(nn.Module):
 
                     action = GenTokenAction(token)
 
-                    # if token in copy_info:
-                    #     action_info.copy_from_src = True
-                    #     action_info.src_token_position = copy_info[token][0]
+                    if token in aggregated_primitive_tokens:
+                        action_info.copy_from_src = True
+                        action_info.src_token_position = aggregated_primitive_tokens[token]
+
+                    if debug:
+                        action_info.gen_copy_switch = primitive_predictor_prob[prev_hyp_id, :].log().cpu().data.numpy()
+                        action_info.in_vocab = token in primitive_vocab
+                        action_info.gen_token_prob = gen_from_vocab_prob[prev_hyp_id, token_id].log().cpu().data[0] \
+                            if token in primitive_vocab else 'n/a'
+                        action_info.copy_token_prob = torch.gather(primitive_copy_prob[prev_hyp_id],
+                                                                   0,
+                                                                   Variable(T.LongTensor(action_info.src_token_position))).sum().log().cpu().data[0] \
+                            if action_info.copy_from_src else 'n/a'
 
                 action_info.action = action
                 action_info.t = t
@@ -756,6 +728,9 @@ class Parser(nn.Module):
                     action_info.parent_t = prev_hyp.frontier_node.created_time
                     action_info.frontier_prod = prev_hyp.frontier_node.production
                     action_info.frontier_field = prev_hyp.frontier_field.field
+
+                if debug:
+                    action_info.action_prob = new_hyp_score - prev_hyp.score
 
                 new_hyp = prev_hyp.clone_and_apply_action_info(action_info)
                 new_hyp.score = new_hyp_score

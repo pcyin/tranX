@@ -35,7 +35,7 @@ def default():
 def parse(utterance, dataset='atis'):
 
     parser = parsers[dataset]
-    hypotheses = parser.parse(utterance.encode('utf-8', 'ignore'))
+    hypotheses = parser.parse(utterance.encode('utf-8', 'ignore'), debug=True)
 
     responses = dict()
     responses['hypotheses'] = []
@@ -48,7 +48,7 @@ def parse(utterance, dataset='atis'):
         # for action_t in hyp.action_infos:
         #     print(action_t)
 
-        actions_repr = [repr(action) for action in hyp.action_infos]
+        actions_repr = [action.__repr__(True) for action in hyp.action_infos]
 
         hyp_entry = dict(id=hyp_id + 1,
                          value=hyp.code,
