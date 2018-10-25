@@ -2,7 +2,7 @@
 
 A general-purpose **Tran**sition-based abstract synta**X** parser 
 that maps natural language queries into machine executable 
-source code (e.g., Python) or logical forms (e.g., lambda calculus).
+source code (e.g., Python) or logical forms (e.g., lambda calculus). **[Online Demo](http://moto.clab.cs.cmu.edu:8081/)**.
 
 ## System Architecture
 
