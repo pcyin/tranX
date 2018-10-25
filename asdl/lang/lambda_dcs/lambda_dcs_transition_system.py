@@ -33,3 +33,6 @@ class LambdaCalculusTransitionSystem(TransitionSystem):
             return [GenTokenAction(realized_field.value)]
         else:
             return []
+
+    def is_valid_hypothesis(self, hyp, **kwargs):
+        return True

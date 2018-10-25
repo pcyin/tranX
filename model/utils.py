@@ -62,3 +62,14 @@ def batch_iter(examples, batch_size, shuffle=False):
         batch_examples = [examples[idx] for idx in indices]
 
         yield batch_examples
+
+
+def get_parser_class(lang):
+    if lang in ['python', 'lambda_dcs', 'prolog']:
+        from model.parser import Parser
+        return Parser
+    elif lang == 'wikisql':
+        from model.wikisql.parser import WikiSqlParser
+        return WikiSqlParser
+    else:
+        raise ValueError('unknown parser class for %s' % lang)

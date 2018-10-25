@@ -6,6 +6,7 @@ from itertools import chain
 
 import six.moves.cPickle as pickle
 from six.moves import xrange as range
+from six.moves import input
 import traceback
 
 import numpy as np
@@ -27,7 +28,7 @@ from model.parser import Parser
 from model.prior import UniformPrior, LSTMPrior
 from model.reconstruction_model import Reconstructor
 from model.struct_vae import StructVAE, StructVAE_LMBaseline, StructVAE_SrcLmAndLinearBaseline
-from model.utils import GloveHelper
+from model.utils import GloveHelper, get_parser_class
 
 
 def init_arg_parser():
@@ -39,7 +40,7 @@ def init_arg_parser():
     arg_parser.add_argument('--lang', choices=['python', 'lambda_dcs', 'wikisql', 'prolog'], default='python')
     arg_parser.add_argument('--asdl_file', type=str, help='Path to ASDL grammar specification')
     arg_parser.add_argument('--mode', choices=['train', 'self_train', 'train_reconstructor',
-                                               'test', 'rerank',], default='train', help='Run mode')
+                                               'test', 'rerank', 'interactive'], default='train', help='Run mode')
 
     #### Model configuration ####
     arg_parser.add_argument('--lstm', choices=['lstm'], default='lstm', help='Type of LSTM used, currently only standard LSTM cell is supported')
@@ -161,16 +162,6 @@ def update_args(args):
         if isinstance(action, argparse._StoreAction) or isinstance(action, argparse._StoreTrueAction) or isinstance(action, argparse._StoreFalseAction):
             if not hasattr(args, action.dest):
                 setattr(args, action.dest, action.default)
-
-
-def get_parser_class(lang):
-    if lang in ['python', 'lambda_dcs', 'prolog']:
-        return Parser
-    elif lang == 'wikisql':
-        from model.wikisql.parser import WikiSqlParser
-        return WikiSqlParser
-    else:
-        raise ValueError('unknown parser class for %s' % lang)
 
 
 def train(args):
@@ -653,6 +644,50 @@ def test(args):
         pickle.dump(decode_results, open(args.save_decode_to, 'wb'))
 
 
+def interactive_mode(args):
+    """Interactive mode"""
+    print('Start interactive mode', file=sys.stderr)
+
+    print('load parser from [%s]' % args.load_model, file=sys.stderr)
+    parser_saved_args = torch.load(args.load_model, map_location=lambda storage, loc: storage)['args']
+    # set the correct domain from saved arg
+    args.lang = parser_saved_args.lang
+    parser = get_parser_class(parser_saved_args.lang).load(args.load_model, cuda=args.cuda)
+    print('Done!', file=sys.stderr)
+
+    parser.eval()
+
+    def load_example_processor(_lang):
+        if _lang == 'python':
+            from datasets.django.example_processor import DjangoExampleProcessor
+            return DjangoExampleProcessor(parser.transition_system)
+        elif _lang == 'lambda_dcs':
+            from datasets.atis.example_processor import ATISExampleProcessor
+            return ATISExampleProcessor(parser.transition_system)
+        else:
+            raise RuntimeError()
+
+    example_processor = load_example_processor(args.lang)
+
+    while True:
+        utterance = input('Query:').strip()
+        processed_utterance_tokens, utterance_meta = example_processor.pre_process_utterance(utterance)
+        print(processed_utterance_tokens)
+
+        hypotheses = parser.parse(processed_utterance_tokens, beam_size=args.beam_size)
+        valid_hypotheses = list(filter(lambda hyp: parser.transition_system.is_valid_hypothesis(hyp), hypotheses))
+        for hyp in valid_hypotheses:
+            example_processor.post_process_hypothesis(hyp, utterance_meta)
+
+        for hyp_id, hyp in enumerate(valid_hypotheses):
+            print('------------------ Hypothesis %d ------------------' % hyp_id)
+            print(hyp.code)
+            print(hyp.tree.to_string())
+            print('Actions:')
+            for action_t in hyp.action_infos:
+                print(action_t.action)
+
+
 def train_reranker_and_test(args):
     print('load dataset [test %s], [dev %s]' % (args.test_file, args.dev_file), file=sys.stderr)
     test_set = Dataset.from_bin_file(args.test_file)
@@ -769,5 +804,7 @@ if __name__ == '__main__':
         train_reranker_and_test(args)
     elif args.mode == 'test':
         test(args)
+    elif args.mode == 'interactive':
+        interactive_mode(args)
     else:
         raise RuntimeError('unknown mode')

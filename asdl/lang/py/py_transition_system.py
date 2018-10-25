@@ -62,3 +62,12 @@ class PythonTransitionSystem(TransitionSystem):
                 actions.append(GenTokenAction(tok))
 
         return actions
+
+    def is_valid_hypothesis(self, hyp, **kwargs):
+        try:
+            hyp_code = self.ast_to_surface_code(hyp.tree)
+            ast.parse(hyp_code)
+            self.tokenize_code(hyp_code)
+        except:
+            return False
+        return True

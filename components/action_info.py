@@ -14,3 +14,9 @@ class ActionInfo(object):
         # for GenToken actions only
         self.copy_from_src = False
         self.src_token_position = -1
+
+    def __repr__(self):
+        return '%s (t=%d, p_t=%d, frontier_field=%s)' % (repr(self.action),
+                                                         self.t,
+                                                         self.parent_t,
+                                                         self.frontier_field.__repr__(True) if self.frontier_field else 'None')
