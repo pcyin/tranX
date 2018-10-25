@@ -11,7 +11,6 @@ import sys
 
 import numpy as np
 
-from asdl.asdl_ast import RealizedField
 from asdl.lang.py.py_asdl_helper import python_ast_to_asdl_ast, asdl_ast_to_python_ast
 from asdl.lang.py.py_transition_system import PythonTransitionSystem
 from asdl.hypothesis import *
@@ -51,6 +50,21 @@ def get_action_infos(src_query, tgt_actions, force_copy=False):
         action_infos.append(action_info)
 
     return action_infos
+
+
+def replace_string_ast_nodes(py_ast, str_map):
+    for node in ast.walk(py_ast):
+        if isinstance(node, ast.Str):
+            str_val = node.s
+
+            if str_val in str_map:
+                node.s = str_map[str_val]
+            else:
+                # handle cases like `\n\t` in string literals
+                for key, val in str_map.items():
+                    str_literal_decoded = key.decode('string_escape')
+                    if str_literal_decoded == str_val:
+                        node.s = val
 
 
 class Django(object):
@@ -156,10 +170,13 @@ class Django(object):
         Django.canonicalize_str_nodes(ast_tree, str_map)
         canonical_code = astor.to_source(ast_tree)
 
-        # for str_literal, str_repr in str_map.items():
-        #     canonical_code = canonical_code.replace(str_literal, '\'' + str_repr + '\'')
-
         # sanity check
+        # decanonical_code = Django.decanonicalize_code(canonical_code, str_map)
+        # decanonical_code_tokens = tokenize_code(decanonical_code)
+        # raw_code_tokens = tokenize_code(code)
+        # if decanonical_code_tokens != raw_code_tokens:
+        #     pass
+
         # try:
         #     ast_tree = ast.parse(canonical_code).body[0]
         # except:
@@ -212,15 +229,15 @@ class Django(object):
             tgt_ast = python_ast_to_asdl_ast(python_ast, grammar)
             tgt_actions = transition_system.get_actions(tgt_ast)
 
-            print('+' * 60)
-            print('Example: %d' % idx)
-            print('Source: %s' % ' '.join(src_query_tokens))
-            if str_map:
-                print('Original String Map:')
-                for str_literal, str_repr in str_map.items():
-                    print('\t%s: %s' % (str_literal, str_repr))
-            print('Code:\n%s' % gold_source)
-            print('Actions:')
+            # print('+' * 60)
+            # print('Example: %d' % idx)
+            # print('Source: %s' % ' '.join(src_query_tokens))
+            # if str_map:
+            #     print('Original String Map:')
+            #     for str_literal, str_repr in str_map.items():
+            #         print('\t%s: %s' % (str_literal, str_repr))
+            # print('Code:\n%s' % gold_source)
+            # print('Actions:')
 
             # sanity check
             hyp = Hypothesis()
@@ -306,7 +323,7 @@ class Django(object):
         return (train_examples, dev_examples, test_examples), vocab
 
     @staticmethod
-    def generate_django_dataset():
+    def process_django_dataset():
         vocab_freq_cutoff = 5
         annot_file = 'data/django/all.anno'
         code_file = 'data/django/all.code'
@@ -374,7 +391,7 @@ if __name__ == '__main__':
     # # print(f1 == rf1)
     # a = {f1: 1}
     # print(a[rf1])
-    Django.generate_django_dataset()
+    Django.process_django_dataset()
 
 
 
