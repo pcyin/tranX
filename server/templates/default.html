@@ -90,7 +90,7 @@
                         </div>
                         <div style="clear:both; margin-bottom: 10px"></div>
                     </div>
-                                      </div>
+                </div>
             </div>
             </div>
         </div>
@@ -106,12 +106,6 @@
                 <button type="button" class="btn btn-primary" id="btn_parse">Parse</button>
             </div>
             </div>
-            <!-- <div class="col-6">
-                <input type="text" class="form-control" id="inputUtterance" placeholder="Enter query">
-            </div>
-            <div class="col">
-                <button type="button" class="btn btn-primary" id="btn_parse">Parse</button>
-            </div> -->
         </div>
         <div class="hypotheses">
             <!-- <div class="row">
@@ -167,6 +161,7 @@ asdfsda</pre>
 
         var on_parse = function(){
             $('.hypotheses').empty()
+            $('#btn_parse').prop('disabled', true)
             $('#btn_parse').html(loadingText)
             input_utterance = $('#inputUtterance').val()
             //alert(input_utterance)
@@ -215,9 +210,10 @@ asdfsda</pre>
                     var tree_json_data = parse(hyp['tree_repr'].replace(/\\/g, "\\\\"))
                     d3Tree(tree_json_data, hyp['id']);
                 }
+                
+                $('#btn_parse').prop('disabled', false)
+                $('#btn_parse').html('Parse')
             })
-
-            $('#btn_parse').html('Parse')
         }
 
         $('#btn_parse').click(on_parse)
