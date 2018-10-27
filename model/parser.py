@@ -92,13 +92,14 @@ class Parser(nn.Module):
         else:
             raise ValueError('Unknown LSTM type %s' % args.lstm)
 
-        # pointer net for copying tokens from source side
-        self.src_pointer_net = PointerNet(query_vec_size=args.att_vec_size, src_encoding_size=args.hidden_size)
+        if args.no_copy is False:
+            # pointer net for copying tokens from source side
+            self.src_pointer_net = PointerNet(query_vec_size=args.att_vec_size, src_encoding_size=args.hidden_size)
 
-        # given the decoder's hidden state, predict whether to copy or generate a target primitive token
-        # output: [p(gen(token)) | s_t, p(copy(token)) | s_t]
+            # given the decoder's hidden state, predict whether to copy or generate a target primitive token
+            # output: [p(gen(token)) | s_t, p(copy(token)) | s_t]
 
-        self.primitive_predictor = nn.Linear(args.att_vec_size, 2)
+            self.primitive_predictor = nn.Linear(args.att_vec_size, 2)
 
         # initialize the decoder's state and cells with encoder hidden states
         self.decoder_cell_init = nn.Linear(args.hidden_size, args.hidden_size)
@@ -205,7 +206,7 @@ class Parser(nn.Module):
         output: score for each training example: Variable(batch_size)
         """
 
-        batch = Batch(examples, self.grammar, self.vocab, self.args.cuda)
+        batch = Batch(examples, self.grammar, self.vocab, copy=self.args.no_copy is False, cuda=self.args.cuda)
 
         # src_encodings: (batch_size, src_sent_len, hidden_size * 2)
         # (last_state, last_cell, dec_init_vec): (batch_size, hidden_size)
@@ -230,23 +231,7 @@ class Parser(nn.Module):
         tgt_apply_rule_prob = torch.gather(apply_rule_prob, dim=2,
                                            index=batch.apply_rule_idx_matrix.unsqueeze(2)).squeeze(2)
 
-        # binary gating probabilities between generating or copying a primitive token
-        # (tgt_action_len, batch_size, 2)
-        primitive_predictor = F.softmax(self.primitive_predictor(query_vectors), dim=-1)
-
         #### compute generation and copying probabilities
-
-        # pointer network copying scores over source tokens
-        # (tgt_action_len, batch_size, src_sent_len)
-        primitive_copy_prob = self.src_pointer_net(src_encodings, batch.src_token_mask, query_vectors)
-
-        # marginalize over the copy probabilities of tokens that are same
-        # (tgt_action_len, batch_size)
-        tgt_primitive_copy_prob = torch.sum(primitive_copy_prob * batch.primitive_copy_token_idx_mask, dim=-1)
-
-        # (tgt_action_len, batch_size)
-        # tgt_primitive_copy_prob = torch.gather(primitive_copy_prob, dim=2,
-        #                                        index=batch.primitive_copy_pos_matrix.unsqueeze(2)).squeeze(2)
 
         # (tgt_action_len, batch_size, primitive_vocab_size)
         gen_from_vocab_prob = F.softmax(self.tgt_token_readout(query_vectors), dim=-1)
@@ -255,20 +240,39 @@ class Parser(nn.Module):
         tgt_primitive_gen_from_vocab_prob = torch.gather(gen_from_vocab_prob, dim=2,
                                                          index=batch.primitive_idx_matrix.unsqueeze(2)).squeeze(2)
 
-        # mask positions in action_prob that are not used
-        # (tgt_action_len, batch_size)
-        action_mask_pad = torch.eq(batch.apply_rule_mask + batch.gen_token_mask + batch.primitive_copy_mask, 0.)
-        action_mask = 1. - action_mask_pad.float()
+        if self.args.no_copy:
+            # mask positions in action_prob that are not used
 
-        # (tgt_action_len, batch_size)
-        action_prob = tgt_apply_rule_prob * batch.apply_rule_mask + \
-                      primitive_predictor[:, :, 0] * tgt_primitive_gen_from_vocab_prob * batch.gen_token_mask + \
-                      primitive_predictor[:, :, 1] * tgt_primitive_copy_prob * batch.primitive_copy_mask
+            # (tgt_action_len, batch_size)
+            action_prob = tgt_apply_rule_prob.log() * batch.apply_rule_mask + \
+                          tgt_primitive_gen_from_vocab_prob.log() * batch.gen_token_mask
+        else:
+            # binary gating probabilities between generating or copying a primitive token
+            # (tgt_action_len, batch_size, 2)
+            primitive_predictor = F.softmax(self.primitive_predictor(query_vectors), dim=-1)
 
-        # avoid nan in log
-        action_prob.data.masked_fill_(action_mask_pad.data, 1.e-7)
+            # pointer network copying scores over source tokens
+            # (tgt_action_len, batch_size, src_sent_len)
+            primitive_copy_prob = self.src_pointer_net(src_encodings, batch.src_token_mask, query_vectors)
 
-        action_prob = action_prob.log() * action_mask
+            # marginalize over the copy probabilities of tokens that are same
+            # (tgt_action_len, batch_size)
+            tgt_primitive_copy_prob = torch.sum(primitive_copy_prob * batch.primitive_copy_token_idx_mask, dim=-1)
+
+            # mask positions in action_prob that are not used
+            # (tgt_action_len, batch_size)
+            action_mask_pad = torch.eq(batch.apply_rule_mask + batch.gen_token_mask + batch.primitive_copy_mask, 0.)
+            action_mask = 1. - action_mask_pad.float()
+
+            # (tgt_action_len, batch_size)
+            action_prob = tgt_apply_rule_prob * batch.apply_rule_mask + \
+                          primitive_predictor[:, :, 0] * tgt_primitive_gen_from_vocab_prob * batch.gen_token_mask + \
+                          primitive_predictor[:, :, 1] * tgt_primitive_copy_prob * batch.primitive_copy_mask
+
+            # avoid nan in log
+            action_prob.data.masked_fill_(action_mask_pad.data, 1.e-7)
+
+            action_prob = action_prob.log() * action_mask
 
         scores = torch.sum(action_prob, dim=0)
 
@@ -572,19 +576,23 @@ class Parser(nn.Module):
             # apply_rule_log_prob = torch.log(F.softmax(self.production_readout(att_t), dim=-1))
             apply_rule_log_prob = F.log_softmax(self.production_readout(att_t), dim=-1)
 
-            # Variable(batch_size, src_sent_len)
-            primitive_copy_prob = self.src_pointer_net(src_encodings, None, att_t.unsqueeze(0)).squeeze(0)
-
             # Variable(batch_size, primitive_vocab_size)
             gen_from_vocab_prob = F.softmax(self.tgt_token_readout(att_t), dim=-1)
 
-            # Variable(batch_size, 2)
-            primitive_predictor_prob = F.softmax(self.primitive_predictor(att_t), dim=-1)
+            if args.no_copy:
+                primitive_prob = gen_from_vocab_prob
+            else:
+                # Variable(batch_size, src_sent_len)
+                primitive_copy_prob = self.src_pointer_net(src_encodings, None, att_t.unsqueeze(0)).squeeze(0)
 
-            # Variable(batch_size, primitive_vocab_size)
-            primitive_prob = primitive_predictor_prob[:, 0].unsqueeze(1) * gen_from_vocab_prob
-            # if src_unk_pos_list:
-            #     primitive_prob[:, primitive_vocab.unk_id] = 1.e-10
+                # Variable(batch_size, 2)
+                primitive_predictor_prob = F.softmax(self.primitive_predictor(att_t), dim=-1)
+
+                # Variable(batch_size, primitive_vocab_size)
+                primitive_prob = primitive_predictor_prob[:, 0].unsqueeze(1) * gen_from_vocab_prob
+
+                # if src_unk_pos_list:
+                #     primitive_prob[:, primitive_vocab.unk_id] = 1.e-10
 
             gentoken_prev_hyp_ids = []
             gentoken_new_hyp_unks = []
@@ -713,14 +721,14 @@ class Parser(nn.Module):
                         action_info.src_token_position = aggregated_primitive_tokens[token]
 
                     if debug:
-                        action_info.gen_copy_switch = primitive_predictor_prob[prev_hyp_id, :].log().cpu().data.numpy()
+                        action_info.gen_copy_switch = 'n/a' if args.no_copy else primitive_predictor_prob[prev_hyp_id, :].log().cpu().data.numpy()
                         action_info.in_vocab = token in primitive_vocab
                         action_info.gen_token_prob = gen_from_vocab_prob[prev_hyp_id, token_id].log().cpu().data[0] \
                             if token in primitive_vocab else 'n/a'
                         action_info.copy_token_prob = torch.gather(primitive_copy_prob[prev_hyp_id],
                                                                    0,
                                                                    Variable(T.LongTensor(action_info.src_token_position))).sum().log().cpu().data[0] \
-                            if action_info.copy_from_src else 'n/a'
+                            if args.no_copy is False and action_info.copy_from_src else 'n/a'
 
                 action_info.action = action
                 action_info.t = t
