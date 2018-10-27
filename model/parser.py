@@ -21,6 +21,7 @@ from components.action_info import ActionInfo
 from components.dataset import Batch
 from model import nn_utils
 from model.attention_util import AttentionUtil
+from model.nn_utils import LabelSmoothing
 from model.pointer_net import PointerNet
 
 
@@ -100,6 +101,9 @@ class Parser(nn.Module):
             # output: [p(gen(token)) | s_t, p(copy(token)) | s_t]
 
             self.primitive_predictor = nn.Linear(args.att_vec_size, 2)
+
+        if args.primitive_token_label_smoothing:
+            self.label_smoothing = LabelSmoothing(args.primitive_token_label_smoothing, len(self.vocab.primitive), ignore_indices=[0, 1, 2])
 
         # initialize the decoder's state and cells with encoder hidden states
         self.decoder_cell_init = nn.Linear(args.hidden_size, args.hidden_size)
@@ -243,9 +247,22 @@ class Parser(nn.Module):
         if self.args.no_copy:
             # mask positions in action_prob that are not used
 
+            if self.args.primitive_token_label_smoothing:
+                # (tgt_action_len, batch_size)
+                # this is actually the negative KL divergence size we will flip the sign later
+                # tgt_primitive_gen_from_vocab_log_prob = -self.label_smoothing(
+                #     gen_from_vocab_prob.view(-1, gen_from_vocab_prob.size(-1)).log(),
+                #     batch.primitive_idx_matrix.view(-1)).view(-1, len(batch))
+
+                tgt_primitive_gen_from_vocab_log_prob = -self.label_smoothing(
+                    gen_from_vocab_prob.log(),
+                    batch.primitive_idx_matrix)
+            else:
+                tgt_primitive_gen_from_vocab_log_prob = tgt_primitive_gen_from_vocab_prob.log()
+
             # (tgt_action_len, batch_size)
             action_prob = tgt_apply_rule_prob.log() * batch.apply_rule_mask + \
-                          tgt_primitive_gen_from_vocab_prob.log() * batch.gen_token_mask
+                          tgt_primitive_gen_from_vocab_log_prob * batch.gen_token_mask
         else:
             # binary gating probabilities between generating or copying a primitive token
             # (tgt_action_len, batch_size, 2)
