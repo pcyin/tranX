@@ -1,4 +1,5 @@
 # coding=utf-8
+from collections import OrderedDict
 
 import torch
 import numpy as np
@@ -64,7 +65,7 @@ class Example(object):
 
 
 class Batch(object):
-    def __init__(self, examples, grammar, vocab, cuda=False):
+    def __init__(self, examples, grammar, vocab, copy=True, cuda=False):
         self.examples = examples
         self.max_action_num = max(len(e.tgt_actions) for e in self.examples)
 
@@ -73,6 +74,7 @@ class Batch(object):
 
         self.grammar = grammar
         self.vocab = vocab
+        self.copy = copy
         self.cuda = cuda
 
         self.init_index_tensors()
@@ -148,7 +150,7 @@ class Batch(object):
 
                         token_can_copy = False
 
-                        if token in src_sent:
+                        if self.copy and token in src_sent:
                             token_pos_list = [idx for idx, _token in enumerate(src_sent) if _token == token]
                             self.primitive_copy_token_idx_mask[t, e_id, token_pos_list] = 1.
                             copy_mask = 1
@@ -212,3 +214,15 @@ class Batch(object):
     def src_token_mask(self):
         return nn_utils.length_array_to_mask_tensor(self.src_sents_len,
                                                     cuda=self.cuda)
+
+    @cached_property
+    def token_pos_list(self):
+        # (batch_size, src_token_pos, unique_src_token_num)
+
+        batch_src_token_to_pos_map = []
+        for e_id, e in enumerate(self.examples):
+            aggregated_primitive_tokens = OrderedDict()
+            for token_pos, token in enumerate(e.src_sent):
+                aggregated_primitive_tokens.setdefault(token, []).append(token_pos)
+
+
