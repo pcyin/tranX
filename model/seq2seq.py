@@ -160,7 +160,7 @@ class Seq2SeqModel(nn.Module):
         log_scores = F.log_softmax(scores, dim=-1)
         tgt_sents_var_sos_omitted = tgt_sents_var[1:]   # remove leading <s> in tgt sent, which is not used as the target
 
-        if self.label_smoothing:
+        if self.training and self.label_smoothing:
             # (tgt_sent_len, batch_size)
             tgt_sent_log_scores = -self.label_smoothing_layer(log_scores, tgt_sents_var_sos_omitted)
         else:
