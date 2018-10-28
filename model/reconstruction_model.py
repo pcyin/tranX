@@ -23,10 +23,17 @@ from model.seq2seq_copy import Seq2SeqWithCopy
 class Reconstructor(nn.Module):
     def __init__(self, args, vocab, transition_system):
         super(Reconstructor, self).__init__()
-        self.seq2seq = Seq2SeqWithCopy(src_vocab=vocab.code, tgt_vocab=vocab.source,
-                                       embed_size=args.embed_size, hidden_size=args.hidden_size,
-                                       dropout=args.dropout,
-                                       cuda=args.cuda)
+        if args.no_copy:
+            self.seq2seq = Seq2SeqModel(src_vocab=vocab.code, tgt_vocab=vocab.source,
+                                        embed_size=args.embed_size, hidden_size=args.hidden_size,
+                                        dropout=args.dropout,
+                                        label_smoothing=args.src_token_label_smoothing,
+                                        cuda=args.cuda)
+        else:
+            self.seq2seq = Seq2SeqWithCopy(src_vocab=vocab.code, tgt_vocab=vocab.source,
+                                           embed_size=args.embed_size, hidden_size=args.hidden_size,
+                                           dropout=args.dropout,
+                                           cuda=args.cuda)
 
         self.vocab = vocab
         self.args = args
@@ -44,10 +51,15 @@ class Reconstructor(nn.Module):
 
         tgt_token_copy_idx_mask, tgt_token_gen_mask = self.get_generate_and_copy_meta_tensor(src_codes, tgt_nls)
 
-        scores = self.seq2seq(src_code_var,
-                              [len(c) for c in src_codes],
-                              tgt_nl_var,
-                              tgt_token_copy_idx_mask, tgt_token_gen_mask)
+        if isinstance(self.seq2seq, Seq2SeqModel):
+            scores = self.seq2seq(src_code_var,
+                                  [len(c) for c in src_codes],
+                                  tgt_nl_var)
+        else:
+            scores = self.seq2seq(src_code_var,
+                                  [len(c) for c in src_codes],
+                                  tgt_nl_var,
+                                  tgt_token_copy_idx_mask, tgt_token_gen_mask)
 
         return scores
 

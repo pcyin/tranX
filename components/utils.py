@@ -89,6 +89,8 @@ def init_arg_parser():
     arg_parser.add_argument('--decoder_word_dropout', default=0.3, type=float, help='Word dropout rate on decoder')
     arg_parser.add_argument('--primitive_token_label_smoothing', default=0.0, type=float,
                             help='Apply label smoothing when predicting primitive tokens')
+    arg_parser.add_argument('--src_token_label_smoothing', default=0.0, type=float,
+                            help='Apply label smoothing in reconstruction model when predicting source tokens')
 
     # training schedule details
     arg_parser.add_argument('--valid_metric', default='acc', choices=['acc'],
