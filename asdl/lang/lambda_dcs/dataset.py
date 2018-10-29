@@ -15,7 +15,7 @@ from asdl.lang.lambda_dcs.lambda_dcs_transition_system import *
 from asdl.lang.lambda_dcs.logical_form import *
 
 
-def load_dataset(transition_system, dataset_file):
+def load_dataset(transition_system, dataset_file, reorder_predicates=True):
     examples = []
     for idx, line in enumerate(open(dataset_file)):
         src_query, tgt_code = line.strip().split('\t')
@@ -23,17 +23,25 @@ def load_dataset(transition_system, dataset_file):
         src_query_tokens = src_query.split(' ')
 
         lf = parse_lambda_expr(tgt_code)
+        assert lf.to_string() == tgt_code
+
+        if reorder_predicates:
+            ordered_lf = get_canonical_order_of_logical_form(lf, order_by='alphabet')
+            assert ordered_lf == lf
+            lf = ordered_lf
+
         gold_source = lf.to_string()
-        assert gold_source == tgt_code
+
         tgt_ast = logical_form_to_ast(grammar, lf)
         reconstructed_lf = ast_to_logical_form(tgt_ast)
         assert lf == reconstructed_lf
 
         tgt_actions = transition_system.get_actions(tgt_ast)
 
+        print(idx)
         print('Utterance: %s' % src_query)
         print('Reference: %s' % tgt_code)
-        print('===== Actions =====')
+        # print('===== Actions =====')
         # sanity check
         hyp = Hypothesis()
         for action in tgt_actions:
@@ -41,7 +49,7 @@ def load_dataset(transition_system, dataset_file):
             if isinstance(action, ApplyRuleAction):
                 assert action.production in transition_system.get_valid_continuating_productions(hyp)
             hyp = hyp.clone_and_apply_action(action)
-            print(action)
+            # print(action)
 
         assert hyp.frontier_node is None and hyp.frontier_field is None
 
@@ -50,7 +58,10 @@ def load_dataset(transition_system, dataset_file):
 
         tgt_action_infos = get_action_infos(src_query_tokens, tgt_actions)
 
-        print(idx)
+        # print(' '.join(src_query_tokens))
+        print('***')
+        print(lf.to_string())
+        print()
         example = Example(idx=idx,
                           src_sent=src_query_tokens,
                           tgt_actions=tgt_action_infos,
@@ -64,7 +75,7 @@ def load_dataset(transition_system, dataset_file):
 
 
 def prepare_atis_dataset():
-    vocab_freq_cutoff = 1
+    vocab_freq_cutoff = 2
     grammar = ASDLGrammar.from_text(open('asdl/lang/lambda_dcs/lambda_asdl.txt').read())
     transition_system = LambdaCalculusTransitionSystem(grammar)
 
@@ -93,20 +104,19 @@ def prepare_atis_dataset():
     print('Avg action len: %d' % np.average(action_len), file=sys.stderr)
     print('Actions larger than 100: %d' % len(filter(lambda x: x > 100, action_len)), file=sys.stderr)
 
-    pickle.dump(train_set, open('data/atis/train.bin', 'w'))
-    pickle.dump(dev_set, open('data/atis/dev.bin', 'w'))
-    pickle.dump(test_set, open('data/atis/test.bin', 'w'))
-    pickle.dump(vocab, open('data/atis/vocab.bin', 'w'))
+    pickle.dump(train_set, open('data/atis/train.ordered.bin', 'w'))
+    pickle.dump(dev_set, open('data/atis/dev.ordered.bin', 'w'))
+    pickle.dump(test_set, open('data/atis/test.ordered.bin', 'w'))
+    pickle.dump(vocab, open('data/atis/vocab.freq%d.bin' % vocab_freq_cutoff, 'w'))
 
 
 def prepare_geo_dataset():
-    # vocab_freq_cutoff = 1 for atis
     vocab_freq_cutoff = 2 # for geo query
     grammar = ASDLGrammar.from_text(open('asdl/lang/lambda_dcs/lambda_asdl.txt').read())
     transition_system = LambdaCalculusTransitionSystem(grammar)
 
-    train_set = load_dataset(transition_system, 'data/geo/train.txt')
-    test_set = load_dataset(transition_system, 'data/geo/test.txt')
+    train_set = load_dataset(transition_system, 'data/geo/train.txt', reorder_predicates=False)
+    test_set = load_dataset(transition_system, 'data/geo/test.txt', reorder_predicates=False)
 
     # generate vocabulary
     src_vocab = VocabEntry.from_corpus([e.src_sent for e in train_set], size=5000, freq_cutoff=vocab_freq_cutoff)

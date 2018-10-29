@@ -248,7 +248,7 @@ class Parser(nn.Module):
         if self.args.no_copy:
             # mask positions in action_prob that are not used
 
-            if self.args.primitive_token_label_smoothing:
+            if self.training and self.args.primitive_token_label_smoothing:
                 # (tgt_action_len, batch_size)
                 # this is actually the negative KL divergence size we will flip the sign later
                 # tgt_primitive_gen_from_vocab_log_prob = -self.label_smoothing(
