@@ -33,13 +33,16 @@ def dot_prod_attention(h_t, src_encoding, src_encoding_att_linear, mask=None):
     return ctx_vec, att_weight
 
 
-def length_array_to_mask_tensor(length_array, cuda=False):
-    max_len = length_array[0]
+def length_array_to_mask_tensor(length_array, cuda=False, valid_entry_has_mask_one=False):
+    max_len = max(length_array)
     batch_size = len(length_array)
 
-    mask = np.ones((batch_size, max_len), dtype=np.uint8)
+    mask = np.zeros((batch_size, max_len), dtype=np.uint8)
     for i, seq_len in enumerate(length_array):
-        mask[i][:seq_len] = 0
+        if valid_entry_has_mask_one:
+            mask[i][:seq_len] = 1
+        else:
+            mask[i][seq_len:] = 1
 
     mask = torch.ByteTensor(mask)
     return mask.cuda() if cuda else mask
@@ -54,12 +57,10 @@ def input_transpose(sents, pad_token):
     batch_size = len(sents)
 
     sents_t = []
-    masks = []
     for i in xrange(max_len):
         sents_t.append([sents[k][i] if len(sents[k]) > i else pad_token for k in xrange(batch_size)])
-        masks.append([1 if len(sents[k]) > i else 0 for k in xrange(batch_size)])
 
-    return sents_t, masks
+    return sents_t
 
 
 def word2id(sents, vocab):
@@ -85,7 +86,7 @@ def to_input_variable(sequences, vocab, cuda=False, training=True, append_bounda
         sequences = [['<s>'] + seq + ['</s>'] for seq in sequences]
 
     word_ids = word2id(sequences, vocab)
-    sents_t, masks = input_transpose(word_ids, vocab['<pad>'])
+    sents_t = input_transpose(word_ids, vocab['<pad>'])
 
     sents_var = Variable(torch.LongTensor(sents_t), volatile=(not training), requires_grad=False)
     if cuda:
@@ -187,3 +188,19 @@ class LabelSmoothing(nn.Module):
         # true_dist.scatter_(1, target.data.unsqueeze(1), self.confidence)
 
         return self.criterion(model_prob, true_dist).sum(dim=-1)
+
+
+class MLP(nn.Module):
+    def __init__(self, input_size, output_size, hidden_size, activation=F.softmax, hidden_activation=F.tanh):
+        super(MLP, self).__init__()
+
+        self.hidden = nn.Linear(input_size, hidden_size)
+        self.output = nn.Linear(hidden_size, output_size)
+        self.activation = activation
+        self.hidden_activation = hidden_activation
+
+    def forward(self, x):
+        hidden = self.hidden_activation(self.hidden(x))
+        output = self.activation(self.output(hidden))
+
+        return output

@@ -14,13 +14,14 @@ from torch.autograd import Variable
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
+from components.reranker import RerankingFeature
 from model.pointer_net import PointerNet
 from model.seq2seq import Seq2SeqModel
 from model import nn_utils
 from model.seq2seq_copy import Seq2SeqWithCopy
 
 
-class Reconstructor(nn.Module):
+class Reconstructor(nn.Module, RerankingFeature):
     def __init__(self, args, vocab, transition_system):
         super(Reconstructor, self).__init__()
         if args.no_copy:
@@ -38,6 +39,12 @@ class Reconstructor(nn.Module):
         self.vocab = vocab
         self.args = args
         self.transition_system = transition_system
+
+    def feature_name(self):
+        return 'reconstruction_score'
+
+    def is_batched(self):
+        return True
 
     def _score(self, src_codes, tgt_nls):
         """score examples sorted by code length"""
@@ -82,6 +89,9 @@ class Reconstructor(nn.Module):
         scores = sorted_scores[example_old_pos_map]
 
         return scores
+
+    def forward(self, examples):
+        return self.score(examples)
 
     def sample(self, code, sample_size=5):
         tokenized_code = self.tokenize_code(code)

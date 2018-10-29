@@ -29,7 +29,7 @@ def init_arg_parser():
     arg_parser.add_argument('--cuda', action='store_true', default=False, help='Use gpu')
     arg_parser.add_argument('--lang', choices=['python', 'lambda_dcs', 'wikisql', 'prolog'], default='python')
     arg_parser.add_argument('--asdl_file', type=str, help='Path to ASDL grammar specification')
-    arg_parser.add_argument('--mode', choices=['train', 'self_train', 'train_reconstructor',
+    arg_parser.add_argument('--mode', choices=['train', 'self_train', 'train_reconstructor', 'train_paraphrase_identifier',
                                                'test', 'rerank', 'interactive'], default='train', help='Run mode')
 
     #### Model configuration ####
@@ -128,6 +128,7 @@ def init_arg_parser():
 
     #### reranking ####
     arg_parser.add_argument('--load_reconstruction_model', type=str, help='Load reconstruction model')
+    arg_parser.add_argument('--train_decode_file', default=None, type=str, help='Decoding results on training set')
     arg_parser.add_argument('--test_decode_file', default=None, type=str, help='Decoding results on test set')
     arg_parser.add_argument('--dev_decode_file', default=None, type=str, help='Decoding results on dev set')
 
