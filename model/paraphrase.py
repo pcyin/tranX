@@ -25,9 +25,11 @@ class ParaphraseIdentificationModel(nn.Module, RerankingFeature):
         self.args = args
         self.transition_system = transition_system
 
+    @property
     def feature_name(self):
         return 'paraphrase_score'
 
+    @property
     def is_batched(self):
         return True
 

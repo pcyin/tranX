@@ -40,9 +40,11 @@ class Reconstructor(nn.Module, RerankingFeature):
         self.args = args
         self.transition_system = transition_system
 
+    @property
     def feature_name(self):
         return 'reconstruction_score'
 
+    @property
     def is_batched(self):
         return True
 
@@ -58,15 +60,15 @@ class Reconstructor(nn.Module, RerankingFeature):
 
         tgt_token_copy_idx_mask, tgt_token_gen_mask = self.get_generate_and_copy_meta_tensor(src_codes, tgt_nls)
 
-        if isinstance(self.seq2seq, Seq2SeqModel):
-            scores = self.seq2seq(src_code_var,
-                                  [len(c) for c in src_codes],
-                                  tgt_nl_var)
-        else:
+        if isinstance(self.seq2seq, Seq2SeqWithCopy):
             scores = self.seq2seq(src_code_var,
                                   [len(c) for c in src_codes],
                                   tgt_nl_var,
                                   tgt_token_copy_idx_mask, tgt_token_gen_mask)
+        else:
+            scores = self.seq2seq(src_code_var,
+                                  [len(c) for c in src_codes],
+                                  tgt_nl_var)
 
         return scores
 

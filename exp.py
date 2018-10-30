@@ -21,6 +21,7 @@ import evaluation
 from asdl.asdl import ASDLGrammar
 from asdl.transition_system import TransitionSystem
 from components.dataset import Dataset, Example
+from components.reranker import Reranker
 from components.standalone_parser import StandaloneParser
 from components.utils import update_args, init_arg_parser
 from model import nn_utils, utils
@@ -646,10 +647,15 @@ def train_reranker_and_test(args):
     # args.lang = parser_saved_args.lang
 
     # parser = get_parser_class(parser_saved_args.lang).load(args.load_model, cuda=args.cuda)
-    print('load reconstruction model from [%s]' % args.load_reconstruction_model, file=sys.stderr)
+    # print('load reconstruction model from [%s]' % args.load_reconstruction_model, file=sys.stderr)
     # reconstruction_model = Reconstructor.load(args.load_reconstruction_model, cuda=args.cuda)
-    reconstruction_model = ParaphraseIdentificationModel.load(args.load_reconstruction_model)
-    transition_system = reconstruction_model.transition_system
+    # reconstruction_model = ParaphraseIdentificationModel.load(args.load_reconstruction_model)
+    reranker = Reranker(features=[Reconstructor.load(
+        'saved_models/atis/model.atis.sup.decoder.lstm.hidden256.embed128.dropout0.3.lr_decay0.5.vocab.freq2.bin.train.ordered.bin.bin'),
+        ParaphraseIdentificationModel.load(
+                                      'saved_models/atis/model.atis.sup.paraphrase.lstm.hidden256.embed128.dropout0.3.lr_decay0.5.vocab.freq2.bin.train.ordered.bin.bin')])
+
+    transition_system = reranker.reconstruction_score.transition_system
 
     # transition_system = parser.transition_system
     # parser.eval()
@@ -680,58 +686,9 @@ def train_reranker_and_test(args):
 
     print('Dev Acc@1=%.4f, Test Oracle Acc=%.4f' % (dev_acc, dev_oracle), file=sys.stderr)
 
-    def _compute_rerank_feature(_examples, _decode_results):
-        hyp_examples = []
+    reranker.train(dev_set.examples, dev_decode_results)
 
-        for example, hyps in zip(_examples, _decode_results):
-            for hyp in hyps:
-                hyp_example = Example(idx=None,
-                                      src_sent=example.src_sent,
-                                      tgt_code=hyp.code,
-                                      tgt_actions=None,
-                                      tgt_ast=None)
-                hyp_examples.append(hyp_example)
-
-        for batch_examples in utils.batch_iter(hyp_examples, batch_size=128):
-            batch_example_scores = reconstruction_model.score(batch_examples).data.cpu().tolist()
-            for i, e in enumerate(batch_examples):
-                e.reconstruction_score = batch_example_scores[i]
-
-        e_ptr = 0
-        for example, hyps in zip(_examples, _decode_results):
-            for hyp in hyps:
-                hyp.reconstruction_score = hyp_examples[e_ptr].reconstruction_score
-                e_ptr += 1
-
-    def _compute_rerank_performance(_examples, _decode_results, _eta):
-        correct_array = []
-        for example, hyps in zip(_examples, _decode_results):
-            if hyps:
-                best_hyp_idx = np.argmax([hyp.score + _eta * hyp.reconstruction_score for hyp in hyps])
-                is_correct = hyps[best_hyp_idx].correct
-                correct_array.append(is_correct)
-
-        acc = sum(correct_array) / float(len(_examples))
-        return acc
-
-    best_eta = eta = 0.
-    delta_eta = 0.01
-    best_dev_score = dev_acc
-
-    _compute_rerank_feature(dev_set.examples, dev_decode_results)
-    while eta <= 1.0:
-        eta += delta_eta
-
-        # compute new dev score using current eta
-        dev_score = _compute_rerank_performance(dev_set.examples, dev_decode_results, eta)
-        if dev_score > best_dev_score:
-            print('New eta=%.4f, dev score=%.4f' % (eta, dev_score), file=sys.stderr)
-            best_eta = eta
-            best_dev_score = dev_score
-
-    # test!
-    _compute_rerank_feature(test_set.examples, test_decode_results)
-    test_score_with_rerank = _compute_rerank_performance(test_set.examples, test_decode_results, best_eta)
+    test_score_with_rerank = reranker.compute_rerank_performance(test_set.examples, test_decode_results)
 
     print('Test Acc@1=%.4f, Test Re-rank Acc=%.4f, Test Oracle Acc=%.4f' % (test_acc,
                                                                             test_score_with_rerank,

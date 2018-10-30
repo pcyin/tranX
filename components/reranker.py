@@ -25,6 +25,7 @@ class Reranker(object):
     def __init__(self, features):
         self.features = []
         self.feat_map = OrderedDict()
+        self.batched_features = OrderedDict()
 
         for feat in features:
             self._add_feature(feat)
@@ -33,18 +34,21 @@ class Reranker(object):
 
     def _add_feature(self, feature):
         self.features.append(feature)
-        self.feat_map[feature.name] = feature
+        self.feat_map[feature.feature_name] = feature
+
+        if feature.is_batched:
+            self.batched_features[feature.feature_name] = feature
 
     def get_initial_reranking_feature_values(self, example, hyp, **kwargs):
         """Given a hypothesis, compute its reranking feature"""
         feat_values = OrderedDict()
         for feat_name, feat in self.feat_map.items():
-            if not feat.is_bathced:
+            if not feat.is_batched:
                 feat_val = feat.get_feat_value(example, hyp, **kwargs)
             else:
                 feat_val = float('inf')
 
-            feat_values[feat_name].append(feat_val)
+            feat_values[feat_name] = feat_val
 
         return feat_values
 
@@ -70,7 +74,7 @@ class Reranker(object):
             for feat_name, feat in self.batched_features.items():
                 batch_example_scores = feat.score(batch_examples).data.cpu().tolist()
                 for i, e in enumerate(batch_examples):
-                    setattr(e, batch_example_scores[i])
+                    setattr(e, feat_name, batch_example_scores[i])
 
         e_ptr = 0
         for example, hyps in zip(examples, decode_results):
@@ -79,21 +83,25 @@ class Reranker(object):
                     hyp.rerank_feature_values[feat_name] = getattr(hyp_examples[e_ptr], feat_name)
                 e_ptr += 1
 
-    def get_rerank_score(self, hyp):
-        feat_vals = np.asarray(hyp.values())
-        score = hyp.score + np.dot(self.parameter, feat_vals)
+    @staticmethod
+    def get_rerank_score(hyp, param):
+        feat_vals = np.array(list(hyp.rerank_feature_values.values()))
+        score = hyp.score + np.dot(param, feat_vals)
 
         return score
 
-    def compute_rerank_performance(self, examples, decode_results):
-        if not hasattr(decode_results[0][0], 'rerank_features'):
+    def compute_rerank_performance(self, examples, decode_results, param=None):
+        if not hasattr(decode_results[0][0], 'rerank_feature_values'):
             print('initializing rerank features for hypotheses...', file=sys.stderr)
             self.initialize_rerank_features(examples, decode_results)
+
+        if param is None:
+            param = self.parameter
 
         correct_array = []
         for example, hyps in zip(examples, decode_results):
             if hyps:
-                best_hyp_idx = np.argmax([self.get_rerank_score(hyp) for hyp in hyps])
+                best_hyp_idx = np.argmax([self.get_rerank_score(hyp, param=param) for hyp in hyps])
                 is_correct = hyps[best_hyp_idx].correct
                 correct_array.append(is_correct)
             else:
@@ -110,7 +118,7 @@ class Reranker(object):
         param_space = (np.array(p) for p in itertools.combinations(np.arange(0, 1.01, 0.01), 2))
 
         for param in param_space:
-            score = self.compute_rerank_performance(examples, decode_results)
+            score = self.compute_rerank_performance(examples, decode_results, param=param)
             if score > best_score:
                 print('New param=%s, score=%.4f' % (param, score), file=sys.stderr)
                 best_param = param
