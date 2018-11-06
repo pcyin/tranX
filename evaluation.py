@@ -1,6 +1,7 @@
 # coding=utf-8
 from __future__ import print_function
 
+import math
 import sys
 import traceback
 import os
@@ -49,8 +50,6 @@ def decode(examples, model, args, verbose=False, **kwargs):
                     print('-' * 60, file=sys.stdout)
 
         count += 1
-        if verbose and count % 50 == 0:
-            print('decoded %d examples...' % count, file=sys.stdout)
 
         decode_results.append(decoded_hyps)
 

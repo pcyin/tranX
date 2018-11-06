@@ -20,6 +20,27 @@ class RerankingFeature(object):
     def is_batched(self):
         raise NotImplementedError
 
+    def get_feat_value(self, example, hyp, **kwargs):
+        raise NotImplementedError
+
+
+class IsSecondHypAndNegativeScoreMargin(RerankingFeature):
+    def __init__(self):
+        pass
+
+    @property
+    def feature_name(self):
+        return 'is_2nd_hyp_and_margin_with_top_hyp'
+
+    @property
+    def is_batched(self):
+        return False
+
+    def get_feat_value(self, example, hyp, **kwargs):
+        if kwargs['hyp_id'] == 1 and (kwargs['all_hyps'][0].score - hyp.score) <= 1.:
+            return 1.
+        return 0.
+
 
 class Reranker(object):
     def __init__(self, features):
@@ -59,7 +80,7 @@ class Reranker(object):
     def initialize_rerank_features(self, examples, decode_results):
         hyp_examples = []
         for example, hyps in zip(examples, decode_results):
-            for hyp in hyps:
+            for hyp_id, hyp in enumerate(hyps):
                 hyp_example = Example(idx=None,
                                       src_sent=example.src_sent,
                                       tgt_code=hyp.code,
@@ -67,7 +88,7 @@ class Reranker(object):
                                       tgt_ast=None)
                 hyp_examples.append(hyp_example)
 
-                feat_vals = self.get_initial_reranking_feature_values(example, hyp)
+                feat_vals = self.get_initial_reranking_feature_values(example, hyp, hyp_id=hyp_id, all_hyps=hyps)
                 hyp.rerank_feature_values = feat_vals
 
         for batch_examples in utils.batch_iter(hyp_examples, batch_size=128):
@@ -115,7 +136,7 @@ class Reranker(object):
         best_score = initial_performance
         best_param = np.zeros(self.feature_num)
 
-        param_space = (np.array(p) for p in itertools.combinations(np.arange(0, 1.01, 0.01), 2))
+        param_space = (np.array(p) for p in itertools.combinations(np.arange(0, 1.01, 0.01), self.feature_num))
 
         for param in param_space:
             score = self.compute_rerank_performance(examples, decode_results, param=param)

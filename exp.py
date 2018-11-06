@@ -650,10 +650,15 @@ def train_reranker_and_test(args):
     # print('load reconstruction model from [%s]' % args.load_reconstruction_model, file=sys.stderr)
     # reconstruction_model = Reconstructor.load(args.load_reconstruction_model, cuda=args.cuda)
     # reconstruction_model = ParaphraseIdentificationModel.load(args.load_reconstruction_model)
-    reranker = Reranker(features=[Reconstructor.load(
-        'saved_models/atis/model.atis.sup.decoder.lstm.hidden256.embed128.dropout0.3.lr_decay0.5.vocab.freq2.bin.train.ordered.bin.bin'),
-        ParaphraseIdentificationModel.load(
-                                      'saved_models/atis/model.atis.sup.paraphrase.lstm.hidden256.embed128.dropout0.3.lr_decay0.5.vocab.freq2.bin.train.ordered.bin.bin')])
+    from components.reranker import IsSecondHypAndNegativeScoreMargin
+    features = []
+    if args.load_reconstruction_model is not None:
+        features.append(Reconstructor.load(args.load_reconstruction_model))
+    if args.load_paraphrase_model is not None:
+        features.append(ParaphraseIdentificationModel.load(args.load_paraphrase_model))
+    features.append(IsSecondHypAndNegativeScoreMargin())
+
+    reranker = Reranker(features)
 
     transition_system = reranker.reconstruction_score.transition_system
 
@@ -686,6 +691,7 @@ def train_reranker_and_test(args):
 
     print('Dev Acc@1=%.4f, Test Oracle Acc=%.4f' % (dev_acc, dev_oracle), file=sys.stderr)
 
+    # reranker.parameter = np.array([0.,   0.31, 0.85])
     reranker.train(dev_set.examples, dev_decode_results)
 
     test_score_with_rerank = reranker.compute_rerank_performance(test_set.examples, test_decode_results)
