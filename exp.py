@@ -21,7 +21,7 @@ import evaluation
 from asdl.asdl import ASDLGrammar
 from asdl.transition_system import TransitionSystem
 from components.dataset import Dataset, Example
-from components.reranker import Reranker
+from components.reranker import *
 from components.standalone_parser import StandaloneParser
 from components.utils import update_args, init_arg_parser
 from model import nn_utils, utils
@@ -267,7 +267,7 @@ def train_rerank_feature(args):
         model.eval()
         labels = []
         for batch in dev_set.batch_iter(args.batch_size):
-            probs = model.score(batch)[:, 0].exp().data.cpu().numpy()
+            probs = model.score(batch).exp().data.cpu().numpy()
             for p in probs:
                 labels.append(p >= 0.5)
 
@@ -276,9 +276,9 @@ def train_rerank_feature(args):
             batch_negative_examples = [get_negative_example(e, _hyps, type='best')
                                        for e, _hyps in zip(batch, batch_decoding_results)]
             batch_negative_examples = list(filter(None, batch_negative_examples))
-            probs = model.score(batch_negative_examples)[:, 1].exp().data.cpu().numpy()
+            probs = model.score(batch_negative_examples).exp().data.cpu().numpy()
             for p in probs:
-                labels.append(p >= 0.5)
+                labels.append(p < 0.5)
 
         acc = np.average(labels)
         model.train()
@@ -328,7 +328,7 @@ def train_rerank_feature(args):
                 # sample negative examples
                 for example, hyps in zip(batch_examples, batch_decoding_results):
                     if hyps:
-                        negative_sample = get_negative_example(example, hyps, type='best')
+                        negative_sample = get_negative_example(example, hyps, type='sample')
                         negative_samples.append(negative_sample)
                         labels.append(1)
 
@@ -650,15 +650,16 @@ def train_reranker_and_test(args):
     # print('load reconstruction model from [%s]' % args.load_reconstruction_model, file=sys.stderr)
     # reconstruction_model = Reconstructor.load(args.load_reconstruction_model, cuda=args.cuda)
     # reconstruction_model = ParaphraseIdentificationModel.load(args.load_reconstruction_model)
-    from components.reranker import IsSecondHypAndNegativeScoreMargin
+    from components.reranker import IsSecondHypAndScoreMargin
     features = []
     if args.load_reconstruction_model is not None:
         features.append(Reconstructor.load(args.load_reconstruction_model))
     if args.load_paraphrase_model is not None:
         features.append(ParaphraseIdentificationModel.load(args.load_paraphrase_model))
-    features.append(IsSecondHypAndNegativeScoreMargin())
+    features.append(IsSecondHypAndScoreMargin())
+    # features.append(IsSecondHypAndParaphraseScoreMargin())
 
-    reranker = Reranker(features)
+    reranker = XGBoostReranker(features)
 
     transition_system = reranker.reconstruction_score.transition_system
 
@@ -691,10 +692,9 @@ def train_reranker_and_test(args):
 
     print('Dev Acc@1=%.4f, Test Oracle Acc=%.4f' % (dev_acc, dev_oracle), file=sys.stderr)
 
-    # reranker.parameter = np.array([0.,   0.31, 0.85])
     reranker.train(dev_set.examples, dev_decode_results)
 
-    test_score_with_rerank = reranker.compute_rerank_performance(test_set.examples, test_decode_results)
+    test_score_with_rerank = reranker.compute_rerank_performance(test_set.examples, test_decode_results, verbose=True)
 
     print('Test Acc@1=%.4f, Test Re-rank Acc=%.4f, Test Oracle Acc=%.4f' % (test_acc,
                                                                             test_score_with_rerank,
