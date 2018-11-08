@@ -328,7 +328,7 @@ def train_rerank_feature(args):
                 # sample negative examples
                 for example, hyps in zip(batch_examples, batch_decoding_results):
                     if hyps:
-                        negative_sample = get_negative_example(example, hyps, type='sample')
+                        negative_sample = get_negative_example(example, hyps, type='best')
                         negative_samples.append(negative_sample)
                         labels.append(1)
 
@@ -656,10 +656,10 @@ def train_reranker_and_test(args):
         features.append(Reconstructor.load(args.load_reconstruction_model))
     if args.load_paraphrase_model is not None:
         features.append(ParaphraseIdentificationModel.load(args.load_paraphrase_model))
-    features.append(IsSecondHypAndScoreMargin())
+    # features.append(IsSecondHypAndScoreMargin())
     # features.append(IsSecondHypAndParaphraseScoreMargin())
 
-    reranker = XGBoostReranker(features)
+    reranker = MERTReranker(features)
 
     transition_system = reranker.reconstruction_score.transition_system
 

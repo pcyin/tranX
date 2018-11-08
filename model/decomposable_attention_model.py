@@ -14,7 +14,7 @@ from model import nn_utils
 class DecomposableAttentionModel(nn.Module):
     """Decomposable attention model for paraphrase identification"""
     
-    def __init__(self, src_vocab, tgt_vocab, embed_size, cuda=False):
+    def __init__(self, src_vocab, tgt_vocab, embed_size, dropout=0., cuda=False):
         super(DecomposableAttentionModel, self).__init__()
 
         self.src_embed = nn.Embedding(len(src_vocab), embed_size, padding_idx=src_vocab['<pad>'])
@@ -23,8 +23,9 @@ class DecomposableAttentionModel(nn.Module):
         self.att_linear = nn.Linear(embed_size, embed_size, bias=False)
 
         self.fuse_linear = nn.Linear(2 * embed_size, embed_size)
-        self.fuse_func = lambda x: F.relu(self.fuse_linear(x))
-        self.final_classifier = nn_utils.MLP(2 * embed_size, 2, 32, hidden_activation=F.relu, activation=F.log_softmax)
+        self.fuse_func = lambda x: F.tanh(self.fuse_linear(x))
+        self.final_classifier = nn_utils.MLP(2 * embed_size, 2, 16, hidden_activation=F.relu, activation=F.log_softmax)
+        self.dropout = nn.Dropout(dropout)
 
     def forward(self, src_sents_var, tgt_sents_var, src_sents_mask, tgt_sents_mask):
         # get input representation
@@ -99,8 +100,8 @@ class DecomposableAttentionModel(nn.Module):
         v_src = self.fuse_func(torch.cat([src_sents_embed, src_aligned_phrases], dim=-1))
         v_tgt = self.fuse_func(torch.cat([tgt_sents_embed, tgt_aligned_phrases], dim=-1))
 
-        v_src = v_src.sum(dim=1)
-        v_tgt = v_tgt.sum(dim=1)
+        v_src = self.dropout(v_src.sum(dim=1))
+        v_tgt = self.dropout(v_tgt.sum(dim=1))
 
         # (batch_size)
         prob = self.final_classifier(torch.cat([v_src, v_tgt], dim=-1))

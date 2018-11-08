@@ -19,6 +19,7 @@ class ParaphraseIdentificationModel(nn.Module, RerankingFeature):
         super(ParaphraseIdentificationModel, self).__init__()
         self.pi_model = DecomposableAttentionModel(src_vocab=vocab.code, tgt_vocab=vocab.source,
                                                    embed_size=args.embed_size,
+                                                   dropout=args.dropout,
                                                    cuda=args.cuda)
 
         self.vocab = vocab

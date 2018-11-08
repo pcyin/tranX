@@ -215,9 +215,9 @@ class XGBoostReranker(Reranker):
     def __init__(self, features):
         super(XGBoostReranker, self).__init__(features)
 
-        params = {'objective': 'rank:ndcg', 'learning_rate': 1.,
+        params = {'objective': 'rank:ndcg', 'learning_rate': .3,
                   'gamma': 1.0, 'min_child_weight': 0.1,
-                  'max_depth': 6, 'n_estimators': 4}
+                  'max_depth': 4, 'n_estimators': 5}
 
         self.ranker = xgb.sklearn.XGBRanker(**params)
 
