@@ -41,8 +41,8 @@ class ParaphraseIdentificationModel(nn.Module, RerankingFeature):
         src_code_var = nn_utils.to_input_variable(src_codes, self.vocab.code, cuda=args.cuda).t()
         tgt_nl_var = nn_utils.to_input_variable(tgt_nls, self.vocab.source, cuda=args.cuda).t()
 
-        src_code_mask = nn_utils.length_array_to_mask_tensor([len(x) for x in src_codes], cuda=args.cuda, valid_entry_has_mask_one=True).float()
-        tgt_nl_mask = nn_utils.length_array_to_mask_tensor([len(x) for x in tgt_nls], cuda=args.cuda, valid_entry_has_mask_one=True).float()
+        src_code_mask = Variable(nn_utils.length_array_to_mask_tensor([len(x) for x in src_codes], cuda=args.cuda, valid_entry_has_mask_one=True).float(), requires_grad=False)
+        tgt_nl_mask = Variable(nn_utils.length_array_to_mask_tensor([len(x) for x in tgt_nls], cuda=args.cuda, valid_entry_has_mask_one=True).float(), requires_grad=False)
 
         scores = self.pi_model(src_code_var, tgt_nl_var, src_code_mask, tgt_nl_mask)
 

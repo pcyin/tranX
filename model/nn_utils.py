@@ -190,17 +190,33 @@ class LabelSmoothing(nn.Module):
         return self.criterion(model_prob, true_dist).sum(dim=-1)
 
 
-class MLP(nn.Module):
-    def __init__(self, input_size, output_size, hidden_size, activation=F.softmax, hidden_activation=F.tanh):
-        super(MLP, self).__init__()
+class FeedForward(nn.Module):
+    """Feed forward neural network adapted from AllenNLP"""
 
-        self.hidden = nn.Linear(input_size, hidden_size)
-        self.output = nn.Linear(hidden_size, output_size)
-        self.activation = activation
-        self.hidden_activation = hidden_activation
+    def __init__(self, input_dim, num_layers, hidden_dims, activations, dropout):
+        super(FeedForward, self).__init__()
+
+        if not isinstance(hidden_dims, list):
+            hidden_dims = [hidden_dims] * num_layers  # type: ignore
+        if not isinstance(activations, list):
+            activations = [activations] * num_layers  # type: ignore
+        if not isinstance(dropout, list):
+            dropout = [dropout] * num_layers  # type: ignore
+
+        self.activations = activations
+        input_dims = [input_dim] + hidden_dims[:-1]
+        linear_layers = []
+        for layer_input_dim, layer_output_dim in zip(input_dims, hidden_dims):
+            linear_layers.append(nn.Linear(layer_input_dim, layer_output_dim))
+
+        self.linear_layers = nn.ModuleList(linear_layers)
+        dropout_layers = [nn.Dropout(p=value) for value in dropout]
+        self.dropout = nn.ModuleList(dropout_layers)
+        self.output_dim = hidden_dims[-1]
+        self.input_dim = input_dim
 
     def forward(self, x):
-        hidden = self.hidden_activation(self.hidden(x))
-        output = self.activation(self.output(hidden))
-
+        output = x
+        for layer, activation, dropout in zip(self.linear_layers, self.activations, self.dropout):
+            output = dropout(activation(layer(output)))
         return output
