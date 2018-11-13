@@ -255,13 +255,13 @@ def train_rerank_feature(args):
     if train_paraphrase_model:
         print('load training decode results [%s]' % args.train_decode_file, file=sys.stderr)
         train_decode_results = pickle.load(open(args.train_decode_file, 'rb'))
-        train_decode_results = {e.idx: hyps for e, hyps in zip(train_set, train_decode_results)}
         _filter_hyps(train_decode_results)
+        train_decode_results = {e.idx: hyps for e, hyps in zip(train_set, train_decode_results)}
 
         print('load dev decode results [%s]' % args.dev_decode_file, file=sys.stderr)
         dev_decode_results = pickle.load(open(args.dev_decode_file, 'rb'))
-        dev_decode_results = {e.idx: hyps for e, hyps in zip(dev_set, dev_decode_results)}
         _filter_hyps(dev_decode_results)
+        dev_decode_results = {e.idx: hyps for e, hyps in zip(dev_set, dev_decode_results)}
 
     def evaluate_ppl():
         model.eval()
