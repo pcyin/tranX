@@ -230,6 +230,17 @@ def train_rerank_feature(args):
         elif args.mode == 'train_paraphrase_identifier':
             return ParaphraseIdentificationModel
 
+    def _filter_hyps(_decode_results):
+        for i in range(len(_decode_results)):
+            valid_hyps = []
+            for hyp in _decode_results[i]:
+                try:
+                    transition_system.tokenize_code(hyp.code)
+                    valid_hyps.append(hyp)
+                except: pass
+
+            _decode_results[i] = valid_hyps
+
     model = _get_feat_class()(args, vocab, transition_system)
 
     if args.glorot_init:
@@ -245,10 +256,12 @@ def train_rerank_feature(args):
         print('load training decode results [%s]' % args.train_decode_file, file=sys.stderr)
         train_decode_results = pickle.load(open(args.train_decode_file, 'rb'))
         train_decode_results = {e.idx: hyps for e, hyps in zip(train_set, train_decode_results)}
+        _filter_hyps(train_decode_results)
 
-        print('load training decode results [%s]' % args.dev_decode_file, file=sys.stderr)
+        print('load dev decode results [%s]' % args.dev_decode_file, file=sys.stderr)
         dev_decode_results = pickle.load(open(args.dev_decode_file, 'rb'))
         dev_decode_results = {e.idx: hyps for e, hyps in zip(dev_set, dev_decode_results)}
+        _filter_hyps(dev_decode_results)
 
     def evaluate_ppl():
         model.eval()
