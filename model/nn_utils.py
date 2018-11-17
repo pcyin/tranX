@@ -85,8 +85,7 @@ def to_input_variable(sequences, vocab, cuda=False, training=True, append_bounda
 
     word_ids = word2id(sequences, vocab)
     sents_t, masks = input_transpose(word_ids, vocab['<pad>'])
-
-    sents_var = Variable(torch.LongTensor(sents_t), volatile=(not training), requires_grad=False)
+    sents_var = Variable(torch.LongTensor(sents_t), requires_grad=False)
     if cuda:
         sents_var = sents_var.cuda()
 
@@ -149,7 +148,7 @@ def uniform_init(lower, upper, params):
 def glorot_init(params):
     for p in params:
         if len(p.data.size()) > 1:
-            init.xavier_normal(p.data)
+            init.xavier_normal_(p.data)
 
 
 def identity(x):
