@@ -30,9 +30,10 @@ def decode(examples, model, args, verbose=False, **kwargs):
             hyps = model.parse(example.src_sent, context=None, beam_size=args.beam_size)
         decoded_hyps = []
         for hyp_id, hyp in enumerate(hyps):
+            got_code = False
             try:
                 hyp.code = model.transition_system.ast_to_surface_code(hyp.tree)
-
+                got_code = True
                 if args.lang == 'wikisql' and args.answer_prune:
                     # try execute the code, if fails, skip this example!
                     # if the execution returns null, also skip this example!
@@ -54,6 +55,9 @@ def decode(examples, model, args, verbose=False, **kwargs):
                                                                                              example.tgt_code,
                                                                                              hyp_id,
                                                                                              hyp.tree.to_string()), file=sys.stdout)
+                    if got_code:
+                        print()
+                        print(hyp.code)
                     traceback.print_exc(file=sys.stdout)
                     print('-' * 60, file=sys.stdout)
 

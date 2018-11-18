@@ -151,7 +151,12 @@ def train(args):
                 eval_results = evaluation.evaluate(dev_set.examples, model, args,
                                                    verbose=True, eval_top_pred_only=args.eval_top_pred_only)
                 dev_score = eval_results['bleu'] if args.lang == 'conala' else eval_results['accuracy']
-                print('[Epoch %d] code generation score=%.5f took %ds' % (epoch, dev_score, time.time() - eval_start), file=sys.stderr)
+                if args.lang == 'conala':
+                    print('[Epoch %d] evaluate details: %s took %ds' % (
+                                        epoch, eval_results, time.time() - eval_start), file=sys.stderr)
+                else:
+                    print('[Epoch %d] code generation accuracy=%.5f took %ds' % (
+                                        epoch, dev_score, time.time() - eval_start), file=sys.stderr)
                 is_better = history_dev_scores == [] or dev_score > max(history_dev_scores)
                 history_dev_scores.append(dev_score)
         else:
