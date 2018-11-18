@@ -118,7 +118,7 @@ def evaluate(examples, parser, args, verbose=False, return_decode_result=False, 
 
                 if args.lang in ['lambda_dcs', 'python', 'prolog']:
                     if hyp.code in hyp_code_set:
-                        print('Duplicate Hyp Example [%d], Code %s' % (example.idx, hyp.code), file=sys.stdout)
+                        print('Duplicate Hyp Example [%s], Code %s' % (example.idx, hyp.code), file=sys.stdout)
                     hyp_code_set.add(hyp.code)
 
                 if eval_top_pred_only: break
