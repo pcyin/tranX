@@ -65,7 +65,7 @@ def batch_iter(examples, batch_size, shuffle=False):
 
 
 def get_parser_class(lang):
-    if lang in ['python', 'lambda_dcs', 'prolog']:
+    if lang in ['python', 'lambda_dcs', 'prolog', 'conala']:
         from model.parser import Parser
         return Parser
     elif lang == 'wikisql':

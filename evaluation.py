@@ -18,6 +18,8 @@ def decode(examples, model, args, verbose=False, **kwargs):
     if args.lang == 'wikisql':
         from asdl.lang.sql.lib.dbengine import DBEngine
         from asdl.lang.sql.utils import detokenize_query
+    elif args.lang == 'conala':
+        from datasets.conala.util import decanonicalize_code
 
     decode_results = []
     count = 0
@@ -39,13 +41,19 @@ def decode(examples, model, args, verbose=False, **kwargs):
                                                                           detokenized_hyp_query,
                                                                           lower=True)
                     if len(hyp_answer) == 0: continue
+                if args.lang == 'conala':
+                    hyp.decanonical_code = decanonicalize_code(hyp.code, slot_map=example.meta['slot_map'])
 
                 decoded_hyps.append(hyp)
             except:
                 if verbose:
                     print("Exception in converting tree to code:", file=sys.stdout)
                     print('-' * 60, file=sys.stdout)
-                    print('example id: %d, hypothesis id: %d' % (example.idx, hyp_id), file=sys.stdout)
+                    print('Example: %s\nIntent: %s\nTarget Code:\n%s\nHypothesis[%d]:\n%s' % (example.idx,
+                                                                                             ' '.join(example.src_sent),
+                                                                                             example.tgt_code,
+                                                                                             hyp_id,
+                                                                                             hyp.tree.to_string()), file=sys.stdout)
                     traceback.print_exc(file=sys.stdout)
                     print('-' * 60, file=sys.stdout)
 
@@ -102,7 +110,7 @@ def evaluate(examples, parser, args, verbose=False, return_decode_result=False, 
                     print('Error in evaluating Example %s, hyp %d {{ %s }}' % (example.idx, hyp_id, hyp.code), file=sys.stdout)
                     hyp.correct = False
 
-                    print('example id: %d, hypothesis id: %d' % (example.idx, hyp_id), file=sys.stdout)
+                    print('example id: %s, hypothesis id: %d' % (example.idx, hyp_id), file=sys.stdout)
                     traceback.print_exc(file=sys.stdout)
                     print('-' * 60, file=sys.stdout)
 
@@ -124,6 +132,12 @@ def evaluate(examples, parser, args, verbose=False, return_decode_result=False, 
 
     eval_result = {'accuracy': cum_acc / len(examples),
                    'oracle_accuracy': cum_oracle_acc / len(examples)}
+
+    if args.lang == 'conala':
+        # evaluate BLEU for conala
+        from datasets.conala import evaluator
+        custom_eval_result = evaluator.evaluate(examples, decode_results)
+        eval_result.update(custom_eval_result)
 
     if return_decode_result:
         return eval_result, decode_results

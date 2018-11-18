@@ -27,7 +27,7 @@ def init_arg_parser():
     #### General configuration ####
     arg_parser.add_argument('--seed', default=0, type=int, help='Random seed')
     arg_parser.add_argument('--cuda', action='store_true', default=False, help='Use gpu')
-    arg_parser.add_argument('--lang', choices=['python', 'lambda_dcs', 'wikisql', 'prolog'], default='python')
+    arg_parser.add_argument('--lang', choices=['python', 'lambda_dcs', 'wikisql', 'prolog', 'conala'], default='python')
     arg_parser.add_argument('--asdl_file', type=str, help='Path to ASDL grammar specification')
     arg_parser.add_argument('--mode', choices=['train', 'self_train', 'train_reconstructor', 'train_paraphrase_identifier',
                                                'test', 'rerank', 'interactive'], default='train', help='Run mode')

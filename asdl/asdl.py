@@ -1,4 +1,5 @@
 # coding=utf-8
+from collections import OrderedDict, Counter
 from itertools import chain
 
 from .utils import remove_comment
@@ -10,7 +11,7 @@ class ASDLGrammar(object):
     """
     def __init__(self, productions):
         # productions are indexed by their head types
-        self._productions = dict()
+        self._productions = OrderedDict()
         self._constructor_production_map = dict()
         for prod in productions:
             if prod.type not in self._productions:
@@ -66,7 +67,7 @@ class ASDLGrammar(object):
             for prod in self.productions:
                 all_fields.update(prod.constructor.fields)
 
-            self._fields = sorted(all_fields, key=lambda x: x.name)
+            self._fields = sorted(all_fields, key=lambda x: (x.name, x.type.name, x.cardinality))
 
         return self._fields
 

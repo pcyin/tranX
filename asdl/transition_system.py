@@ -144,5 +144,8 @@ class TransitionSystem(object):
         elif lang == 'wikisql':
             from .lang.sql.sql_transition_system import SqlTransitionSystem
             return SqlTransitionSystem
+        elif lang == 'conala':
+            from .lang.py3.py3_transition_system import Python3TransitionSystem
+            return Python3TransitionSystem
 
         raise ValueError

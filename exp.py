@@ -98,7 +98,6 @@ def train(args):
 
         for batch_examples in train_set.batch_iter(batch_size=args.batch_size, shuffle=True):
             batch_examples = [e for e in batch_examples if len(e.tgt_actions) <= args.decode_max_time_step]
-
             train_iter += 1
             optimizer.zero_grad()
 
@@ -151,10 +150,10 @@ def train(args):
                 eval_start = time.time()
                 eval_results = evaluation.evaluate(dev_set.examples, model, args,
                                                    verbose=True, eval_top_pred_only=args.eval_top_pred_only)
-                dev_acc = eval_results['accuracy']
-                print('[Epoch %d] code generation accuracy=%.5f took %ds' % (epoch, dev_acc, time.time() - eval_start), file=sys.stderr)
-                is_better = history_dev_scores == [] or dev_acc > max(history_dev_scores)
-                history_dev_scores.append(dev_acc)
+                dev_score = eval_results['bleu'] if args.lang == 'conala' else eval_results['accuracy']
+                print('[Epoch %d] code generation score=%.5f took %ds' % (epoch, dev_score, time.time() - eval_start), file=sys.stderr)
+                is_better = history_dev_scores == [] or dev_score > max(history_dev_scores)
+                history_dev_scores.append(dev_score)
         else:
             is_better = True
 

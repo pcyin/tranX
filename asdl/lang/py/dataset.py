@@ -27,6 +27,7 @@ p_decorator = re.compile(r'^@.*')
 
 QUOTED_STRING_RE = re.compile(r"(?P<quote>['\"])(?P<string>.*?)(?<!\\)(?P=quote)")
 
+
 def get_action_infos(src_query, tgt_actions, force_copy=False):
     action_infos = []
     hyp = Hypothesis()
