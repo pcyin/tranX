@@ -676,7 +676,9 @@ def train_reranker_and_test(args):
     # features.append(IsSecondHypAndScoreMargin())
     # features.append(IsSecondHypAndParaphraseScoreMargin())
 
+    metric = args.metric
     reranker = MERTReranker(features)
+    reranker.parameter = np.array([0.74, 0.96])
 
     transition_system = reranker.reconstruction_score.transition_system
 
@@ -689,7 +691,8 @@ def train_reranker_and_test(args):
             for hyp in _decode_results[i]:
                 try: 
                     transition_system.tokenize_code(hyp.code)
-                    valid_hyps.append(hyp)
+                    if hyp.code:
+                        valid_hyps.append(hyp)
                 except: pass
 
             _decode_results[i] = valid_hyps
@@ -698,22 +701,23 @@ def train_reranker_and_test(args):
     dev_decode_results = pickle.load(open(args.dev_decode_file, 'rb'))
     _filter_hyps(dev_decode_results)
     beam_size = max(len(hyps) for hyps in dev_decode_results)
-    dev_acc = sum(hyps and hyps[0].correct for hyps in dev_decode_results) / float(len(dev_set))
+    dev_acc = sum(hyps[0].correct for hyps in dev_decode_results if hyps) / float(len(dev_set))
     dev_oracle = sum(any(hyp.correct for hyp in hyps) for hyps in dev_decode_results) / float(len(dev_set))
 
     print('load test decode results [%s]' % args.test_decode_file, file=sys.stderr)
     test_decode_results = pickle.load(open(args.test_decode_file, 'rb'))
     _filter_hyps(test_decode_results)
-    test_acc = sum(hyps and hyps[0].correct for hyps in test_decode_results) / float(len(test_set))
+    test_acc = sum(hyps[0].correct for hyps in test_decode_results if hyps) / float(len(test_set))
     test_oracle = sum(any(hyp.correct for hyp in hyps) for hyps in test_decode_results) / float(len(test_set))
 
     print('Dev Acc@1=%.4f, Test Oracle Acc=%.4f' % (dev_acc, dev_oracle), file=sys.stderr)
 
-    reranker.train(dev_set.examples, dev_decode_results)
+    # reranker.parameter = np.array([0.74, 0.96])
+    reranker.train(dev_set.examples, dev_decode_results, metric=metric)
 
-    test_score_with_rerank = reranker.compute_rerank_performance(test_set.examples, test_decode_results, verbose=True)
+    test_score_with_rerank = reranker.compute_rerank_performance(test_set.examples, test_decode_results, verbose=True, metric=metric, full_metric=True)
 
-    print('Test Acc@1=%.4f, Test Re-rank Acc=%.4f, Test Oracle Acc=%.4f' % (test_acc,
+    print('Test Acc@1=%.4f, Test Re-rank Acc=%s, Test Oracle Acc=%.4f' % (test_acc,
                                                                             test_score_with_rerank,
                                                                             test_oracle), file=sys.stderr)
 

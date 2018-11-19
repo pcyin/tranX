@@ -7,6 +7,8 @@ from collections import OrderedDict
 
 import numpy as np
 
+from datasets.conala.conala_eval import tokenize_for_bleu_eval
+from datasets.conala import evaluator as conala_evaluator
 from model import utils
 from components.dataset import Example
 
@@ -101,7 +103,7 @@ class Reranker(object):
         """rerank the hypotheses using the current model parameter"""
         raise NotImplementedError
 
-    def initialize_rerank_features(self, examples, decode_results):
+    def initialize_rerank_features(self, examples, decode_results, metric='accuracy'):
         hyp_examples = []
         for example, hyps in zip(examples, decode_results):
             for hyp_id, hyp in enumerate(hyps):
@@ -135,24 +137,48 @@ class Reranker(object):
                         feat_val = feat.get_feat_value(example, hyp, hyp_id=hyp_id, all_hyps=hyps)
                         hyp.rerank_feature_values[feat_name] = feat_val
 
+        # also pre-tokenize references and hypotheses for BLEU evaluation
+        if metric == 'bleu':
+            for example in examples:
+                ref_code_tokens = tokenize_for_bleu_eval(example.meta['example_dict']['snippet'])
+                example.meta['example_dict']['ref_code_tokens'] = ref_code_tokens
+            for hyp_list in decode_results:
+                for hyp in hyp_list:
+                    hyp.decanonical_code_tokens = tokenize_for_bleu_eval(hyp.decanonical_code)
+
     def get_rerank_score(self, hyp, param):
         raise NotImplementedError
 
-    def compute_rerank_performance(self, examples, decode_results, param=None, verbose=False):
+    def compute_rerank_performance(self, examples, decode_results, param=None, verbose=False, metric='accuracy', full_metric=False):
         if not hasattr(decode_results[0][0], 'rerank_feature_values'):
             print('initializing rerank features for hypotheses...', file=sys.stderr)
-            self.initialize_rerank_features(examples, decode_results)
+            self.initialize_rerank_features(examples, decode_results, metric=metric)
 
         if param is None:
             param = self.parameter
 
         correct_array = []
+        hypotheses = []
+        sorted_decode_results = []
         for example, hyps in zip(examples, decode_results):
             if hyps:
                 best_hyp_idx = np.argmax([self.get_rerank_score(hyp, param=param) for hyp in hyps])
-                is_correct = hyps[best_hyp_idx].correct
+                best_hyp = hyps[best_hyp_idx]
+                is_correct = best_hyp.correct
+
+                if metric == 'bleu':
+                    hypotheses.append(best_hyp.decanonical_code_tokens)
+
+                if full_metric:
+                    sorted_decode_results.append([best_hyp])
             else:
                 is_correct = False
+
+                if metric == 'bleu':
+                    hypotheses.append('')
+
+                if full_metric:
+                    sorted_decode_results.append([])
 
             correct_array.append(is_correct)
             if verbose:
@@ -170,9 +196,19 @@ class Reranker(object):
                         print('\t%s' % hyp.rerank_feature_values, file=sys.stderr)
 
         acc = np.average(correct_array)
+        if metric == 'bleu':
+            if full_metric:
+                eval_results = conala_evaluator.evaluate(examples, sorted_decode_results)
+                return eval_results
+            else:
+                references = [e.meta['example_dict']['ref_code_tokens'] for e in examples]
+                assert len(references) == len(hypotheses)
+                corpus_bleu = conala_evaluator.evaluate(references=references, hypotheses=hypotheses)
+                return corpus_bleu
+
         return acc
 
-    def train(self, examples, decode_results, initial_performance=0.):
+    def train(self, examples, decode_results, initial_performance=0., metric='accuracy'):
         raise NotImplementedError
 
     @property
@@ -194,7 +230,7 @@ class MERTReranker(Reranker):
 
         return score
 
-    def train(self, examples, decode_results, initial_performance=0.):
+    def train(self, examples, decode_results, initial_performance=0., metric='accuracy'):
         """optimize the ranker on a dataset using grid search"""
         best_score = initial_performance
         best_param = np.zeros(self.feature_num)
@@ -202,7 +238,7 @@ class MERTReranker(Reranker):
         param_space = (np.array(p) for p in itertools.combinations(np.arange(0, 1.01, 0.01), self.feature_num))
 
         for param in param_space:
-            score = self.compute_rerank_performance(examples, decode_results, param=param)
+            score = self.compute_rerank_performance(examples, decode_results, param=param, metric=metric)
             if score > best_score:
                 print('New param=%s, score=%.4f' % (param, score), file=sys.stderr)
                 best_param = param
