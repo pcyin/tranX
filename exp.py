@@ -687,6 +687,10 @@ def train_reranker_and_test(args):
     print('Test Eval Results After Reranking', file=sys.stderr)
     print(test_score_with_rerank, file=sys.stderr)
 
+    if args.save_to:
+        print('Save Reranker to %s' % args.save_to, file=sys.stderr)
+        reranker.save(args.save_to)
+
 
 if __name__ == '__main__':
     arg_parser = init_arg_parser()

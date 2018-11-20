@@ -192,7 +192,7 @@ class Reranker(Savable):
                 best_decode_results.append([])
 
             if verbose:
-                gold_standard_idx = [i for i, hyp in enumerate(hyps) if hyp.correct]
+                gold_standard_idx = [i for i, hyp in enumerate(hyps) if hyp.is_correct]
                 if gold_standard_idx and any(hyp.is_correct for hyp in hyps):
                     gold_standard_idx = gold_standard_idx[0]
                     print('Utterance: %s' % ' '.join(example.src_sent), file=sys.stderr)
