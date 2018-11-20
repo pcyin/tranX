@@ -9,12 +9,15 @@ from torch.autograd import Variable
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
+from common.registerable import Registrable
+from common.savable import Savable
 from components.reranker import RerankingFeature
 from model import nn_utils
 from model.decomposable_attention_model import DecomposableAttentionModel
 
 
-class ParaphraseIdentificationModel(nn.Module, RerankingFeature):
+@Registrable.register('paraphrase_identifier')
+class ParaphraseIdentificationModel(nn.Module, RerankingFeature, Savable):
     def __init__(self, args, vocab, transition_system):
         super(ParaphraseIdentificationModel, self).__init__()
         self.pi_model = DecomposableAttentionModel(src_vocab=vocab.code, tgt_vocab=vocab.source,
@@ -28,7 +31,7 @@ class ParaphraseIdentificationModel(nn.Module, RerankingFeature):
 
     @property
     def feature_name(self):
-        return 'paraphrase_score'
+        return 'paraphrase_identifier'
 
     @property
     def is_batched(self):

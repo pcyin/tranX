@@ -11,7 +11,7 @@ except:
 from torch.autograd import Variable
 
 from asdl.transition_system import ApplyRuleAction, ReduceAction
-from components.utils import cached_property
+from common.utils import cached_property
 
 from model import nn_utils
 

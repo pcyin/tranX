@@ -31,6 +31,7 @@ def init_arg_parser():
     arg_parser.add_argument('--asdl_file', type=str, help='Path to ASDL grammar specification')
     arg_parser.add_argument('--mode', choices=['train', 'self_train', 'train_reconstructor', 'train_paraphrase_identifier',
                                                'test', 'rerank', 'interactive'], default='train', help='Run mode')
+    arg_parser.add_argument('--evaluator', type=str, default='default_evaluator', required=False)
 
     #### Model configuration ####
     arg_parser.add_argument('--lstm', choices=['lstm'], default='lstm', help='Type of LSTM used, currently only standard LSTM cell is supported')

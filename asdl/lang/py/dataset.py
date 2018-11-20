@@ -325,7 +325,7 @@ class Django(object):
 
     @staticmethod
     def process_django_dataset():
-        vocab_freq_cutoff = 5  # TODO: found the best cutoff threshold
+        vocab_freq_cutoff = 30  # TODO: found the best cutoff threshold
         annot_file = 'data/django/all.anno'
         code_file = 'data/django/all.code'
 
@@ -333,9 +333,9 @@ class Django(object):
                                                                 'asdl/lang/py/py_asdl.txt',
                                                                 vocab_freq_cutoff=vocab_freq_cutoff)
 
-        pickle.dump(train, open('data/django/train.bin', 'w'))
-        pickle.dump(dev, open('data/django/dev.bin', 'w'))
-        pickle.dump(test, open('data/django/test.bin', 'w'))
+        # pickle.dump(train, open('data/django/train.bin', 'w'))
+        # pickle.dump(dev, open('data/django/dev.bin', 'w'))
+        # pickle.dump(test, open('data/django/test.bin', 'w'))
         pickle.dump(vocab, open('data/django/vocab.freq%d.bin' % vocab_freq_cutoff, 'w'))
 
     @staticmethod

@@ -19,7 +19,7 @@ from asdl.transition_system import ApplyRuleAction, ReduceAction, Action
 from components.decode_hypothesis import DecodeHypothesis
 from components.action_info import ActionInfo
 from components.dataset import Batch
-from components.utils import update_args, init_arg_parser
+from common.utils import update_args, init_arg_parser
 from model import nn_utils
 from model.attention_util import AttentionUtil
 from model.nn_utils import LabelSmoothing

@@ -14,6 +14,8 @@ from torch.autograd import Variable
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
+from common.registerable import Registrable
+from common.savable import Savable
 from components.reranker import RerankingFeature
 from model.pointer_net import PointerNet
 from model.seq2seq import Seq2SeqModel
@@ -21,7 +23,8 @@ from model import nn_utils
 from model.seq2seq_copy import Seq2SeqWithCopy
 
 
-class Reconstructor(nn.Module, RerankingFeature):
+@Registrable.register('reconstructor')
+class Reconstructor(nn.Module, RerankingFeature, Savable):
     def __init__(self, args, vocab, transition_system):
         super(Reconstructor, self).__init__()
         if args.no_copy:
@@ -42,7 +45,7 @@ class Reconstructor(nn.Module, RerankingFeature):
 
     @property
     def feature_name(self):
-        return 'reconstruction_score'
+        return 'reconstructor'
 
     @property
     def is_batched(self):

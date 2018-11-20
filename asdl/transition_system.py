@@ -86,9 +86,6 @@ class TransitionSystem(object):
     def tokenize_code(self, code, mode):
         raise NotImplementedError
 
-    def hyp_correct(self, hyp, example):
-        raise NotImplementedError
-
     def compare_ast(self, hyp_ast, ref_ast):
         raise NotImplementedError
 
@@ -135,6 +132,9 @@ class TransitionSystem(object):
         if lang == 'python':
             from .lang.py.py_transition_system import PythonTransitionSystem
             return PythonTransitionSystem
+        elif lang == 'python3':
+            from .lang.py3.py3_transition_system import Python3TransitionSystem
+            return Python3TransitionSystem
         elif lang == 'lambda_dcs':
             from .lang.lambda_dcs.lambda_dcs_transition_system import LambdaCalculusTransitionSystem
             return LambdaCalculusTransitionSystem
@@ -144,8 +144,5 @@ class TransitionSystem(object):
         elif lang == 'wikisql':
             from .lang.sql.sql_transition_system import SqlTransitionSystem
             return SqlTransitionSystem
-        elif lang == 'conala':
-            from .lang.py3.py3_transition_system import Python3TransitionSystem
-            return Python3TransitionSystem
 
-        raise ValueError
+        raise ValueError('unknown language %s' % lang)

@@ -23,7 +23,7 @@ from asdl.transition_system import TransitionSystem
 from components.dataset import Dataset, Example
 from components.reranker import *
 from components.standalone_parser import StandaloneParser
-from components.utils import update_args, init_arg_parser
+from common.utils import update_args, init_arg_parser
 from model import nn_utils, utils
 from model.neural_lm import LSTMLanguageModel
 from model.paraphrase import ParaphraseIdentificationModel
@@ -67,6 +67,7 @@ def train(args):
     parser_cls = get_parser_class(args.lang)
     model = parser_cls(args, vocab, transition_system)
     model.train()
+    evaluator = Registrable.by_name(args.evaluator)(transition_system)
     if args.cuda: model.cuda()
 
     optimizer_cls = eval('torch.optim.%s' % args.optimizer)  # FIXME: this is evil!
@@ -148,15 +149,16 @@ def train(args):
             if epoch % args.valid_every_epoch == 0:
                 print('[Epoch %d] begin validation' % epoch, file=sys.stderr)
                 eval_start = time.time()
-                eval_results = evaluation.evaluate(dev_set.examples, model, args,
+                eval_results = evaluation.evaluate(dev_set.examples, model, evaluator, args,
                                                    verbose=True, eval_top_pred_only=args.eval_top_pred_only)
-                dev_score = eval_results['bleu'] if args.lang == 'conala' else eval_results['accuracy']
-                if args.lang == 'conala':
-                    print('[Epoch %d] evaluate details: %s took %ds' % (
-                                        epoch, eval_results, time.time() - eval_start), file=sys.stderr)
-                else:
-                    print('[Epoch %d] code generation accuracy=%.5f took %ds' % (
-                                        epoch, dev_score, time.time() - eval_start), file=sys.stderr)
+                dev_score = eval_results[evaluator.default_metric]
+
+                print('[Epoch %d] evaluate details: %s, dev %s: %.5f (took %ds)' % (
+                                    epoch, eval_results,
+                                    evaluator.default_metric,
+                                    dev_score,
+                                    time.time() - eval_start), file=sys.stderr)
+
                 is_better = history_dev_scores == [] or dev_score > max(history_dev_scores)
                 history_dev_scores.append(dev_score)
         else:
@@ -303,7 +305,7 @@ def train_rerank_feature(args):
 
     def get_negative_example(_example, _hyps, type='sample'):
         if _hyps:
-            incorrect_hyps = [hyp for hyp in _hyps if not hyp.correct]
+            incorrect_hyps = [hyp for hyp in _hyps if not hyp.is_correct]
             incorrect_hyp_scores = [hyp.score for hyp in incorrect_hyps]
             if type == 'best':
                 sample_idx = np.argmax(incorrect_hyp_scores)
@@ -605,25 +607,17 @@ def test(args):
 
     print('load model from [%s]' % args.load_model, file=sys.stderr)
     params = torch.load(args.load_model, map_location=lambda storage, loc: storage)
-    vocab = params['vocab']
     transition_system = params['transition_system']
     saved_args = params['args']
-    saved_state = params['state_dict']
     saved_args.cuda = args.cuda
     # set the correct domain from saved arg
     args.lang = saved_args.lang
 
-    update_args(saved_args, arg_parser)
-
     parser_cls = get_parser_class(saved_args.lang)
-    parser = parser_cls(saved_args, vocab, transition_system)
-
-    parser.load_state_dict(saved_state)
-
-    if args.cuda: parser = parser.cuda()
+    parser = parser_cls.load(model_path=args.load_model, cuda=args.cuda)
     parser.eval()
-
-    eval_results, decode_results = evaluation.evaluate(test_set.examples, parser, args,
+    evaluator = Registrable.by_name(args.evaluator)(transition_system)
+    eval_results, decode_results = evaluation.evaluate(test_set.examples, parser, evaluator, args,
                                                        verbose=args.verbose, return_decode_result=True)
     print(eval_results, file=sys.stderr)
     if args.save_decode_to:
@@ -658,15 +652,6 @@ def train_reranker_and_test(args):
     test_set = Dataset.from_bin_file(args.test_file)
     dev_set = Dataset.from_bin_file(args.dev_file)
 
-    # print('load parser from [%s]' % args.load_model, file=sys.stderr)
-    # parser_saved_args = torch.load(args.load_model, map_location=lambda storage, loc: storage)['args']
-    # set the correct domain from saved arg
-    # args.lang = parser_saved_args.lang
-
-    # parser = get_parser_class(parser_saved_args.lang).load(args.load_model, cuda=args.cuda)
-    # print('load reconstruction model from [%s]' % args.load_reconstruction_model, file=sys.stderr)
-    # reconstruction_model = Reconstructor.load(args.load_reconstruction_model, cuda=args.cuda)
-    # reconstruction_model = ParaphraseIdentificationModel.load(args.load_reconstruction_model)
     from components.reranker import IsSecondHypAndScoreMargin
     features = []
     if args.load_reconstruction_model is not None:
@@ -676,50 +661,31 @@ def train_reranker_and_test(args):
     # features.append(IsSecondHypAndScoreMargin())
     # features.append(IsSecondHypAndParaphraseScoreMargin())
 
-    metric = args.metric
-    reranker = MERTReranker(features)
-    reranker.parameter = np.array([0.74, 0.96])
+    transition_system = features[0].transition_system
+    evaluator = Registrable.by_name(args.evaluator)(transition_system)
 
-    transition_system = reranker.reconstruction_score.transition_system
-
-    # transition_system = parser.transition_system
-    # parser.eval()
-
-    def _filter_hyps(_decode_results):
-        for i in range(len(_decode_results)):
-            valid_hyps = []
-            for hyp in _decode_results[i]:
-                try: 
-                    transition_system.tokenize_code(hyp.code)
-                    if hyp.code:
-                        valid_hyps.append(hyp)
-                except: pass
-
-            _decode_results[i] = valid_hyps
+    reranker = MERTReranker(features, transition_system=transition_system)
 
     print('load dev decode results [%s]' % args.dev_decode_file, file=sys.stderr)
     dev_decode_results = pickle.load(open(args.dev_decode_file, 'rb'))
-    _filter_hyps(dev_decode_results)
-    beam_size = max(len(hyps) for hyps in dev_decode_results)
-    dev_acc = sum(hyps[0].correct for hyps in dev_decode_results if hyps) / float(len(dev_set))
-    dev_oracle = sum(any(hyp.correct for hyp in hyps) for hyps in dev_decode_results) / float(len(dev_set))
+    dev_eval_results = evaluator.evaluate_dataset(dev_set, dev_decode_results)
 
     print('load test decode results [%s]' % args.test_decode_file, file=sys.stderr)
     test_decode_results = pickle.load(open(args.test_decode_file, 'rb'))
-    _filter_hyps(test_decode_results)
-    test_acc = sum(hyps[0].correct for hyps in test_decode_results if hyps) / float(len(test_set))
-    test_oracle = sum(any(hyp.correct for hyp in hyps) for hyps in test_decode_results) / float(len(test_set))
+    test_eval_results = evaluator.evaluate_dataset(test_set, test_decode_results)
 
-    print('Dev Acc@1=%.4f, Test Oracle Acc=%.4f' % (dev_acc, dev_oracle), file=sys.stderr)
+    print('Dev Eval Results', file=sys.stderr)
+    print(dev_eval_results, file=sys.stderr)
+    print('Test Eval Results', file=sys.stderr)
+    print(test_eval_results, file=sys.stderr)
 
-    # reranker.parameter = np.array([0.74, 0.96])
-    reranker.train(dev_set.examples, dev_decode_results, metric=metric)
+    reranker.train(dev_set.examples, dev_decode_results, evaluator=evaluator)
 
-    test_score_with_rerank = reranker.compute_rerank_performance(test_set.examples, test_decode_results, verbose=True, metric=metric, full_metric=True)
+    test_score_with_rerank = reranker.compute_rerank_performance(test_set.examples, test_decode_results, verbose=True,
+                                                                 evaluator=evaluator)
 
-    print('Test Acc@1=%.4f, Test Re-rank Acc=%s, Test Oracle Acc=%.4f' % (test_acc,
-                                                                            test_score_with_rerank,
-                                                                            test_oracle), file=sys.stderr)
+    print('Test Eval Results After Reranking', file=sys.stderr)
+    print(test_score_with_rerank, file=sys.stderr)
 
 
 if __name__ == '__main__':

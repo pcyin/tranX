@@ -2,11 +2,16 @@
 from __future__ import print_function
 
 import itertools
-import sys
+import sys, os
+import torch
+import torch.nn as nn
 from collections import OrderedDict
 
 import numpy as np
 
+from common.evaluator import CachedExactMatchEvaluator
+from common.registerable import Registrable
+from common.savable import Savable
 from datasets.conala.conala_eval import tokenize_for_bleu_eval
 from datasets.conala import evaluator as conala_evaluator
 from model import utils
@@ -29,6 +34,7 @@ class RerankingFeature(object):
         raise NotImplementedError
 
 
+@Registrable.register('is_2nd_hyp_and_margin_with_top_hyp')
 class IsSecondHypAndScoreMargin(RerankingFeature):
     def __init__(self):
         pass
@@ -47,6 +53,7 @@ class IsSecondHypAndScoreMargin(RerankingFeature):
         return 0.
 
 
+@Registrable.register('is_2nd_hyp_and_paraphrase_score_margin_with_top_hyp')
 class IsSecondHypAndParaphraseScoreMargin(RerankingFeature):
     def __init__(self):
         pass
@@ -65,9 +72,11 @@ class IsSecondHypAndParaphraseScoreMargin(RerankingFeature):
         return 0.
 
 
-class Reranker(object):
-    def __init__(self, features, parameter=None):
+@Registrable.register('reranker')
+class Reranker(Savable):
+    def __init__(self, features, parameter=None, transition_system=None):
         self.features = []
+        self.transition_system = transition_system
         self.feat_map = OrderedDict()
         self.batched_features = OrderedDict()
 
@@ -103,7 +112,7 @@ class Reranker(object):
         """rerank the hypotheses using the current model parameter"""
         raise NotImplementedError
 
-    def initialize_rerank_features(self, examples, decode_results, metric='accuracy'):
+    def initialize_rerank_features(self, examples, decode_results):
         hyp_examples = []
         for example, hyps in zip(examples, decode_results):
             for hyp_id, hyp in enumerate(hyps):
@@ -137,53 +146,54 @@ class Reranker(object):
                         feat_val = feat.get_feat_value(example, hyp, hyp_id=hyp_id, all_hyps=hyps)
                         hyp.rerank_feature_values[feat_name] = feat_val
 
-        # also pre-tokenize references and hypotheses for BLEU evaluation
-        if metric == 'bleu':
-            for example in examples:
-                ref_code_tokens = tokenize_for_bleu_eval(example.meta['example_dict']['snippet'])
-                example.meta['example_dict']['ref_code_tokens'] = ref_code_tokens
-            for hyp_list in decode_results:
-                for hyp in hyp_list:
-                    hyp.decanonical_code_tokens = tokenize_for_bleu_eval(hyp.decanonical_code)
-
     def get_rerank_score(self, hyp, param):
         raise NotImplementedError
 
-    def compute_rerank_performance(self, examples, decode_results, param=None, verbose=False, metric='accuracy', full_metric=False):
+    def _filter_hyps(self, decode_results, is_valid_hyp):
+        for i in range(len(decode_results)):
+            valid_hyps = []
+            for hyp in decode_results[i]:
+                if is_valid_hyp(hyp):
+                    valid_hyps.append(hyp)
+
+            decode_results[i] = valid_hyps
+
+    def compute_rerank_performance(self, examples, decode_results, evaluator=CachedExactMatchEvaluator(),
+                                   param=None, fast_mode=False, verbose=False):
+
         if not hasattr(decode_results[0][0], 'rerank_feature_values'):
             print('initializing rerank features for hypotheses...', file=sys.stderr)
-            self.initialize_rerank_features(examples, decode_results, metric=metric)
+
+            def is_valid_hyp(hyp):
+                try:
+                    self.transition_system.tokenize_code(hyp.code)
+                    if hyp.code:
+                        return True
+                except:
+                    return False
+
+                return False
+
+            self._filter_hyps(decode_results, is_valid_hyp)
+
+            self.initialize_rerank_features(examples, decode_results)
 
         if param is None:
             param = self.parameter
 
-        correct_array = []
-        hypotheses = []
-        sorted_decode_results = []
+        best_decode_results = []
         for example, hyps in zip(examples, decode_results):
             if hyps:
                 best_hyp_idx = np.argmax([self.get_rerank_score(hyp, param=param) for hyp in hyps])
                 best_hyp = hyps[best_hyp_idx]
-                is_correct = best_hyp.correct
 
-                if metric == 'bleu':
-                    hypotheses.append(best_hyp.decanonical_code_tokens)
-
-                if full_metric:
-                    sorted_decode_results.append([best_hyp])
+                best_decode_results.append([best_hyp])
             else:
-                is_correct = False
+                best_decode_results.append([])
 
-                if metric == 'bleu':
-                    hypotheses.append('')
-
-                if full_metric:
-                    sorted_decode_results.append([])
-
-            correct_array.append(is_correct)
             if verbose:
                 gold_standard_idx = [i for i, hyp in enumerate(hyps) if hyp.correct]
-                if not is_correct and gold_standard_idx:
+                if gold_standard_idx and any(hyp.is_correct for hyp in hyps):
                     gold_standard_idx = gold_standard_idx[0]
                     print('Utterance: %s' % ' '.join(example.src_sent), file=sys.stderr)
                     print('Gold hyp id: %d' % gold_standard_idx, file=sys.stderr)
@@ -195,18 +205,9 @@ class Reranker(object):
                               file=sys.stderr)
                         print('\t%s' % hyp.rerank_feature_values, file=sys.stderr)
 
-        acc = np.average(correct_array)
-        if metric == 'bleu':
-            if full_metric:
-                eval_results = conala_evaluator.evaluate(examples, sorted_decode_results)
-                return eval_results
-            else:
-                references = [e.meta['example_dict']['ref_code_tokens'] for e in examples]
-                assert len(references) == len(hypotheses)
-                corpus_bleu = conala_evaluator.evaluate(references=references, hypotheses=hypotheses)
-                return corpus_bleu
+        metric = evaluator.evaluate_dataset(examples, best_decode_results, fast_mode=fast_mode)
 
-        return acc
+        return metric
 
     def train(self, examples, decode_results, initial_performance=0., metric='accuracy'):
         raise NotImplementedError
@@ -220,6 +221,43 @@ class Reranker(object):
             return self.feat_map.get(item)
         raise ValueError
 
+    def save(self, path):
+        dir_name = os.path.dirname(path)
+        if not os.path.exists(dir_name):
+            os.makedirs(dir_name)
+
+        feature_names = []
+        for feat in self.features:
+            if isinstance(feat, nn.Module):
+                feat.save(os.path.join(path + '.%s' % feat.feature_name))
+            feature_names.append(feat.feature_name)
+
+        params = {
+            'parameter': self.parameter,
+            'feature_names': feature_names,
+            'transition_system': self.transition_system
+        }
+
+        torch.save(params, path)
+
+    @classmethod
+    def load(cls, model_path, cuda=False):
+        params = torch.load(model_path, map_location=lambda storage, loc: storage)
+        feature_names = params['feature_names']
+        features = []
+        for feat_name in feature_names:
+            feat_cls = Registrable.registered_components[feat_name]
+            if issubclass(feat_cls, Savable):
+                feat_inst = feat_cls.load(model_path + '.%s' % feat_name, cuda=cuda)
+                feat_inst.eval()
+            else:
+                feat_inst = feat_cls()
+            features.append(feat_inst)
+
+        reranker = cls(features, params['parameter'], params['transition_system'])
+
+        return reranker
+
 
 class MERTReranker(Reranker):
     """MERT reranker"""
@@ -230,7 +268,7 @@ class MERTReranker(Reranker):
 
         return score
 
-    def train(self, examples, decode_results, initial_performance=0., metric='accuracy'):
+    def train(self, examples, decode_results, evaluator=CachedExactMatchEvaluator(), initial_performance=0.):
         """optimize the ranker on a dataset using grid search"""
         best_score = initial_performance
         best_param = np.zeros(self.feature_num)
@@ -238,7 +276,7 @@ class MERTReranker(Reranker):
         param_space = (np.array(p) for p in itertools.combinations(np.arange(0, 1.01, 0.01), self.feature_num))
 
         for param in param_space:
-            score = self.compute_rerank_performance(examples, decode_results, param=param, metric=metric)
+            score = self.compute_rerank_performance(examples, decode_results, fast_mode=True, evaluator=evaluator, param=param)
             if score > best_score:
                 print('New param=%s, score=%.4f' % (param, score), file=sys.stderr)
                 best_param = param

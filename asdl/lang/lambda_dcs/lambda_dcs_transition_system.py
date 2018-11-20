@@ -9,9 +9,6 @@ class LambdaCalculusTransitionSystem(TransitionSystem):
     def tokenize_code(self, code, mode=None):
         return code.strip().split(' ')
 
-    def hyp_correct(self, hyp, example):
-        return self.compare_ast(hyp.tree, example.tgt_ast)
-
     def surface_code_to_ast(self, code):
         return logical_form_to_ast(self.grammar, parse_lambda_expr(code))
 

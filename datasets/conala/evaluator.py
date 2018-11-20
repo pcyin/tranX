@@ -1,60 +1,108 @@
+from common.evaluator import Evaluator
+from common.registerable import Registrable
+from components.dataset import Dataset
 from .util import decanonicalize_code
 from .conala_eval import tokenize_for_bleu_eval
 from .bleu_score import compute_bleu
 from nltk.translate.bleu_score import corpus_bleu, sentence_bleu, SmoothingFunction
 import numpy as np
+import ast
+import astor
 
 
-def evaluate(examples=None, decode_results=None, references=None, hypotheses=None):
-    if references and hypotheses:
-        bleu_tup = compute_bleu([[x] for x in references], hypotheses, smooth=False)
-        bleu = bleu_tup[0]
+@Registrable.register('conala_evaluator')
+class ConalaEvaluator(Evaluator):
+    def __init__(self, transition_system=None):
+        super(ConalaEvaluator, self).__init__()
+        self.transition_system = transition_system
+        self.default_metric = 'corpus_bleu'
 
-        return bleu
-    else:
-        ref_snippets = [e.meta['example_dict']['snippet'] for e in examples]
-        hyp_code_list = []
-        best_hyp_code_list = []
-        sm_func = SmoothingFunction().method3
-        sent_bleu_scores = []
-        oracle_bleu_scores = []
-        for example, hyp_list in zip(examples, decode_results):
-            ref_code_tokens = tokenize_for_bleu_eval(example.meta['example_dict']['snippet'])
-            example_hyp_bleu_scores = []
-            if hyp_list:
-                for i, hyp in enumerate(hyp_list):
-                    hyp.bleu_score = sentence_bleu([ref_code_tokens], tokenize_for_bleu_eval(hyp.decanonical_code),
-                                                   smoothing_function=sm_func)
+    def is_hyp_correct(self, example, hyp):
+        ref_code = example.tgt_code
+        ref_py_ast = ast.parse(ref_code)
+        ref_reformatted_code = astor.to_source(ref_py_ast).strip()
 
-                    if i == 0:
-                        top_decanonical_code = hyp.decanonical_code
-                        sent_bleu_scores.append(hyp.bleu_score)
+        ref_code_tokens = self.transition_system.tokenize_code(ref_reformatted_code)
+        hyp_code_tokens = self.transition_system.tokenize_code(hyp.code)
 
-                    example_hyp_bleu_scores.append(hyp.bleu_score)
+        return ref_code_tokens == hyp_code_tokens
 
-                best_hyp_idx = np.argmax(example_hyp_bleu_scores)
-                oracle_bleu = example_hyp_bleu_scores[best_hyp_idx]
-                oracle_bleu_scores.append(oracle_bleu)
-                best_hyp_code_list.append(hyp_list[best_hyp_idx].decanonical_code)
-            else:
-                top_decanonical_code = ''
+    def get_sentence_bleu(self, example, hyp):
+        return sentence_bleu([tokenize_for_bleu_eval(example.meta['example_dict']['snippet'])],
+                             tokenize_for_bleu_eval(hyp.decanonical_code),
+                             smoothing_function=SmoothingFunction().method3)
 
-            hyp_code_list.append(top_decanonical_code)
+    def evaluate_dataset(self, dataset, decode_results, fast_mode=False):
+        examples = dataset.examples if isinstance(dataset, Dataset) else dataset
+        assert len(examples) == len(decode_results)
 
-        c_hyp = [tokenize_for_bleu_eval(s) for s in hyp_code_list]
-        c_best_hyp = [tokenize_for_bleu_eval(s) for s in best_hyp_code_list]
-        c_ref = [tokenize_for_bleu_eval(s) for s in ref_snippets]
+        # speed up, cache tokenization results
+        if not hasattr(examples[0], 'reference_code_tokens'):
+            for example in examples:
+                setattr(example, 'reference_code_tokens', tokenize_for_bleu_eval(example.meta['example_dict']['snippet']))
 
-        bleu_tup = compute_bleu([[x] for x in c_ref], c_hyp, smooth=False)
-        bleu = bleu_tup[0]
+        if not hasattr(decode_results[0][0], 'decanonical_code_tokens'):
+            for hyp_list in decode_results:
+                for hyp in hyp_list:
+                    hyp.decanonical_code_tokens = tokenize_for_bleu_eval(hyp.decanonical_code)
 
-        bleu_tup = compute_bleu([[x] for x in c_ref], c_best_hyp, smooth=False)
-        oracle_bleu = bleu_tup[0]
+        if fast_mode:
+            references = [e.reference_code_tokens for e in examples]
+            hypotheses = [hyp_list[0].decanonical_code_tokens if hyp_list else [] for hyp_list in decode_results]
 
-        sent_bleu = np.average(sent_bleu_scores)
-        oracle_sent_bleu = np.average(oracle_bleu_scores)
-        exact = sum([1 if h == r else 0 for h, r in zip(c_hyp, c_ref)]) / len(c_hyp)
+            bleu_tup = compute_bleu([[x] for x in references], hypotheses, smooth=False)
+            bleu = bleu_tup[0]
 
-        return {'bleu': bleu, 'oracle_bleu': oracle_bleu,
-                'avg_sent_bleu': sent_bleu, 'avg_oracle_sent_bleu': oracle_sent_bleu,
-                'exact_match': exact}
+            return bleu
+        else:
+            tokenized_ref_snippets = []
+            hyp_code_tokens = []
+            best_hyp_code_tokens = []
+            sm_func = SmoothingFunction().method3
+            sent_bleu_scores = []
+            oracle_bleu_scores = []
+            for example, hyp_list in zip(examples, decode_results):
+                tokenized_ref_snippets.append(example.reference_code_tokens)
+                example_hyp_bleu_scores = []
+                if hyp_list:
+                    for i, hyp in enumerate(hyp_list):
+                        hyp.bleu_score = sentence_bleu([example.reference_code_tokens],
+                                                       hyp.decanonical_code_tokens,
+                                                       smoothing_function=sm_func)
+                        hyp.is_correct = self.is_hyp_correct(example, hyp)
+
+                        example_hyp_bleu_scores.append(hyp.bleu_score)
+
+                    top_decanonical_code_tokens = hyp_list[0].decanonical_code_tokens
+                    sent_bleu_score = hyp_list[0].bleu_score
+
+                    best_hyp_idx = np.argmax(example_hyp_bleu_scores)
+                    oracle_sent_bleu = example_hyp_bleu_scores[best_hyp_idx]
+                    _best_hyp_code_tokens = hyp_list[best_hyp_idx].decanonical_code_tokens
+                else:
+                    top_decanonical_code_tokens = []
+                    sent_bleu_score = 0.
+                    oracle_sent_bleu = 0.
+                    _best_hyp_code_tokens = []
+
+                hyp_code_tokens.append(top_decanonical_code_tokens)
+                sent_bleu_scores.append(sent_bleu_score)
+                oracle_bleu_scores.append(oracle_sent_bleu)
+                best_hyp_code_tokens.append(_best_hyp_code_tokens)
+
+            bleu_tup = compute_bleu([[x] for x in tokenized_ref_snippets], hyp_code_tokens, smooth=False)
+            corpus_bleu = bleu_tup[0]
+
+            bleu_tup = compute_bleu([[x] for x in tokenized_ref_snippets], best_hyp_code_tokens, smooth=False)
+            oracle_corpus_bleu = bleu_tup[0]
+
+            avg_sent_bleu = np.average(sent_bleu_scores)
+            oracle_avg_sent_bleu = np.average(oracle_bleu_scores)
+            exact = sum([1 if h == r else 0 for h, r in zip(hyp_code_tokens, tokenized_ref_snippets)]) / float(
+                len(examples))
+
+            return {'corpus_bleu': corpus_bleu,
+                    'oracle_corpus_bleu': oracle_corpus_bleu,
+                    'avg_sent_bleu': avg_sent_bleu,
+                    'oracle_avg_sent_bleu': oracle_avg_sent_bleu,
+                    'exact_match': exact}
