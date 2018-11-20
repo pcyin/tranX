@@ -271,22 +271,6 @@ class Django(object):
 
             # print('first pass, processed %d' % idx, file=sys.stderr)
 
-        src_vocab = VocabEntry.from_corpus([e['src_query_tokens'] for e in loaded_examples], size=5000, freq_cutoff=vocab_freq_cutoff)
-
-        primitive_tokens = [map(lambda a: a.token,
-                            filter(lambda a: isinstance(a, GenTokenAction), e['tgt_actions']))
-                            for e in loaded_examples]
-
-        primitive_vocab = VocabEntry.from_corpus(primitive_tokens, size=5000, freq_cutoff=vocab_freq_cutoff)
-        assert '_STR:0_' in primitive_vocab
-
-        # generate vocabulary for the code tokens!
-        code_tokens = [tokenize_code(e['tgt_canonical_code'], mode='decoder') for e in loaded_examples]
-        code_vocab = VocabEntry.from_corpus(code_tokens, size=5000, freq_cutoff=vocab_freq_cutoff)
-
-        vocab = Vocab(source=src_vocab, primitive=primitive_vocab, code=code_vocab)
-        print('generated vocabulary %s' % repr(vocab), file=sys.stderr)
-
         train_examples = []
         dev_examples = []
         test_examples = []
@@ -321,11 +305,27 @@ class Django(object):
         print('Avg action len: %d' % np.average(action_len), file=sys.stderr)
         print('Actions larger than 100: %d' % len(list(filter(lambda x: x > 100, action_len))), file=sys.stderr)
 
+        src_vocab = VocabEntry.from_corpus([e.src_sent for e in train_examples], size=5000, freq_cutoff=vocab_freq_cutoff)
+
+        primitive_tokens = [map(lambda a: a.action.token,
+                            filter(lambda a: isinstance(a.action, GenTokenAction), e.tgt_actions))
+                            for e in train_examples]
+
+        primitive_vocab = VocabEntry.from_corpus(primitive_tokens, size=5000, freq_cutoff=vocab_freq_cutoff)
+        assert '_STR:0_' in primitive_vocab
+
+        # generate vocabulary for the code tokens!
+        code_tokens = [tokenize_code(e.tgt_code, mode='decoder') for e in train_examples]
+        code_vocab = VocabEntry.from_corpus(code_tokens, size=5000, freq_cutoff=vocab_freq_cutoff)
+
+        vocab = Vocab(source=src_vocab, primitive=primitive_vocab, code=code_vocab)
+        print('generated vocabulary %s' % repr(vocab), file=sys.stderr)
+
         return (train_examples, dev_examples, test_examples), vocab
 
     @staticmethod
     def process_django_dataset():
-        vocab_freq_cutoff = 5
+        vocab_freq_cutoff = 5  # TODO: found the best cutoff threshold
         annot_file = 'data/django/all.anno'
         code_file = 'data/django/all.code'
 
@@ -333,10 +333,10 @@ class Django(object):
                                                                 'asdl/lang/py/py_asdl.txt',
                                                                 vocab_freq_cutoff=vocab_freq_cutoff)
 
-        pickle.dump(train, open('data/django/train.0513.bin', 'w'))
-        pickle.dump(dev, open('data/django/dev.0513.bin', 'w'))
-        pickle.dump(test, open('data/django/test.0513.bin', 'w'))
-        pickle.dump(vocab, open('data/django/vocab.0513.freq%d.bin' % vocab_freq_cutoff, 'w'))
+        pickle.dump(train, open('data/django/train.bin', 'w'))
+        pickle.dump(dev, open('data/django/dev.bin', 'w'))
+        pickle.dump(test, open('data/django/test.bin', 'w'))
+        pickle.dump(vocab, open('data/django/vocab.freq%d.bin' % vocab_freq_cutoff, 'w'))
 
     @staticmethod
     def run():
