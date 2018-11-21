@@ -181,15 +181,19 @@ class Reranker(Savable):
         if param is None:
             param = self.parameter
 
-        best_decode_results = []
+        sorted_decode_results = []
         for example, hyps in zip(examples, decode_results):
             if hyps:
-                best_hyp_idx = np.argmax([self.get_rerank_score(hyp, param=param) for hyp in hyps])
+                new_hyp_scores = [self.get_rerank_score(hyp, param=param) for hyp in hyps]
+                best_hyp_idx = np.argmax(new_hyp_scores)
                 best_hyp = hyps[best_hyp_idx]
 
-                best_decode_results.append([best_hyp])
+                if fast_mode:
+                    sorted_decode_results.append([best_hyp])
+                else:
+                    sorted_decode_results.append([hyps[i] for i in np.argsort(new_hyp_scores)[::-1]])
             else:
-                best_decode_results.append([])
+                sorted_decode_results.append([])
 
             if verbose:
                 gold_standard_idx = [i for i, hyp in enumerate(hyps) if hyp.is_correct]
@@ -205,7 +209,7 @@ class Reranker(Savable):
                               file=sys.stderr)
                         print('\t%s' % hyp.rerank_feature_values, file=sys.stderr)
 
-        metric = evaluator.evaluate_dataset(examples, best_decode_results, fast_mode=fast_mode)
+        metric = evaluator.evaluate_dataset(examples, sorted_decode_results, fast_mode=fast_mode)
 
         return metric
 

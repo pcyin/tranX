@@ -652,14 +652,22 @@ def train_reranker_and_test(args):
     test_set = Dataset.from_bin_file(args.test_file)
     dev_set = Dataset.from_bin_file(args.dev_file)
 
-    from components.reranker import IsSecondHypAndScoreMargin
     features = []
-    if args.load_reconstruction_model is not None:
-        features.append(Reconstructor.load(args.load_reconstruction_model))
-    if args.load_paraphrase_model is not None:
-        features.append(ParaphraseIdentificationModel.load(args.load_paraphrase_model))
-    # features.append(IsSecondHypAndScoreMargin())
-    # features.append(IsSecondHypAndParaphraseScoreMargin())
+    i = 0
+    while i < len(args.features):
+        feat_name = args.features[i]
+        feat_cls = Registrable.by_name(feat_name)
+        print('Add feature %s' % feat_name, file=sys.stderr)
+        if issubclass(feat_cls, nn.Module):
+            i += 1
+            feat_path = args.features[i]
+            feat_inst = feat_cls.load(feat_path)
+            print('Load feature %s from %s' % (feat_name, feat_path), file=sys.stderr)
+        else:
+            feat_inst = feat_cls()
+
+        features.append(feat_inst)
+        i += 1
 
     transition_system = features[0].transition_system
     evaluator = Registrable.by_name(args.evaluator)(transition_system)
