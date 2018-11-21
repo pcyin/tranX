@@ -128,7 +128,7 @@ def init_arg_parser():
     arg_parser.add_argument('--save_decode_to', default=None, type=str, help='Save decoding results to file')
 
     #### reranking ####
-    arg_parser.add_argument('--features', nargs='+', required=True)
+    arg_parser.add_argument('--features', nargs='+')
     arg_parser.add_argument('--load_reconstruction_model', type=str, help='Load reconstruction model')
     arg_parser.add_argument('--load_paraphrase_model', type=str, help='Load paraphrase model')
     arg_parser.add_argument('--train_decode_file', default=None, type=str, help='Decoding results on training set')
