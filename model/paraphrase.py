@@ -1,6 +1,7 @@
 # coding=utf-8
 import os
 from itertools import chain
+import numpy as np
 
 import torch
 import torch.nn as nn
@@ -14,15 +15,17 @@ from common.savable import Savable
 from components.reranker import RerankingFeature
 from model import nn_utils
 from model.decomposable_attention_model import DecomposableAttentionModel
+from model.nn_utils import input_transpose
 
 
 @Registrable.register('paraphrase_identifier')
 class ParaphraseIdentificationModel(nn.Module, RerankingFeature, Savable):
     def __init__(self, args, vocab, transition_system):
         super(ParaphraseIdentificationModel, self).__init__()
-        self.pi_model = DecomposableAttentionModel(src_vocab=vocab.code, tgt_vocab=vocab.source,
+        self.pi_model = DecomposableAttentionModel(src_vocab=vocab, tgt_vocab=vocab,
                                                    embed_size=args.embed_size,
                                                    dropout=args.dropout,
+                                                   tie_embed=True,
                                                    cuda=args.cuda)
 
         self.vocab = vocab
@@ -41,8 +44,8 @@ class ParaphraseIdentificationModel(nn.Module, RerankingFeature, Savable):
         """score examples sorted by code length"""
         args = self.args
 
-        src_code_var = nn_utils.to_input_variable(src_codes, self.vocab.code, cuda=args.cuda).t()
-        tgt_nl_var = nn_utils.to_input_variable(tgt_nls, self.vocab.source, cuda=args.cuda).t()
+        src_code_var = self.to_input_variable(src_codes, cuda=args.cuda).t()
+        tgt_nl_var = self.to_input_variable(tgt_nls, cuda=args.cuda).t()
 
         src_code_mask = Variable(nn_utils.length_array_to_mask_tensor([len(x) for x in src_codes], cuda=args.cuda, valid_entry_has_mask_one=True).float(), requires_grad=False)
         tgt_nl_mask = Variable(nn_utils.length_array_to_mask_tensor([len(x) for x in tgt_nls], cuda=args.cuda, valid_entry_has_mask_one=True).float(), requires_grad=False)
@@ -64,6 +67,37 @@ class ParaphraseIdentificationModel(nn.Module, RerankingFeature, Savable):
 
     def tokenize_code(self, code):
         return self.transition_system.tokenize_code(code, mode='decoder')
+
+    def to_input_variable(self, sequences, cuda=False, training=True):
+        """
+        given a list of sequences,
+        return a tensor of shape (max_sent_len, batch_size)
+        """
+        word_ids = []
+        for seq in sequences:
+            unk_dict = dict()
+            seq_wids = []
+            for word in seq:
+                if self.vocab.is_unk(word):
+                    if word in unk_dict:
+                        word_id = unk_dict[word]
+                    else:
+                        word_id = self.vocab['<unk_%d>' % len(unk_dict)]
+                        unk_dict[word] = word_id
+                else:
+                    word_id = self.vocab[word]
+
+                seq_wids.append(word_id)
+
+            word_ids.append(seq_wids)
+
+        sents_t = input_transpose(word_ids, self.vocab['<pad>'])
+
+        sents_var = Variable(torch.LongTensor(sents_t), volatile=(not training), requires_grad=False)
+        if cuda:
+            sents_var = sents_var.cuda()
+
+        return sents_var
 
     def save(self, path):
         dir_name = os.path.dirname(path)

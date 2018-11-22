@@ -15,11 +15,14 @@ from model.nn_utils import FeedForward
 class DecomposableAttentionModel(nn.Module):
     """Decomposable attention model for paraphrase identification"""
     
-    def __init__(self, src_vocab, tgt_vocab, embed_size, dropout=0., cuda=False):
+    def __init__(self, src_vocab, tgt_vocab, embed_size, dropout=0., tie_embed=False, cuda=False):
         super(DecomposableAttentionModel, self).__init__()
 
-        self.src_embed = nn.Embedding(len(src_vocab), embed_size, padding_idx=src_vocab['<pad>'])
-        self.tgt_embed = nn.Embedding(len(tgt_vocab), embed_size, padding_idx=tgt_vocab['<pad>'])
+        if tie_embed:
+            self.src_embed = nn.Embedding(len(src_vocab), embed_size, padding_idx=src_vocab['<pad>'])
+            self.tgt_embed = nn.Embedding(len(tgt_vocab), embed_size, padding_idx=tgt_vocab['<pad>'])
+        else:
+            self.src_embed = self.tgt_embed = nn.Embedding(len(src_vocab), embed_size, padding_idx=src_vocab['<pad>'])
 
         self.att_linear = nn.Linear(embed_size, embed_size, bias=False)
 
