@@ -61,7 +61,18 @@ class CachedExactMatchEvaluator(Evaluator):
         raise hyp.is_correct
 
     def evaluate_dataset(self, examples, decode_results, fast_mode=True):
-        return sum(hyps[0].is_correct for hyps in decode_results if len(hyps) > 0) / float(len(examples))
+        if fast_mode:
+            acc = sum(hyps[0].is_correct for hyps in decode_results if len(hyps) > 0) / float(len(examples))
+            return acc
+
+        acc_array = []
+        oracle_array = []
+        for hyp_list in decode_results:
+            acc_array.append(hyp_list[0].is_correct if hyp_list else False)
+            oracle_array.append(any(hyp.is_correct for hyp in hyp_list))
+
+        return dict(accuracy=np.average(acc_array),
+                    oracle_array=np.average(oracle_array))
 
 
 @Registrable.register('lambda_evaluator')
