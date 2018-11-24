@@ -12,6 +12,7 @@ from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
 from common.registerable import Registrable
 from common.savable import Savable
+from common.utils import init_arg_parser, update_args
 from components.reranker import RerankingFeature
 from model import nn_utils
 from model.decomposable_attention_model import DecomposableAttentionModel
@@ -128,8 +129,10 @@ class ParaphraseIdentificationModel(nn.Module, RerankingFeature, Savable):
     def load(model_path, cuda=False):
         decoder_params = torch.load(model_path, map_location=lambda storage, loc: storage)
         decoder_params['args'].cuda = cuda
-
-        model = ParaphraseIdentificationModel(decoder_params['args'], decoder_params['vocab'], decoder_params['transition_system'])
+        # update saved args
+        saved_args = decoder_params['args']
+        update_args(saved_args, init_arg_parser())
+        model = ParaphraseIdentificationModel(saved_args, decoder_params['vocab'], decoder_params['transition_system'])
         model.load_state_dict(decoder_params['state_dict'])
 
         if cuda: model = model.cuda()
