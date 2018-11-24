@@ -22,11 +22,18 @@ from model.nn_utils import input_transpose
 class ParaphraseIdentificationModel(nn.Module, RerankingFeature, Savable):
     def __init__(self, args, vocab, transition_system):
         super(ParaphraseIdentificationModel, self).__init__()
-        self.pi_model = DecomposableAttentionModel(src_vocab=vocab, tgt_vocab=vocab,
-                                                   embed_size=args.embed_size,
-                                                   dropout=args.dropout,
-                                                   tie_embed=True,
-                                                   cuda=args.cuda)
+        if args.tie_embed:
+            self.pi_model = DecomposableAttentionModel(src_vocab=vocab, tgt_vocab=vocab,
+                                                       embed_size=args.embed_size,
+                                                       dropout=args.dropout,
+                                                       tie_embed=True,
+                                                       cuda=args.cuda)
+        else:
+            self.pi_model = DecomposableAttentionModel(src_vocab=vocab.code, tgt_vocab=vocab.source,
+                                                       embed_size=args.embed_size,
+                                                       dropout=args.dropout,
+                                                       tie_embed=False,
+                                                       cuda=args.cuda)
 
         self.vocab = vocab
         self.args = args
@@ -44,8 +51,12 @@ class ParaphraseIdentificationModel(nn.Module, RerankingFeature, Savable):
         """score examples sorted by code length"""
         args = self.args
 
-        src_code_var = self.to_input_variable(src_codes, cuda=args.cuda).t()
-        tgt_nl_var = self.to_input_variable(tgt_nls, cuda=args.cuda).t()
+        if args.tie_embed:
+            src_code_var = self.to_input_variable_with_unk_handling(src_codes, cuda=args.cuda).t()
+            tgt_nl_var = self.to_input_variable_with_unk_handling(tgt_nls, cuda=args.cuda).t()
+        else:
+            src_code_var = nn_utils.to_input_variable(src_codes, self.vocab.code, cuda=args.cuda).t()
+            tgt_nl_var = nn_utils.to_input_variable(tgt_nls, self.vocab.source, cuda=args.cuda).t()
 
         src_code_mask = Variable(nn_utils.length_array_to_mask_tensor([len(x) for x in src_codes], cuda=args.cuda, valid_entry_has_mask_one=True).float(), requires_grad=False)
         tgt_nl_mask = Variable(nn_utils.length_array_to_mask_tensor([len(x) for x in tgt_nls], cuda=args.cuda, valid_entry_has_mask_one=True).float(), requires_grad=False)
@@ -68,7 +79,7 @@ class ParaphraseIdentificationModel(nn.Module, RerankingFeature, Savable):
     def tokenize_code(self, code):
         return self.transition_system.tokenize_code(code, mode='decoder')
 
-    def to_input_variable(self, sequences, cuda=False, training=True):
+    def to_input_variable_with_unk_handling(self, sequences, cuda=False, training=True):
         """
         given a list of sequences,
         return a tensor of shape (max_sent_len, batch_size)

@@ -197,7 +197,7 @@ class Reranker(Savable):
 
             if verbose:
                 gold_standard_idx = [i for i, hyp in enumerate(hyps) if hyp.is_correct]
-                if gold_standard_idx and any(hyp.is_correct for hyp in hyps):
+                if gold_standard_idx and gold_standard_idx[0] != 0:
                     gold_standard_idx = gold_standard_idx[0]
                     print('Utterance: %s' % ' '.join(example.src_sent), file=sys.stderr)
                     print('Gold hyp id: %d' % gold_standard_idx, file=sys.stderr)

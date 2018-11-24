@@ -19,10 +19,10 @@ class DecomposableAttentionModel(nn.Module):
         super(DecomposableAttentionModel, self).__init__()
 
         if tie_embed:
+            self.src_embed = self.tgt_embed = nn.Embedding(len(src_vocab), embed_size, padding_idx=src_vocab['<pad>'])
+        else:
             self.src_embed = nn.Embedding(len(src_vocab), embed_size, padding_idx=src_vocab['<pad>'])
             self.tgt_embed = nn.Embedding(len(tgt_vocab), embed_size, padding_idx=tgt_vocab['<pad>'])
-        else:
-            self.src_embed = self.tgt_embed = nn.Embedding(len(src_vocab), embed_size, padding_idx=src_vocab['<pad>'])
 
         self.att_linear = nn.Linear(embed_size, embed_size, bias=False)
 
