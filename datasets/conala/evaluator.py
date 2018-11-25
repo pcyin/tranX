@@ -42,8 +42,11 @@ class ConalaEvaluator(Evaluator):
                 setattr(example, 'reference_code_tokens', tokenize_for_bleu_eval(example.meta['example_dict']['snippet']))
 
         if not hasattr(decode_results[0][0], 'decanonical_code_tokens'):
-            for hyp_list in decode_results:
+            for example, hyp_list in zip(examples, decode_results):
                 for hyp in hyp_list:
+                    if not hasattr(hyp, 'decanonical_code'):
+                        hyp.decanonical_code = decanonicalize_code(hyp.code, slot_map=example.meta['slot_map'])
+
                     hyp.decanonical_code_tokens = tokenize_for_bleu_eval(hyp.decanonical_code)
 
         if fast_mode:
