@@ -42,9 +42,21 @@ class ConalaEvaluator(Evaluator):
                 setattr(example, 'reference_code_tokens', tokenize_for_bleu_eval(example.meta['example_dict']['snippet']))
 
         if not hasattr(decode_results[0][0], 'decanonical_code_tokens'):
-            for hyp_list in decode_results:
+            for i, example in enumerate(examples):
+                hyp_list = decode_results[i]
+                # here we prune any hypothesis that throws an error when converting back to the decanonical code!
+                # This modifies the decode_results in-place!
+                filtered_hyp_list = []
                 for hyp in hyp_list:
-                    hyp.decanonical_code_tokens = tokenize_for_bleu_eval(hyp.decanonical_code)
+                    if not hasattr(hyp, 'decanonical_code'):
+                        try:
+                            hyp.decanonical_code = decanonicalize_code(hyp.code, slot_map=example.meta['slot_map'])
+                            if hyp.decanonical_code:
+                                hyp.decanonical_code_tokens = tokenize_for_bleu_eval(hyp.decanonical_code)
+                                filtered_hyp_list.append(hyp)
+                        except: pass
+
+                decode_results[i] = filtered_hyp_list
 
         if fast_mode:
             references = [e.reference_code_tokens for e in examples]
@@ -61,6 +73,7 @@ class ConalaEvaluator(Evaluator):
             sm_func = SmoothingFunction().method3
             sent_bleu_scores = []
             oracle_bleu_scores = []
+            oracle_exact_match = []
             for example, hyp_list in zip(examples, decode_results):
                 tokenized_ref_snippets.append(example.reference_code_tokens)
                 example_hyp_bleu_scores = []
@@ -85,6 +98,7 @@ class ConalaEvaluator(Evaluator):
                     oracle_sent_bleu = 0.
                     _best_hyp_code_tokens = []
 
+                oracle_exact_match.append(any(hyp.is_correct for hyp in hyp_list))
                 hyp_code_tokens.append(top_decanonical_code_tokens)
                 sent_bleu_scores.append(sent_bleu_score)
                 oracle_bleu_scores.append(oracle_sent_bleu)
@@ -100,9 +114,11 @@ class ConalaEvaluator(Evaluator):
             oracle_avg_sent_bleu = np.average(oracle_bleu_scores)
             exact = sum([1 if h == r else 0 for h, r in zip(hyp_code_tokens, tokenized_ref_snippets)]) / float(
                 len(examples))
+            oracle_exact_match = np.average(oracle_exact_match)
 
             return {'corpus_bleu': corpus_bleu,
                     'oracle_corpus_bleu': oracle_corpus_bleu,
                     'avg_sent_bleu': avg_sent_bleu,
                     'oracle_avg_sent_bleu': oracle_avg_sent_bleu,
-                    'exact_match': exact}
+                    'exact_match': exact,
+                    'oracle_exact_match': oracle_exact_match}

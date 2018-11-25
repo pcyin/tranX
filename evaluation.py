@@ -16,8 +16,6 @@ def decode(examples, model, args, verbose=False, **kwargs):
     if args.lang == 'wikisql':
         from asdl.lang.sql.lib.dbengine import DBEngine
         from asdl.lang.sql.utils import detokenize_query
-    elif args.lang == 'conala':
-        from datasets.conala.util import decanonicalize_code
 
     decode_results = []
     count = 0
@@ -40,8 +38,6 @@ def decode(examples, model, args, verbose=False, **kwargs):
                                                                           detokenized_hyp_query,
                                                                           lower=True)
                     if len(hyp_answer) == 0: continue
-                if args.lang == 'conala':
-                    hyp.decanonical_code = decanonicalize_code(hyp.code, slot_map=example.meta['slot_map'])
 
                 decoded_hyps.append(hyp)
             except:

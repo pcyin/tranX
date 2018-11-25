@@ -73,10 +73,3 @@ class CachedExactMatchEvaluator(Evaluator):
 
         return dict(accuracy=np.average(acc_array),
                     oracle_array=np.average(oracle_array))
-
-
-@Registrable.register('lambda_evaluator')
-class LambdaCalculusEvaluator(Evaluator):
-    def __init__(self, transition_system):
-        super(LambdaCalculusEvaluator, self).__init__()
-        self.transition_system = transition_system
