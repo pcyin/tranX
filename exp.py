@@ -676,11 +676,11 @@ def train_reranker_and_test(args):
 
     print('load dev decode results [%s]' % args.dev_decode_file, file=sys.stderr)
     dev_decode_results = pickle.load(open(args.dev_decode_file, 'rb'))
-    dev_eval_results = evaluator.evaluate_dataset(dev_set, dev_decode_results)
+    dev_eval_results = evaluator.evaluate_dataset(dev_set, dev_decode_results, fast_mode=False)
 
     print('load test decode results [%s]' % args.test_decode_file, file=sys.stderr)
     test_decode_results = pickle.load(open(args.test_decode_file, 'rb'))
-    test_eval_results = evaluator.evaluate_dataset(test_set, test_decode_results)
+    test_eval_results = evaluator.evaluate_dataset(test_set, test_decode_results, fast_mode=False)
 
     print('Dev Eval Results', file=sys.stderr)
     print(dev_eval_results, file=sys.stderr)
