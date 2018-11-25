@@ -73,6 +73,7 @@ class ConalaEvaluator(Evaluator):
             sm_func = SmoothingFunction().method3
             sent_bleu_scores = []
             oracle_bleu_scores = []
+            oracle_exact_match = []
             for example, hyp_list in zip(examples, decode_results):
                 tokenized_ref_snippets.append(example.reference_code_tokens)
                 example_hyp_bleu_scores = []
@@ -97,6 +98,7 @@ class ConalaEvaluator(Evaluator):
                     oracle_sent_bleu = 0.
                     _best_hyp_code_tokens = []
 
+                oracle_exact_match.append(any(hyp.is_correct for hyp in hyp_list))
                 hyp_code_tokens.append(top_decanonical_code_tokens)
                 sent_bleu_scores.append(sent_bleu_score)
                 oracle_bleu_scores.append(oracle_sent_bleu)
@@ -112,9 +114,11 @@ class ConalaEvaluator(Evaluator):
             oracle_avg_sent_bleu = np.average(oracle_bleu_scores)
             exact = sum([1 if h == r else 0 for h, r in zip(hyp_code_tokens, tokenized_ref_snippets)]) / float(
                 len(examples))
+            oracle_exact_match = np.average(oracle_exact_match)
 
             return {'corpus_bleu': corpus_bleu,
                     'oracle_corpus_bleu': oracle_corpus_bleu,
                     'avg_sent_bleu': avg_sent_bleu,
                     'oracle_avg_sent_bleu': oracle_avg_sent_bleu,
-                    'exact_match': exact}
+                    'exact_match': exact,
+                    'oracle_exact_match': oracle_exact_match}
