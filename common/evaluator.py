@@ -60,7 +60,7 @@ class CachedExactMatchEvaluator(Evaluator):
     def is_hyp_correct(self, example, hyp):
         raise hyp.is_correct
 
-    def evaluate_dataset(self, examples, decode_results, fast_mode=True):
+    def evaluate_dataset(self, examples, decode_results, fast_mode=False):
         if fast_mode:
             acc = sum(hyps[0].is_correct for hyps in decode_results if len(hyps) > 0) / float(len(examples))
             return acc
