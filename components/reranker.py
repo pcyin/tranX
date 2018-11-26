@@ -1,6 +1,7 @@
 # coding=utf-8
 from __future__ import print_function
-
+import multiprocessing
+import math
 import itertools
 import sys, os
 import torch
@@ -21,6 +22,32 @@ import xgboost as xgb
 from sklearn import preprocessing
 
 
+# shared across processes for multi-processed reranking
+_examples = None
+_decode_results = None
+_evaluator = None
+_ranker = None
+
+
+def _rank_worker(param):
+    score = _ranker.compute_rerank_performance(_examples, _decode_results, fast_mode=True, evaluator=_evaluator, param=param)
+    return param, score
+
+
+def _rank_segment_worker(param_space):
+    best_score = 0.
+    best_param = None
+    print('[Child] New parameter segments [%s ~ %s] (%d entries)' % (param_space[0], param_space[-1], len(param_space)), file=sys.stderr)
+    for param in param_space:
+        score = _ranker.compute_rerank_performance(_examples, _decode_results, fast_mode=True, evaluator=_evaluator, param=param)
+        if score > best_score:
+            print('[Child] New param=%s, score=%.4f' % (param, score), file=sys.stderr)
+            best_param = param
+            best_score = score
+
+    return best_param, best_score
+
+
 class RerankingFeature(object):
     @property
     def feature_name(self):
@@ -32,6 +59,23 @@ class RerankingFeature(object):
 
     def get_feat_value(self, example, hyp, **kwargs):
         raise NotImplementedError
+
+
+@Registrable.register('parser_score')
+class ParserScore(RerankingFeature):
+    def __init__(self):
+        pass
+
+    @property
+    def feature_name(self):
+        return 'parser_score'
+
+    @property
+    def is_batched(self):
+        return False
+
+    def get_feat_value(self, example, hyp, **kwargs):
+        return float(hyp.score)
 
 
 @Registrable.register('is_2nd_hyp_and_margin_with_top_hyp')
@@ -158,9 +202,7 @@ class Reranker(Savable):
 
             decode_results[i] = valid_hyps
 
-    def compute_rerank_performance(self, examples, decode_results, evaluator=CachedExactMatchEvaluator(),
-                                   param=None, fast_mode=False, verbose=False):
-
+    def filter_hyps_and_initialize_features(self, examples, decode_results):
         if not hasattr(decode_results[0][0], 'rerank_feature_values'):
             print('initializing rerank features for hypotheses...', file=sys.stderr)
 
@@ -177,6 +219,10 @@ class Reranker(Savable):
             self._filter_hyps(decode_results, is_valid_hyp)
 
             self.initialize_rerank_features(examples, decode_results)
+
+    def compute_rerank_performance(self, examples, decode_results, evaluator=CachedExactMatchEvaluator(),
+                                   param=None, fast_mode=False, verbose=False):
+        self.filter_hyps_and_initialize_features(examples, decode_results)
 
         if param is None:
             param = self.parameter
@@ -197,7 +243,7 @@ class Reranker(Savable):
 
             if verbose:
                 gold_standard_idx = [i for i, hyp in enumerate(hyps) if hyp.is_correct]
-                if gold_standard_idx and gold_standard_idx[0] != 0:
+                if gold_standard_idx and gold_standard_idx[0] != best_hyp_idx:
                     gold_standard_idx = gold_standard_idx[0]
                     print('Utterance: %s' % ' '.join(example.src_sent), file=sys.stderr)
                     print('Gold hyp id: %d' % gold_standard_idx, file=sys.stderr)
@@ -263,12 +309,13 @@ class Reranker(Savable):
         return reranker
 
 
-class MERTReranker(Reranker):
-    """MERT reranker"""
+class GridSearchReranker(Reranker):
+    """Grid search reranker"""
 
     def get_rerank_score(self, hyp, param):
         feat_vals = np.array(list(hyp.rerank_feature_values.values()))
-        score = hyp.score + np.dot(param, feat_vals)
+        # score = hyp.score + np.dot(param, feat_vals)
+        score = np.dot(param, feat_vals)
 
         return score
 
@@ -288,13 +335,53 @@ class MERTReranker(Reranker):
 
         self.parameter = best_param
 
+    def train_multiprocess(self, examples, decode_results, evaluator=CachedExactMatchEvaluator(), initial_performance=0., num_workers=8):
+        """optimize the ranker on a dataset using grid search"""
+        best_score = initial_performance
+        best_param = np.zeros(self.feature_num)
+
+        param_space = [np.array(p) for p in itertools.combinations(np.arange(0, 1.01, 0.01), self.feature_num)]
+
+        self.initialize_rerank_features(examples, decode_results)
+        global _examples
+        _examples = examples
+        global _decode_results
+        _decode_results = decode_results
+        global _evaluator
+        _evaluator = evaluator
+        global _ranker
+        _ranker = self
+
+        def _norm(_param):
+            return sum(p ** 2 for p in _param)
+
+        with multiprocessing.Pool(processes=num_workers) as pool:
+            # segment the parameter space
+            segment_size = int(len(param_space) / num_workers / 5)
+            param_space_segments = []
+            ptr = 0
+            while ptr < len(param_space):
+                param_space_segments.append(param_space[ptr: ptr + segment_size])
+                ptr += segment_size
+            print('generated %d parameter segments' % len(param_space_segments), file=sys.stderr)
+
+            results = pool.imap_unordered(_rank_segment_worker, param_space_segments)
+
+            for param, score in results:
+                if score > best_score or score == best_score and _norm(param) < _norm(best_param):
+                    print('[Main] New param=%s, score=%.4f' % (param, score), file=sys.stderr)
+                    best_param = param
+                    best_score = score
+
+        self.parameter = best_param
+
 
 class XGBoostReranker(Reranker):
-    def __init__(self, features):
-        super(XGBoostReranker, self).__init__(features)
+    def __init__(self, features, transition_system=None):
+        super(XGBoostReranker, self).__init__(features, transition_system=transition_system)
 
-        params = {'objective': 'rank:ndcg', 'learning_rate': .3,
-                  'gamma': 1.0, 'min_child_weight': 0.1,
+        params = {'objective': 'rank:ndcg', 'learning_rate': .1,
+                  'gamma': 5.0, 'min_child_weight': 0.1,
                   'max_depth': 4, 'n_estimators': 5}
 
         self.ranker = xgb.sklearn.XGBRanker(**params)
@@ -305,7 +392,7 @@ class XGBoostReranker(Reranker):
         for hyps in decode_results:
             if hyps:
                 for hyp in hyps:
-                    label = 1 if hyp.correct else 0
+                    label = 1 if hyp.is_correct else 0
                     feat_vec = np.array([hyp.score] + [v for v in hyp.rerank_feature_values.values()])
                     x.append(feat_vec)
                     y.append(label)
@@ -328,11 +415,11 @@ class XGBoostReranker(Reranker):
 
         return y[0]
 
-    def train(self, examples, decode_results, initial_performance=0.):
+    def train(self, examples, decode_results, evaluator=CachedExactMatchEvaluator(), initial_performance=0.):
         self.initialize_rerank_features(examples, decode_results)
 
         train_x, train_y, group_train = self.get_feature_matrix(decode_results, train=True)
         self.ranker.fit(train_x, train_y, group_train)
 
-        train_acc = self.compute_rerank_performance(examples, decode_results)
+        train_acc = self.compute_rerank_performance(examples, decode_results, fast_mode=True, evaluator=evaluator)
         print('Dev acc: %f' % train_acc, file=sys.stderr)

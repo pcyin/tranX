@@ -136,6 +136,7 @@ def init_arg_parser():
     arg_parser.add_argument('--test_decode_file', default=None, type=str, help='Decoding results on test set')
     arg_parser.add_argument('--dev_decode_file', default=None, type=str, help='Decoding results on dev set')
     arg_parser.add_argument('--metric', default='accuracy', choices=['bleu', 'accuracy'])
+    arg_parser.add_argument('--num_workers', default=4, type=int, help='number of multiprocess workers')
 
     #### self-training ####
     arg_parser.add_argument('--load_decode_results', default=None, type=str)

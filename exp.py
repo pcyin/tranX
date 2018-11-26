@@ -669,10 +669,10 @@ def train_reranker_and_test(args):
         features.append(feat_inst)
         i += 1
 
-    transition_system = features[0].transition_system
+    transition_system = next(feat.transition_system for feat in features if hasattr(feat, 'transition_system'))
     evaluator = Registrable.by_name(args.evaluator)(transition_system)
 
-    reranker = MERTReranker(features, transition_system=transition_system)
+    reranker = GridSearchReranker(features, transition_system=transition_system)
 
     print('load dev decode results [%s]' % args.dev_decode_file, file=sys.stderr)
     dev_decode_results = pickle.load(open(args.dev_decode_file, 'rb'))
@@ -687,7 +687,10 @@ def train_reranker_and_test(args):
     print('Test Eval Results', file=sys.stderr)
     print(test_eval_results, file=sys.stderr)
 
-    reranker.train(dev_set.examples, dev_decode_results, evaluator=evaluator)
+    if args.num_workers == 1:
+        reranker.train(dev_set.examples, dev_decode_results, evaluator=evaluator)
+    else:
+        reranker.train_multiprocess(dev_set.examples, dev_decode_results, evaluator=evaluator, num_workers=args.num_workers)
 
     test_score_with_rerank = reranker.compute_rerank_performance(test_set.examples, test_decode_results, verbose=True,
                                                                  evaluator=evaluator)
