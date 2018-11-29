@@ -93,6 +93,8 @@ def init_arg_parser():
     arg_parser.add_argument('--src_token_label_smoothing', default=0.0, type=float,
                             help='Apply label smoothing in reconstruction model when predicting source tokens')
 
+    arg_parser.add_argument('--negative_sample_type', default='best', type=str, choices=['best', 'sample', 'all'])
+
     # training schedule details
     arg_parser.add_argument('--valid_metric', default='acc', choices=['acc'],
                             help='Metric used for validation')

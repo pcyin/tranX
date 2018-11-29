@@ -307,21 +307,33 @@ def train_rerank_feature(args):
         if _hyps:
             incorrect_hyps = [hyp for hyp in _hyps if not hyp.is_correct]
             incorrect_hyp_scores = [hyp.score for hyp in incorrect_hyps]
-            if type == 'best':
-                sample_idx = np.argmax(incorrect_hyp_scores)
-                sampled_hyp = incorrect_hyps[sample_idx]
-            else:
-                incorrect_hyp_probs = [np.exp(score) for score in incorrect_hyp_scores]
-                incorrect_hyp_probs = np.array(incorrect_hyp_probs) / sum(incorrect_hyp_probs)
-                sampled_hyp = np.random.choice(incorrect_hyps, size=1, p=incorrect_hyp_probs)
-                sampled_hyp = sampled_hyp[0]
+            if type in ('best', 'sample'):
+                if type == 'best':
+                    sample_idx = np.argmax(incorrect_hyp_scores)
+                    sampled_hyp = incorrect_hyps[sample_idx]
+                else:
+                    incorrect_hyp_probs = [np.exp(score) for score in incorrect_hyp_scores]
+                    incorrect_hyp_probs = np.array(incorrect_hyp_probs) / sum(incorrect_hyp_probs)
+                    sampled_hyp = np.random.choice(incorrect_hyps, size=1, p=incorrect_hyp_probs)
+                    sampled_hyp = sampled_hyp[0]
 
-            sample = Example(idx='negative-%s' % _example.idx,
-                             src_sent=_example.src_sent,
-                             tgt_code=sampled_hyp.code,
-                             tgt_actions=None,
-                             tgt_ast=None)
-            return sample
+                sample = Example(idx='negative-%s' % _example.idx,
+                                 src_sent=_example.src_sent,
+                                 tgt_code=sampled_hyp.code,
+                                 tgt_actions=None,
+                                 tgt_ast=None)
+                return sample
+            elif type == 'all':
+                samples = []
+                for i, hyp in enumerate(incorrect_hyps):
+                    sample = Example(idx='negative-%s-%d' % (_example.idx, i),
+                                     src_sent=_example.src_sent,
+                                     tgt_code=hyp.code,
+                                     tgt_actions=None,
+                                     tgt_ast=None)
+                    samples.append(sample)
+
+                return samples
         else:
             return None
 
@@ -347,9 +359,13 @@ def train_rerank_feature(args):
                 # sample negative examples
                 for example, hyps in zip(batch_examples, batch_decoding_results):
                     if hyps:
-                        negative_sample = get_negative_example(example, hyps, type='best')
-                        negative_samples.append(negative_sample)
-                        labels.append(1)
+                        negative_sample = get_negative_example(example, hyps, type=args.negative_sample_type)
+                        if isinstance(negative_sample, Example):
+                            negative_samples.append(negative_sample)
+                            labels.append(1)
+                        else:
+                            negative_samples.extend(negative_sample)
+                            labels.extend([1] * len(negative_sample))
 
                 batch_examples += negative_samples
 
