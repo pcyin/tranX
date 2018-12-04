@@ -39,7 +39,7 @@ def _rank_segment_worker(param_space):
     best_param = None
     print('[Child] New parameter segments [%s ~ %s] (%d entries)' % (param_space[0], param_space[-1], len(param_space)), file=sys.stderr)
     for param in param_space:
-        score = _ranker.compute_rerank_performance(_examples, _decode_results, fast_mode=True, evaluator=_evaluator, param=param)
+        score = _ranker.compute_rerank_performance(_examples, _decode_results, fast_mode=True, evaluator=_evaluator, param=np.array(param))
         if score > best_score:
             print('[Child] New param=%s, score=%.4f' % (param, score), file=sys.stderr)
             best_param = param
@@ -61,21 +61,35 @@ class RerankingFeature(object):
         raise NotImplementedError
 
 
-@Registrable.register('parser_score')
-class ParserScore(RerankingFeature):
+@Registrable.register('normalized_parser_score')
+class NormalizedParserScore(RerankingFeature):
     def __init__(self):
         pass
 
     @property
     def feature_name(self):
-        return 'parser_score'
+        return 'normalized_parser_score'
 
     @property
     def is_batched(self):
         return False
 
     def get_feat_value(self, example, hyp, **kwargs):
-        return float(hyp.score)
+        return float(hyp.score) / hyp.code_token_count
+
+
+@Registrable.register('code_token_count')
+class HypCodeTokensCount(RerankingFeature):
+    @property
+    def feature_name(self):
+        return 'code_token_count'
+
+    @property
+    def is_batched(self):
+        return False
+
+    def get_feat_value(self, example, hyp, **kwargs):
+        return float(hyp.code_token_count)
 
 
 @Registrable.register('is_2nd_hyp_and_margin_with_top_hyp')
@@ -158,6 +172,7 @@ class Reranker(Savable):
 
     def initialize_rerank_features(self, examples, decode_results):
         hyp_examples = []
+        print('initializing features...', file=sys.stderr)
         for example, hyps in zip(examples, decode_results):
             for hyp_id, hyp in enumerate(hyps):
                 hyp_example = Example(idx=None,
@@ -166,6 +181,7 @@ class Reranker(Savable):
                                       tgt_actions=None,
                                       tgt_ast=None)
                 hyp_examples.append(hyp_example)
+                hyp.code_token_count = len(self.transition_system.tokenize_code(hyp.code))
 
                 feat_vals = OrderedDict()
                 hyp.rerank_feature_values = feat_vals
@@ -324,7 +340,7 @@ class GridSearchReranker(Reranker):
         best_score = initial_performance
         best_param = np.zeros(self.feature_num)
 
-        param_space = (np.array(p) for p in itertools.combinations(np.arange(0, 1.01, 0.01), self.feature_num))
+        param_space = (np.array(p) for p in itertools.combinations(np.arange(0, 3.01, 0.01), self.feature_num))
 
         for param in param_space:
             score = self.compute_rerank_performance(examples, decode_results, fast_mode=True, evaluator=evaluator, param=param)
@@ -340,9 +356,12 @@ class GridSearchReranker(Reranker):
         best_score = initial_performance
         best_param = np.zeros(self.feature_num)
 
-        param_space = [np.array(p) for p in itertools.combinations(np.arange(0, 1.01, 0.01), self.feature_num)]
-
         self.initialize_rerank_features(examples, decode_results)
+
+        print('generating parameter list', file=sys.stderr)
+        param_space = [p for p in itertools.combinations(np.arange(0, 2.01, 0.01), self.feature_num)]
+        print('generating parameter list done', file=sys.stderr)
+
         global _examples
         _examples = examples
         global _decode_results
