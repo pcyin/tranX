@@ -3,7 +3,8 @@ import sys
 import numpy as np
 import pickle
 
-from asdl.lang.py.dataset import get_action_infos
+from components.action_info import get_action_infos
+from datasets import ConalaEvaluator
 from datasets.conala.util import *
 from asdl.lang.py3.py3_transition_system import python_ast_to_asdl_ast, asdl_ast_to_python_ast, Python3TransitionSystem
 
@@ -16,7 +17,7 @@ from components.dataset import Dataset
 from components.action_info import ActionInfo
 
 
-def preprocess_conala_dataset(train_file, test_file, grammar_file):
+def preprocess_conala_dataset(train_file, test_file, grammar_file, src_freq=2, code_freq=2):
     np.random.seed(1234)
 
     asdl_text = open(grammar_file).read()
@@ -25,28 +26,43 @@ def preprocess_conala_dataset(train_file, test_file, grammar_file):
 
     print('process training data...')
     train_examples = preprocess_dataset(train_file, name='train', transition_system=transition_system)
-    print(f'{len(train_examples)} training instances', file=sys.stderr)
 
     # held out 200 examples for development
+    # full_train_examples = train_examples[:]
+    # np.random.shuffle(train_examples)
+    # dev_examples = train_examples[:200]
+    # train_examples = train_examples[200:]
+
     full_train_examples = train_examples[:]
     np.random.shuffle(train_examples)
-    dev_examples = train_examples[:200]
-    train_examples = train_examples[200:]
+    dev_examples = []
+    dev_questions = set()
+    dev_examples_id = []
+    for i, example in enumerate(full_train_examples):
+        qid = example.meta['example_dict']['question_id']
+        if qid not in dev_questions and len(dev_examples) < 200:
+            dev_questions.add(qid)
+            dev_examples.append(example)
+            dev_examples_id.append(i)
+
+    train_examples = [e for i, e in enumerate(full_train_examples) if i not in dev_examples_id]
+    print(f'{len(train_examples)} training instances', file=sys.stderr)
+    print(f'{len(dev_examples)} dev instances', file=sys.stderr)
 
     print('process testing data...')
     test_examples = preprocess_dataset(test_file, name='test', transition_system=transition_system)
     print(f'{len(test_examples)} testing instances', file=sys.stderr)
 
     src_vocab = VocabEntry.from_corpus([e.src_sent for e in train_examples], size=5000,
-                                       freq_cutoff=2)
+                                       freq_cutoff=src_freq)
     primitive_tokens = [map(lambda a: a.action.token,
                             filter(lambda a: isinstance(a.action, GenTokenAction), e.tgt_actions))
                         for e in train_examples]
-    primitive_vocab = VocabEntry.from_corpus(primitive_tokens, size=5000, freq_cutoff=2)
+    primitive_vocab = VocabEntry.from_corpus(primitive_tokens, size=5000, freq_cutoff=code_freq)
 
     # generate vocabulary for the code tokens!
     code_tokens = [transition_system.tokenize_code(e.tgt_code, mode='decoder') for e in train_examples]
-    code_vocab = VocabEntry.from_corpus(code_tokens, size=5000, freq_cutoff=2)
+    code_vocab = VocabEntry.from_corpus(code_tokens, size=5000, freq_cutoff=code_freq)
 
     vocab = Vocab(source=src_vocab, primitive=primitive_vocab, code=code_vocab)
     print('generated vocabulary %s' % repr(vocab), file=sys.stderr)
@@ -56,16 +72,19 @@ def preprocess_conala_dataset(train_file, test_file, grammar_file):
     print('Avg action len: %d' % np.average(action_lens), file=sys.stderr)
     print('Actions larger than 100: %d' % len(list(filter(lambda x: x > 100, action_lens))), file=sys.stderr)
 
-    pickle.dump(train_examples, open('data/conala/train.bin', 'wb'))
-    pickle.dump(full_train_examples, open('data/conala/train.full.bin', 'wb'))
-    pickle.dump(dev_examples, open('data/conala/dev.bin', 'wb'))
-    pickle.dump(test_examples, open('data/conala/test.bin', 'wb'))
-    pickle.dump(vocab, open('data/conala/vocab.bin', 'wb'))
+    pickle.dump(train_examples, open('data/conala/train.var_str_sep.new_dev.bin', 'wb'))
+    pickle.dump(full_train_examples, open('data/conala/train.var_str_sep.full.bin', 'wb'))
+    pickle.dump(dev_examples, open('data/conala/dev.var_str_sep.new_dev.bin', 'wb'))
+    pickle.dump(test_examples, open('data/conala/test.var_str_sep.new_dev.bin', 'wb'))
+    pickle.dump(vocab, open('data/conala/vocab.var_str_sep.new_dev.src_freq%d.code_freq%d.bin' % (src_freq, code_freq), 'wb'))
 
 
 def preprocess_dataset(file_path, transition_system, name='train'):
     dataset = json.load(open(file_path))
     examples = []
+    evaluator = ConalaEvaluator(transition_system)
+
+    f = open(file_path + '.debug', 'w')
 
     for i, example_json in enumerate(dataset):
         example_dict = preprocess_example(example_json)
@@ -112,9 +131,20 @@ def preprocess_dataset(file_path, transition_system, name='train'):
                           tgt_ast=tgt_ast,
                           meta=dict(example_dict=example_json,
                                     slot_map=example_dict['slot_map']))
-        assert transition_system.hyp_correct(hyp, example)
+        assert evaluator.is_hyp_correct(example, hyp)
 
         examples.append(example)
+
+        # log!
+        f.write(f'Example: {example.idx}\n')
+        f.write(f"Original Utterance: {example.meta['example_dict']['rewritten_intent']}\n")
+        f.write(f"Original Snippet: {example.meta['example_dict']['snippet']}\n")
+        f.write(f"\n")
+        f.write(f"Utterance: {' '.join(example.src_sent)}\n")
+        f.write(f"Snippet: {example.tgt_code}\n")
+        f.write(f"++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n")
+
+    f.close()
 
     return examples
 
@@ -144,7 +174,24 @@ def preprocess_example(example_json):
             'canonical_snippet': canonical_snippet}
 
 
+def generate_vocab_for_paraphrase_model(vocab_path, save_path):
+    from components.vocab import VocabEntry, Vocab
+
+    vocab = pickle.load(open(vocab_path, 'rb'))
+    para_vocab = VocabEntry()
+    for i in range(0, 10):
+        para_vocab.add('<unk_%d>' % i)
+    for word in vocab.source.word2id:
+        para_vocab.add(word)
+    for word in vocab.code.word2id:
+        para_vocab.add(word)
+
+    pickle.dump(para_vocab, open(save_path, 'wb'))
+
+
 if __name__ == '__main__':
     preprocess_conala_dataset(train_file='/Users/yinpengcheng/Research/SemanticParsing/conala_eval/data/conala-train.json',
                               test_file='/Users/yinpengcheng/Research/SemanticParsing/conala_eval/data/conala-test.json',
-                              grammar_file='asdl/lang/py3/py3_asdl.simplified.txt')
+                              grammar_file='asdl/lang/py3/py3_asdl.simplified.txt', src_freq=3, code_freq=3)
+
+    # generate_vocab_for_paraphrase_model('data/conala/vocab.src_freq3.code_freq3.bin', 'data/conala/vocab.para.src_freq3.code_freq3.bin')

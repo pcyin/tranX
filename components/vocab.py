@@ -58,11 +58,15 @@ class VocabEntry(object):
         print('singletons: %s' % singletons)
 
         top_k_words = sorted(word_freq.keys(), reverse=True, key=word_freq.get)[:size]
-
+        words_not_included = []
         for word in top_k_words:
             if len(vocab_entry) < size:
                 if word_freq[word] >= freq_cutoff:
                     vocab_entry.add(word)
+                else:
+                    words_not_included.append(word)
+
+        print('word types not included: %s' % words_not_included)
 
         return vocab_entry
 

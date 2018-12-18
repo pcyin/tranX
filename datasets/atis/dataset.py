@@ -7,7 +7,7 @@ try: import cPickle as pickle
 except: import pickle
 
 from asdl.hypothesis import Hypothesis
-from asdl.lang.py.dataset import get_action_infos
+from components.action_info import get_action_infos
 from asdl.transition_system import *
 from components.dataset import Example
 from components.vocab import VocabEntry, Vocab
@@ -94,7 +94,7 @@ def prepare_atis_dataset():
 
     # generate vocabulary for the code tokens!
     code_tokens = [transition_system.tokenize_code(e.tgt_code, mode='decoder') for e in train_set]
-    code_vocab = VocabEntry.from_corpus(code_tokens, size=5000, freq_cutoff=0)
+    code_vocab = VocabEntry.from_corpus(code_tokens, size=5000, freq_cutoff=2)
 
     vocab = Vocab(source=src_vocab, primitive=primitive_vocab, code=code_vocab)
     print('generated vocabulary %s' % repr(vocab), file=sys.stderr)
@@ -104,9 +104,9 @@ def prepare_atis_dataset():
     print('Avg action len: %d' % np.average(action_len), file=sys.stderr)
     print('Actions larger than 100: %d' % len(filter(lambda x: x > 100, action_len)), file=sys.stderr)
 
-    pickle.dump(train_set, open('data/atis/train.ordered.bin', 'w'))
-    pickle.dump(dev_set, open('data/atis/dev.ordered.bin', 'w'))
-    pickle.dump(test_set, open('data/atis/test.ordered.bin', 'w'))
+    pickle.dump(train_set, open('data/atis/train.bin', 'w'))
+    pickle.dump(dev_set, open('data/atis/dev.bin', 'w'))
+    pickle.dump(test_set, open('data/atis/test.bin', 'w'))
     pickle.dump(vocab, open('data/atis/vocab.freq%d.bin' % vocab_freq_cutoff, 'w'))
 
 
@@ -158,9 +158,25 @@ def prepare_geo_dataset():
     pickle.dump(vocab, open('data/geo/vocab.freq2.bin', 'wb'))
 
 
+def generate_vocab_for_paraphrase_model(vocab_path, save_path):
+    from components.vocab import VocabEntry, Vocab
+
+    vocab = pickle.load(open(vocab_path))
+    para_vocab = VocabEntry()
+    for i in range(0, 10):
+        para_vocab.add('<unk_%d>' % i)
+    for word in vocab.source.word2id:
+        para_vocab.add(word)
+    for word in vocab.code.word2id:
+        para_vocab.add(word)
+
+    pickle.dump(para_vocab, open(save_path, 'w'))
+
+
 if __name__ == '__main__':
     grammar = ASDLGrammar.from_text(open('asdl/lang/lambda_dcs/lambda_asdl.txt').read())
     transition_system = LambdaCalculusTransitionSystem(grammar)
     # load_dataset(transition_system, 'data/atis/train.txt')
-    prepare_geo_dataset()
-    prepare_atis_dataset()
+    # prepare_geo_dataset()
+    # prepare_atis_dataset()
+    generate_vocab_for_paraphrase_model('data/atis/vocab.freq2.bin', 'data/atis/vocab.para.freq2.bin')

@@ -2,6 +2,7 @@
 
 from __future__ import print_function
 
+import torch
 import re
 import pickle
 import ast
@@ -16,7 +17,7 @@ from asdl.lang.py.py_transition_system import PythonTransitionSystem
 from asdl.hypothesis import *
 from asdl.lang.py.py_utils import tokenize_code
 
-from components.action_info import ActionInfo
+from components.action_info import ActionInfo, get_action_infos
 
 p_elif = re.compile(r'^elif\s?')
 p_else = re.compile(r'^else\s?')
@@ -26,31 +27,6 @@ p_finally = re.compile(r'^finally\s?')
 p_decorator = re.compile(r'^@.*')
 
 QUOTED_STRING_RE = re.compile(r"(?P<quote>['\"])(?P<string>.*?)(?<!\\)(?P=quote)")
-
-
-def get_action_infos(src_query, tgt_actions, force_copy=False):
-    action_infos = []
-    hyp = Hypothesis()
-    for t, action in enumerate(tgt_actions):
-        action_info = ActionInfo(action)
-        action_info.t = t
-        if hyp.frontier_node:
-            action_info.parent_t = hyp.frontier_node.created_time
-            action_info.frontier_prod = hyp.frontier_node.production
-            action_info.frontier_field = hyp.frontier_field.field
-
-        if isinstance(action, GenTokenAction):
-            try:
-                tok_src_idx = src_query.index(str(action.token))
-                action_info.copy_from_src = True
-                action_info.src_token_position = tok_src_idx
-            except ValueError:
-                if force_copy: raise ValueError('cannot copy primitive token %s from source' % action.token)
-
-        hyp.apply_action(action)
-        action_infos.append(action_info)
-
-    return action_infos
 
 
 def replace_string_ast_nodes(py_ast, str_map):
@@ -384,6 +360,21 @@ class Django(object):
         return code
 
 
+def generate_vocab_for_paraphrase_model(vocab_path, save_path):
+    from components.vocab import VocabEntry, Vocab
+
+    vocab = pickle.load(open(vocab_path))
+    para_vocab = VocabEntry()
+    for i in range(0, 10):
+        para_vocab.add('<unk_%d>' % i)
+    for word in vocab.source.word2id:
+        para_vocab.add(word)
+    for word in vocab.code.word2id:
+        para_vocab.add(word)
+
+    pickle.dump(para_vocab, open(save_path, 'w'))
+
+
 if __name__ == '__main__':
     # Django.run()
     # f1 = Field('hahah', ASDLPrimitiveType('123'), 'single')
@@ -392,9 +383,8 @@ if __name__ == '__main__':
     # # print(f1 == rf1)
     # a = {f1: 1}
     # print(a[rf1])
-    Django.process_django_dataset()
-
-
+    # Django.process_django_dataset()
+    generate_vocab_for_paraphrase_model('data/django/vocab.freq10.bin', 'data/django/vocab.para.freq10.bin')
 
     # py_ast = ast.parse("""sorted(asf, reverse='k' 'k', k='re' % sdf)""")
     # canonicalize_py_ast(py_ast)
