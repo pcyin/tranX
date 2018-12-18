@@ -28,24 +28,24 @@ def preprocess_conala_dataset(train_file, test_file, grammar_file, src_freq=2, c
     train_examples = preprocess_dataset(train_file, name='train', transition_system=transition_system)
 
     # held out 200 examples for development
-    # full_train_examples = train_examples[:]
-    # np.random.shuffle(train_examples)
-    # dev_examples = train_examples[:200]
-    # train_examples = train_examples[200:]
-
     full_train_examples = train_examples[:]
     np.random.shuffle(train_examples)
-    dev_examples = []
-    dev_questions = set()
-    dev_examples_id = []
-    for i, example in enumerate(full_train_examples):
-        qid = example.meta['example_dict']['question_id']
-        if qid not in dev_questions and len(dev_examples) < 200:
-            dev_questions.add(qid)
-            dev_examples.append(example)
-            dev_examples_id.append(i)
+    dev_examples = train_examples[:200]
+    train_examples = train_examples[200:]
 
-    train_examples = [e for i, e in enumerate(full_train_examples) if i not in dev_examples_id]
+    # full_train_examples = train_examples[:]
+    # np.random.shuffle(train_examples)
+    # dev_examples = []
+    # dev_questions = set()
+    # dev_examples_id = []
+    # for i, example in enumerate(full_train_examples):
+    #     qid = example.meta['example_dict']['question_id']
+    #     if qid not in dev_questions and len(dev_examples) < 200:
+    #         dev_questions.add(qid)
+    #         dev_examples.append(example)
+    #         dev_examples_id.append(i)
+
+    # train_examples = [e for i, e in enumerate(full_train_examples) if i not in dev_examples_id]
     print(f'{len(train_examples)} training instances', file=sys.stderr)
     print(f'{len(dev_examples)} dev instances', file=sys.stderr)
 
