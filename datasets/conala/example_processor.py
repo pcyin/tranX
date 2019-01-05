@@ -1,6 +1,7 @@
 import astor
 
 from datasets.utils import ExampleProcessor
+from datasets.conala.dataset import canonicalize_intent, tokenize_intent, asdl_ast_to_python_ast, decanonicalize_code
 
 
 class ConalaExampleProcessor(ExampleProcessor):
@@ -8,15 +9,13 @@ class ConalaExampleProcessor(ExampleProcessor):
         self.transition_system = transition_system
 
     def pre_process_utterance(self, utterance):
-        canonical_utterance, str2slot_map = Django.canonicalize_query(utterance)
+        canonical_intent, slot_map = canonicalize_intent(utterance)
+        intent_tokens = tokenize_intent(canonical_intent)
 
-        meta_info = str2slot_map
-        return canonical_utterance.split(' '), meta_info
+        return intent_tokens, slot_map
 
     def post_process_hypothesis(self, hyp, meta_info, utterance=None):
         """traverse the AST and replace slot ids with original strings"""
-        slot2str_map = {v: k for k, v in meta_info.items()}
         hyp_ast = asdl_ast_to_python_ast(hyp.tree, self.transition_system.grammar)
-        replace_string_ast_nodes(hyp_ast, slot2str_map)
-
-        hyp.code = astor.to_source(hyp_ast).strip()
+        code_from_hyp = astor.to_source(hyp_ast).strip()
+        hyp.code = decanonicalize_code(code_from_hyp, meta_info)

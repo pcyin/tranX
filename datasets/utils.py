@@ -23,5 +23,8 @@ def get_example_processor_cls(dataset):
     elif dataset == 'geo':
         from datasets.geo.example_processor import GeoQueryExampleProcessor
         return GeoQueryExampleProcessor
+    elif dataset == 'conala':
+        from datasets.conala.example_processor import ConalaExampleProcessor
+        return ConalaExampleProcessor
     else:
         raise RuntimeError()

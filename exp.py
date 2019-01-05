@@ -644,11 +644,11 @@ def interactive_mode(args):
     """Interactive mode"""
     print('Start interactive mode', file=sys.stderr)
 
-    parser = StandaloneParser('atis',
-                                 'saved_models/atis/'
-                                 'model.atis.sup.lstm.hidden200.embed128.action128.field32.type32.dropout0.3.lr_decay0.5.beam5.vocab.bin.train.bin.glorot.par_state_w_field_embed.seed0.bin',
-                                 beam_size=5,
-                                 cuda=False)
+    parser = StandaloneParser('conala',
+                              'saved_models/conala/'
+                              'model.sup.conala.lstm.hidden256.embed128.action128.field64.type64.dr0.3.lr0.001.lr_de0.5.lr_da15.beam15.vocab.var_str_sep.new_dev.src_freq3.code_freq3.bin.train.var_str_sep.new_dev.bin.glorot.par_state.seed1.bin',
+                              beam_size=15,
+                              cuda=False)
 
     while True:
         utterance = input('Query:').strip()
