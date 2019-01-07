@@ -43,14 +43,13 @@ class StandaloneParser(object):
         self.example_processor = get_example_processor_cls(dataset_name)(parser.transition_system)
         self.beam_size = beam_size
 
-    def parse(self, utterance):
+    def parse(self, utterance, debug=False):
         utterance = utterance.strip()
         processed_utterance_tokens, utterance_meta = self.example_processor.pre_process_utterance(utterance)
         print(processed_utterance_tokens)
-        hypotheses = self.parser.parse(processed_utterance_tokens, beam_size=self.beam_size)
+        hypotheses = self.parser.parse(processed_utterance_tokens, beam_size=self.beam_size, debug=debug)
 
         valid_hypotheses = list(filter(lambda hyp: self.parser.transition_system.is_valid_hypothesis(hyp), hypotheses))
-        print(len(valid_hypotheses))
 
         for hyp in valid_hypotheses:
             self.example_processor.post_process_hypothesis(hyp, utterance_meta)
