@@ -136,7 +136,7 @@ def norm_lambda_variable(f):
   if c_right < c_left:
     f_list.extend([')' for it in range(c_left - c_right)])
   elif c_right > c_left:
-    print c_right, '>', c_left, f_list
+    print(c_right, '>', c_left, f_list)
 
   return ' '.join(map(lambda x: v_dict.get(x, x), f_list))
 

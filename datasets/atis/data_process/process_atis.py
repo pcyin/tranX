@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from __future__ import print_function
 
 import random as rnd
 import argparse
@@ -160,7 +161,7 @@ def process_main(d, split):
   with open(d + '%s.txt' % (split,), 'w') as f_out:
     f_out.write('\n'.join(map(lambda x: '%s\t%s' %
                               (' '.join(x[0]), ' '.join(x[1])), l_list)).encode('utf-8'))
-    print 'maximun length:', max([len(x[0]) for x in l_list]), max([len(x[1]) for x in l_list])
+    print('maximun length:', max([len(x[0]) for x in l_list]), max([len(x[1]) for x in l_list]))
 
 def vocab_main(d):
   cq, cf = {}, {}
@@ -176,10 +177,10 @@ def vocab_main(d):
       cf[it] = cf.get(it, 0) + 1
   with open(d + 'vocab.q.txt', 'w') as f_out:
     for w, c in sorted([(k, v) for k, v in cq.iteritems()], key=lambda x: x[1], reverse=True):
-      print >>f_out, ('%s\t%d' % (w, c)).encode('utf-8')
+      print(('%s\t%d' % (w, c)).encode('utf-8'), file=f_out)
   with open(d + 'vocab.f.txt', 'w') as f_out:
     for w, c in sorted([(k, v) for k, v in cf.iteritems()], key=lambda x: x[1], reverse=True):
-      print >>f_out, ('%s\t%d' % (w, c)).encode('utf-8')
+      print(('%s\t%d' % (w, c)).encode('utf-8'), file=f_out)
 
 
 if __name__ == '__main__':
@@ -191,7 +192,7 @@ if __name__ == '__main__':
   args = parser.parse_args()
 
   for split in ('train', 'dev', 'test'):
-    print split, ':'
+    print(split, ':')
     process_main(args.data_dir, split)
 
   vocab_main(args.data_dir)

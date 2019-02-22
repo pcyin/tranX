@@ -657,10 +657,10 @@ def interactive_mode(args):
         for hyp_id, hyp in enumerate(hypotheses):
             print('------------------ Hypothesis %d ------------------' % hyp_id)
             print(hyp.code)
-            print(hyp.tree.to_string())
-            print('Actions:')
-            for action_t in hyp.action_infos:
-                print(action_t.__repr__(True))
+            # print(hyp.tree.to_string())
+            # print('Actions:')
+            # for action_t in hyp.action_infos:
+            #     print(action_t.__repr__(True))
 
 
 def train_reranker_and_test(args):
