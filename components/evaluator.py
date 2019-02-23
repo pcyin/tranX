@@ -7,7 +7,7 @@ from common.registerable import Registrable
 
 @Registrable.register('default_evaluator')
 class Evaluator(object):
-    def __init__(self, transition_system=None):
+    def __init__(self, transition_system=None, args=None):
         self.transition_system = transition_system
         self.default_metric = 'accuracy'
 

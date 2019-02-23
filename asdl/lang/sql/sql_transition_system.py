@@ -3,7 +3,7 @@ from __future__ import absolute_import
 
 import json
 
-from datasets.wikisql.utils import detokenize_query
+from common.registerable import Registrable
 from ...asdl import ASDLGrammar
 from ...asdl_ast import RealizedField, AbstractSyntaxTree
 from ...transition_system import GenTokenAction, TransitionSystem, ApplyRuleAction, ReduceAction
@@ -90,25 +90,13 @@ def asdl_ast_to_sql_query(asdl_ast):
     return query
 
 
+@Registrable.register('sql')
 class SqlTransitionSystem(TransitionSystem):
     def ast_to_surface_code(self, asdl_ast):
         return asdl_ast_to_sql_query(asdl_ast)
 
     def compare_ast(self, hyp_ast, ref_ast):
         raise NotImplementedError
-
-    def hyp_correct(self, hyp, example, execution_engine):
-        hyp_query = asdl_ast_to_sql_query(hyp.tree)
-        ref_query = Query.from_tokenized_dict(example.meta['query'])
-        detokenized_hyp_query = detokenize_query(hyp_query, example.meta, example.table)
-
-        # result = detokenized_hyp_query == ref_query
-        ref_answer = execution_engine.execute_query(example.meta['table_id'], ref_query, lower=True)
-        hyp_answer = execution_engine.execute_query(example.meta['table_id'], detokenized_hyp_query, lower=True)
-
-        result = ref_answer == hyp_answer
-
-        return result
 
     def tokenize_code(self, code, mode):
         raise NotImplementedError

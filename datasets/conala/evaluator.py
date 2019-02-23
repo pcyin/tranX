@@ -1,10 +1,10 @@
-from common.evaluator import Evaluator
+from components.evaluator import Evaluator
 from common.registerable import Registrable
 from components.dataset import Dataset
 from .util import decanonicalize_code
 from .conala_eval import tokenize_for_bleu_eval
 from .bleu_score import compute_bleu
-from nltk.translate.bleu_score import corpus_bleu, sentence_bleu, SmoothingFunction
+from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 import numpy as np
 import ast
 import astor
@@ -12,7 +12,7 @@ import astor
 
 @Registrable.register('conala_evaluator')
 class ConalaEvaluator(Evaluator):
-    def __init__(self, transition_system=None):
+    def __init__(self, transition_system=None, args=None):
         super(ConalaEvaluator, self).__init__()
         self.transition_system = transition_system
         self.default_metric = 'corpus_bleu'

@@ -1,4 +1,4 @@
-from common.evaluator import Evaluator
+from components.evaluator import Evaluator
 from common.registerable import Registrable
 import ast
 import astor
@@ -6,7 +6,7 @@ import astor
 
 @Registrable.register('django_evaluator')
 class DjangoEvaluator(Evaluator):
-    def __init__(self, transition_system=None):
+    def __init__(self, transition_system=None, args=None):
         super(DjangoEvaluator, self).__init__()
         self.transition_system = transition_system
 

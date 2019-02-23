@@ -46,6 +46,12 @@ def init_config():
 def train(args):
     """Maximum Likelihood Estimation"""
 
+    if args.parser == 'wikisql_parser':
+        # import additional packages for wikisql dataset (works only under Python 3)
+        from model.wikisql.dataset import WikiSqlExample, WikiSqlTable, TableColumn
+        from model.wikisql.parser import WikiSqlParser
+        from datasets.wikisql.dataset import Query, DBEngine
+
     # load in train/dev set
     train_set = Dataset.from_bin_file(args.train_file)
 
@@ -54,10 +60,6 @@ def train(args):
     else: dev_set = Dataset(examples=[])
 
     vocab = pickle.load(open(args.vocab, 'rb'))
-    
-    if args.lang == 'wikisql':
-        # import additional packages for wikisql dataset (works only under Python 3)
-        from model.wikisql.dataset import WikiSqlExample, WikiSqlTable, TableColumn
 
     grammar = ASDLGrammar.from_text(open(args.asdl_file).read())
     transition_system = Registrable.by_name(args.transition_system)(grammar)
@@ -66,7 +68,7 @@ def train(args):
     model = parser_cls(args, vocab, transition_system)
     model.train()
 
-    evaluator = Registrable.by_name(args.evaluator)(transition_system)
+    evaluator = Registrable.by_name(args.evaluator)(transition_system, args=args)
     if args.cuda: model.cuda()
 
     optimizer_cls = eval('torch.optim.%s' % args.optimizer)  # FIXME: this is evil!
@@ -231,10 +233,10 @@ def test(args):
     # set the correct domain from saved arg
     args.lang = saved_args.lang
 
-    parser_cls = get_parser_class(saved_args.lang)
+    parser_cls = Registrable.by_name(args.parser)
     parser = parser_cls.load(model_path=args.load_model, cuda=args.cuda)
     parser.eval()
-    evaluator = Registrable.by_name(args.evaluator)(transition_system)
+    evaluator = Registrable.by_name(args.evaluator)(transition_system, args=args)
     eval_results, decode_results = evaluation.evaluate(test_set.examples, parser, evaluator, args,
                                                        verbose=args.verbose, return_decode_result=True)
     print(eval_results, file=sys.stderr)
@@ -245,6 +247,11 @@ def test(args):
 def interactive_mode(args):
     """Interactive mode"""
     print('Start interactive mode', file=sys.stderr)
+
+    from datasets.conala.example_processor import ConalaExampleProcessor
+    from datasets.atis.example_processor import ATISExampleProcessor
+    from datasets.geo.example_processor import GeoQueryExampleProcessor
+    from datasets.django.example_processor import DjangoExampleProcessor
 
     parser = StandaloneParser(args.parser,
                               args.load_model,

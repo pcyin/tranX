@@ -7,19 +7,22 @@ from tqdm import tqdm
 
 
 def decode(examples, model, args, verbose=False, **kwargs):
+    ## TODO: create decoder for each dataset
+
     if verbose:
         print('evaluating %d examples' % len(examples))
 
     was_training = model.training
     model.eval()
 
-    if args.lang == 'wikisql':
+    is_wikisql = args.parser == 'wikisql_parser'
+    if is_wikisql:
         from datasets.wikisql.utils import detokenize_query
 
     decode_results = []
     count = 0
     for example in tqdm(examples, desc='Decoding', file=sys.stdout, total=len(examples)):
-        if args.lang == 'wikisql':
+        if is_wikisql:
             hyps = model.parse(example.src_sent, context=example.table, beam_size=args.beam_size)
         else:
             hyps = model.parse(example.src_sent, context=None, beam_size=args.beam_size)
@@ -29,7 +32,7 @@ def decode(examples, model, args, verbose=False, **kwargs):
             try:
                 hyp.code = model.transition_system.ast_to_surface_code(hyp.tree)
                 got_code = True
-                if args.lang == 'wikisql' and args.answer_prune:
+                if is_wikisql and args.answer_prune:
                     # try execute the code, if fails, skip this example!
                     # if the execution returns null, also skip this example!
                     detokenized_hyp_query = detokenize_query(hyp.code, example.meta, example.table)
