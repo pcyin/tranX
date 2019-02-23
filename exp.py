@@ -24,6 +24,7 @@ from common.registerable import Registrable
 from components.dataset import Dataset, Example
 from components.standalone_parser import StandaloneParser
 from common.utils import update_args, init_arg_parser
+from datasets import *
 from model import nn_utils, utils
 
 from model.parser import Parser
