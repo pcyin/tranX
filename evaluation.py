@@ -14,8 +14,7 @@ def decode(examples, model, args, verbose=False, **kwargs):
     model.eval()
 
     if args.lang == 'wikisql':
-        from asdl.lang.sql.lib.dbengine import DBEngine
-        from asdl.lang.sql.utils import detokenize_query
+        from datasets.wikisql.utils import detokenize_query
 
     decode_results = []
     count = 0

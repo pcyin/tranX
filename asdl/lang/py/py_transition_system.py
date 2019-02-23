@@ -8,7 +8,10 @@ from asdl.lang.py.py_asdl_helper import asdl_ast_to_python_ast, python_ast_to_as
 from asdl.lang.py.py_utils import tokenize_code
 from asdl.transition_system import TransitionSystem, GenTokenAction
 
+from common.registerable import Registrable
 
+
+@Registrable.register('python2')
 class PythonTransitionSystem(TransitionSystem):
     def tokenize_code(self, code, mode=None):
         return tokenize_code(code, mode)

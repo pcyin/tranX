@@ -45,8 +45,7 @@ def init_config():
 def train(args):
     """Maximum Likelihood Estimation"""
 
-    grammar = ASDLGrammar.from_text(open(args.asdl_file).read())
-    transition_system = TransitionSystem.get_class_by_lang(args.lang)(grammar)
+    # load in train/dev set
     train_set = Dataset.from_bin_file(args.train_file)
 
     if args.dev_file:
@@ -56,12 +55,16 @@ def train(args):
     vocab = pickle.load(open(args.vocab, 'rb'))
     
     if args.lang == 'wikisql':
-        # import additional packages for wikisql dataset
+        # import additional packages for wikisql dataset (works only under Python 3)
         from model.wikisql.dataset import WikiSqlExample, WikiSqlTable, TableColumn
 
-    parser_cls = get_parser_class(args.lang)
+    grammar = ASDLGrammar.from_text(open(args.asdl_file).read())
+    transition_system = Registrable.by_name(args.transition_system)(grammar)
+
+    parser_cls = Registrable.by_name(args.parser)  # TODO: add arg
     model = parser_cls(args, vocab, transition_system)
     model.train()
+
     evaluator = Registrable.by_name(args.evaluator)(transition_system)
     if args.cuda: model.cuda()
 
@@ -242,11 +245,11 @@ def interactive_mode(args):
     """Interactive mode"""
     print('Start interactive mode', file=sys.stderr)
 
-    parser = StandaloneParser('conala',
-                              'saved_models/conala/'
-                              'model.sup.conala.lstm.hidden256.embed128.action128.field64.type64.dr0.3.lr0.001.lr_de0.5.lr_da15.beam15.vocab.var_str_sep.new_dev.src_freq3.code_freq3.bin.train.var_str_sep.new_dev.bin.glorot.par_state.seed1.bin',
-                              beam_size=15,
-                              cuda=False)
+    parser = StandaloneParser(args.parser,
+                              args.load_model,
+                              args.example_preprocessor,
+                              beam_size=args.beam_size,
+                              cuda=args.cuda)
 
     while True:
         utterance = input('Query:').strip()

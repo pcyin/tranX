@@ -4,7 +4,10 @@ from asdl.transition_system import TransitionSystem, GenTokenAction, ReduceActio
 
 from .logical_form import ast_to_logical_form, logical_form_to_ast, Node, parse_lambda_expr
 
+from common.registerable import Registrable
 
+
+@Registrable.register('lambda_dcs')
 class LambdaCalculusTransitionSystem(TransitionSystem):
     def tokenize_code(self, code, mode=None):
         return code.strip().split(' ')

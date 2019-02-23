@@ -3,12 +3,13 @@ from __future__ import absolute_import
 
 import json
 
-from asdl.lang.sql.utils import detokenize_query
-from ...asdl_ast import RealizedField, AbstractSyntaxTree
-from ...transition_system import GenTokenAction, TransitionSystem, Action, ApplyRuleAction, ReduceAction
-from .lib.query import Query
-from .lib.dbengine import DBEngine
+from datasets.wikisql.utils import detokenize_query
 from ...asdl import ASDLGrammar
+from ...asdl_ast import RealizedField, AbstractSyntaxTree
+from ...transition_system import GenTokenAction, TransitionSystem, ApplyRuleAction, ReduceAction
+
+from datasets.wikisql.lib.query import Query
+from datasets.wikisql.lib.dbengine import DBEngine
 
 
 cmp_op_idx2op_name = {0: 'Equal', 1: 'GreaterThan', 2: 'LessThan'}

@@ -1,9 +1,11 @@
 import astor
 
+from common.registerable import Registrable
 from datasets.utils import ExampleProcessor
 from datasets.conala.dataset import canonicalize_intent, tokenize_intent, asdl_ast_to_python_ast, decanonicalize_code
 
 
+@Registrable.register('conala_example_processor')
 class ConalaExampleProcessor(ExampleProcessor):
     def __init__(self, transition_system):
         self.transition_system = transition_system

@@ -1,11 +1,12 @@
 import astor
 
+from common.registerable import Registrable
 from datasets.utils import ExampleProcessor
-
-from asdl.lang.py.dataset import Django, replace_string_ast_nodes
+from datasets.django.dataset import Django, replace_string_ast_nodes
 from asdl.lang.py.py_asdl_helper import asdl_ast_to_python_ast
 
 
+@Registrable.register('django_example_processor')
 class DjangoExampleProcessor(ExampleProcessor):
     def __init__(self, transition_system):
         self.transition_system = transition_system

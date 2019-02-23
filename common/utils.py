@@ -27,11 +27,15 @@ def init_arg_parser():
     #### General configuration ####
     arg_parser.add_argument('--seed', default=0, type=int, help='Random seed')
     arg_parser.add_argument('--cuda', action='store_true', default=False, help='Use gpu')
-    arg_parser.add_argument('--lang', choices=['python', 'lambda_dcs', 'wikisql', 'prolog', 'python3'], default='python')
+    arg_parser.add_argument('--lang', choices=['python', 'lambda_dcs', 'wikisql', 'prolog', 'python3'], default='python',
+                            help='[Deprecated] language to parse. Deprecated, use --transition_system and --parser instead')
     arg_parser.add_argument('--asdl_file', type=str, help='Path to ASDL grammar specification')
-    arg_parser.add_argument('--mode', choices=['train', 'self_train', 'train_reconstructor', 'train_paraphrase_identifier',
-                                               'test', 'rerank', 'interactive'], default='train', help='Run mode')
-    arg_parser.add_argument('--evaluator', type=str, default='default_evaluator', required=False)
+    arg_parser.add_argument('--mode', choices=['train', 'test', 'interactive'], default='train', help='Run mode')
+
+    #### Modularized configuration ####
+    arg_parser.add_argument('--parser', type=str, default='default_parser', required=False, help='name of parser class to load')
+    arg_parser.add_argument('--transition_system', type=str, default='python2', required=False, help='name of transition system to use')
+    arg_parser.add_argument('--evaluator', type=str, default='default_evaluator', required=False, help='name of evaluator class to use')
 
     #### Model configuration ####
     arg_parser.add_argument('--lstm', choices=['lstm'], default='lstm', help='Type of LSTM used, currently only standard LSTM cell is supported')
@@ -146,7 +150,7 @@ def init_arg_parser():
     arg_parser.add_argument('--unlabeled_file', type=str, help='Path to the training source file used in semi-supervised self-training')
 
     #### interactive mode ####
-    arg_parser.add_argument('--dataset_name', default=None, type=str)
+    arg_parser.add_argument('--example_preprocessor', default=None, type=str, help='name of the class that is used to pre-process raw input examples')
 
     return arg_parser
 

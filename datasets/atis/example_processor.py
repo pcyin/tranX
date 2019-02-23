@@ -1,10 +1,11 @@
-
+from common.registerable import Registrable
 from datasets.utils import ExampleProcessor
 
 from asdl.asdl_ast import AbstractSyntaxTree
 from .data_process.process_atis import q_process
 
 
+@Registrable.register('atis_example_processor')
 class ATISExampleProcessor(ExampleProcessor):
     def __init__(self, transition_system):
         self.transition_system = transition_system
