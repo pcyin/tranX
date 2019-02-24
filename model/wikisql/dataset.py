@@ -4,7 +4,6 @@ from itertools import chain
 from collections import namedtuple
 
 from components.dataset import Example, Batch
-from components.utils import cached_property
 
 import torch
 from torch.autograd import Variable
@@ -31,11 +30,15 @@ class WikiSqlBatch(Batch):
     def init_index_tensors(self):
         pass
 
-    @cached_property
     def table_head_input_tensor(self):
-        return WikiSqlBatch.get_table_header_input_tensor([e.table for e in self.examples],
-                                                          self.vocab.source,
-                                                          cuda=self.cuda)
+        if not hasattr(self, '_table_head_input_tensor'):
+            _table_head_input_tensor = WikiSqlBatch.get_table_header_input_tensor([e.table for e in self.examples],
+                                                                                   self.vocab.source,
+                                                                                   cuda=self.cuda)
+
+            setattr(self, '_table_head_input_tensor', _table_head_input_tensor)
+        else:
+            return self._table_head_input_tensor
 
     @staticmethod
     def get_table_header_mask(tables, attention_mask=True, cuda=False):
