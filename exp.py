@@ -165,13 +165,13 @@ def train(args):
         else:
             is_better = True
 
-            if epoch > args.lr_decay_after_epoch:
-                lr = optimizer.param_groups[0]['lr'] * args.lr_decay
-                print('decay learning rate to %f' % lr, file=sys.stderr)
+        if args.decay_lr_every_epoch and epoch > args.lr_decay_after_epoch:
+            lr = optimizer.param_groups[0]['lr'] * args.lr_decay
+            print('decay learning rate to %f' % lr, file=sys.stderr)
 
-                # set new lr
-                for param_group in optimizer.param_groups:
-                    param_group['lr'] = lr
+            # set new lr
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = lr
 
         if is_better:
             patience = 0
