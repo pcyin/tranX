@@ -170,13 +170,13 @@ def train(args):
         else:
             is_better = True
 
-            if epoch > args.lr_decay_after_epoch:
-                lr = optimizer.param_groups[0]['lr'] * args.lr_decay
-                print('decay learning rate to %f' % lr, file=sys.stderr)
+        if args.decay_lr_every_epoch and epoch > args.lr_decay_after_epoch:
+            lr = optimizer.param_groups[0]['lr'] * args.lr_decay
+            print('decay learning rate to %f' % lr, file=sys.stderr)
 
-                # set new lr
-                for param_group in optimizer.param_groups:
-                    param_group['lr'] = lr
+            # set new lr
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = lr
 
         if is_better:
             patience = 0
@@ -310,8 +310,8 @@ def train_rerank_feature(args):
         return acc
 
     def get_negative_example(_example, _hyps, type='sample'):
-        if _hyps:
-            incorrect_hyps = [hyp for hyp in _hyps if not hyp.is_correct]
+        incorrect_hyps = [hyp for hyp in _hyps if not hyp.is_correct]
+        if incorrect_hyps:
             incorrect_hyp_scores = [hyp.score for hyp in incorrect_hyps]
             if type in ('best', 'sample'):
                 if type == 'best':
@@ -366,12 +366,13 @@ def train_rerank_feature(args):
                 for example, hyps in zip(batch_examples, batch_decoding_results):
                     if hyps:
                         negative_sample = get_negative_example(example, hyps, type=args.negative_sample_type)
-                        if isinstance(negative_sample, Example):
-                            negative_samples.append(negative_sample)
-                            labels.append(1)
-                        else:
-                            negative_samples.extend(negative_sample)
-                            labels.extend([1] * len(negative_sample))
+                        if negative_sample:
+                            if isinstance(negative_sample, Example):
+                                negative_samples.append(negative_sample)
+                                labels.append(1)
+                            else:
+                                negative_samples.extend(negative_sample)
+                                labels.extend([1] * len(negative_sample))
 
                 batch_examples += negative_samples
 
