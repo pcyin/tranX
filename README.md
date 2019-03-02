@@ -31,30 +31,94 @@ Figure 1 gives a brief overview of the system.
 
 These two components are implemented in the following two folders, respectively:
 
-* `asdl` defines a general-purpose transition system based on the ASDL formalism, and its instantiations in different programming languages and datasets.
-The transition system defines how an AST is constructed using a sequence of actions.
-This package can be used as a standalone library independent of tranX.
-See Section 2.2 of the technical report for details.
-* `model` contains the neural network implementation of the transition system defined in `asdl`, which computes action probabilities using neural networks.
-See Section 2.3 of the technical report for details.
+* `asdl` defines a general-purpose transition system based on the ASDL formalism, and its instantiations in different programming languages and datasets. The transition system defines how an AST is constructed using a sequence of actions. This package can be used as a standalone library independent of tranX. See Section 2.2 of the technical report for details.
 
-Additionally, the `components` folder contains helper functions and classes (e.g., vocabulary). 
+* `model` contains the neural network implementation of the transition system defined in `asdl`, which computes action probabilities using neural networks.See Section 2.3 of the technical report for details.
 
-## Supported Language
+Here is a detailed map of the file strcuture:
+```bash
+├── asdl (grammar-based transition system)
+├── datasets (dataset specific code like data preprocessing/evaluation/etc.)
+├── model (PyTorch implementation of neural nets)
+├── server (interactive Web server)
+├── components (helper functions and classes like vocabulary)
+```
+
+## Supported Language and Datasets
 
 TranX officially supports the following grammatical formalism and datasets.
 More languages (C#) are coming! 
 
-Language | ASDL Specification | Example Datasets
----------|--------------------| --------
-Python   | `asdl/lang/py_asdl.txt` | Django (Oda et al., 2015)
-lambda calculus| `asdl/lang/lambda_asdl.txt` | ATIS, GeoQuery (Zettlemoyer and Collins, 2005)
-prolog | `asdl/lang/prolog_asdl.txt`  | Jobs (Zettlemoyer and Collins, 2005)
-SQL | `asdl/lang/sql/sql_asdl.txt` | WikiSQL (Zhong et al., 2017)
+Language | Transition System | Grammar Specification | Example Datasets
+---------|--------------------| -------- | -------- 
+Python 2   | `asdl.PythonTransitionSystem` | `asdl/lang/py/py_asdl.txt` | Django (Oda et al., 2015)
+Python 3 | `asdl.Python3TransitionSystem` | `asdl/lang/py3/py3_asdl.simplified.txt` | CoNaLa (Yin et al., 2018) 
+Lambda Calculus| `asdl.LambdaCalculusTransitionSystem` | `asdl/lang/lambda_asdl.txt` | ATIS, GeoQuery (Zettlemoyer and Collins, 2005)
+Prolog | `asdl.PrologTransitionSystem` | `asdl/lang/prolog_asdl.txt`  | Jobs (Zettlemoyer and Collins, 2005)
+SQL | `asdl.SqlTransitionSystem` | `asdl/lang/sql/sql_asdl.txt` | WikiSQL (Zhong et al., 2017)
+
+### Evaluation Results
+
+Here is a list of performance results on six datasets using pretrained models in `data/pretrained_models`
+
+| Dataset | Results      | Metric             |
+| ------- | ------------ | ------------------ |
+| GEO     | 88.6         | Accuracy           |
+| ATIS    | 87.7         | Accuracy           |
+| JOBS    | 90.0         | Accuracy           |
+| Django  | 77.2         | Accuracy           |
+| CoNaLa  | 24.5         | Corpus BLEU        |
+| WikiSQL | 79.1         | Execution Accuracy |
+
 
 ## Usage
 
+
+### TL;DR
+
+```bash
+git clone https://github.com/pcyin/tranX
+cd tranX
+
+./pull_data.sh  # get datasets, training scripts, and pre-trained models
+
+conda env create -f data/env/py3torch3cuda9.yml  # create conda Python environment
+
+./scripts/atis/train.sh 0  # train on ATIS semantic parsing dataset with random seed 0
+./scripts/geo/train.sh 0  # train on GEO dataset
+./scripts/django/train.sh 0  # train on django code generation dataset
+./scripts/conala/train.sh 0  # train on CoNaLa code generation dataset
+./scripts/wikisql/train.sh 0  # train on WikiSQL SQL code generation dataset
+```
+
+### Web Server/HTTP API
+
+`tranX` also ships with a web server for demonstraction and interactive debugging perpuse. It also exposes an HTTP API for online semantic parsing/code generation.
+
+
+To start the web server, simply run:
+
+```
+source activate py3torch3cuda9
+PYTHONPATH=../ python app.py --config_file data/server/config_py3.json
+```
+
+This will start a web server at port 8081 with ATIS/GEO/CoNaLa datasets.
+
+
+
+**HTTP API** To programmically query `tranX` to get semantic parsing results, send your HTTP GET request to
+
+```
+http://<IP Address>:8081/parse/<dataset_name>/<utterance>
+
+# e.g., http://localhost:8081/parser/atis/show me flight from Pittsburgh to Seattle
+```
+
+
+
 ### Conda Environments
+
 TranX supports both Python 2.7 and 3.5. Please note that 
 some datasets only support Python 2.7 (e.g., Django) or Python 3+ (e.g., WikiSQL). We provide example
 conda environments (`data/env/(py2torch3cuda9.yml|py3torch3cuda9.yml)`) for both Python versions.
@@ -66,20 +130,7 @@ conda env create -f data/env/(py2torch3cuda9.yml|py3torch3cuda9.yml)
 
 **Note** The conda enviroments are generated on a Ubuntu 16.04 machine. If you are unable to import the enviroment with error message like `cannot found package numpy=1.14.3=py36h14a74c5_0`, please try removing the sha after the version number (e.g., `=py36h14a74c5_0`), since it might be different on different platforms. We keep the detailed version number with sha to ensure reproducibility.
 
-### Example Training Script
 
-```bash
-git clone https://github.com/pcyin/tranX
-cd tranX
-
-. pull_data.sh  # get datasets and training scripts for supported languages
-```
-
-The `scripts` folder contains scripts to train TranX on example datasets. For example, to train on the Django dataset, simply run:
-```
-. scripts/django/train.sh 0  # start training on Django dataset with seed 0
-```
-Using the provided conda environment, it achieves 73.9% test accuracy on a Ubuntu 16.04 machine with GTX1080 GPU.
 
 ## FAQs
 
@@ -93,7 +144,7 @@ You may take a look at the examples in `asdl/lang/*`.
 
 #### How to generate those pickled datasets (.bin files)?
 
-Please refer to `asdl/lang/*/dataset.py` for code snippets that converts 
+Please refer to `datasets/<lang>/dataset.py` for code snippets that converts 
 a dataset into pickled files. 
 
 ## Reference
@@ -117,6 +168,8 @@ TranX is described/used in the following two papers:
 }
 ```
 
+## Thanks
+
 We are also grateful to the following papers that inspire this work :P
 ```
 Abstract Syntax Networks for Code Generation and Semantic Parsing.
@@ -127,3 +180,5 @@ The Zephyr Abstract Syntax Description Language.
 Daniel C. Wang, Andrew W. Appel, Jeff L. Korn, and Christopher S. Serra.
 in Proceedings of the Conference on Domain-Specific Languages, 1997
 ```
+
+We also thanks [Li Dong](http://homepages.inf.ed.ac.uk/s1478528/) for all the helpful discussions and sharing the data-preprocessing code for ATIS and GEO used in our Web Demo.
