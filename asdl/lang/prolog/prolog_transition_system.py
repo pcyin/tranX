@@ -10,6 +10,8 @@ from collections import Iterable
 from asdl.asdl import *
 from asdl.asdl_ast import RealizedField, AbstractSyntaxTree
 
+from common.registerable import Registrable
+
 
 def prolog_node_to_ast(grammar, prolog_tokens, start_idx):
     node_name = prolog_tokens[start_idx]
@@ -236,9 +238,10 @@ def is_equal_ast(this_ast, other_ast):
     return True
 
 
+@Registrable.register('prolog')
 class PrologTransitionSystem(TransitionSystem):
     def compare_ast(self, hyp_ast, ref_ast):
-        raise NotImplementedError
+        return is_equal_ast(hyp_ast, ref_ast)
 
     def ast_to_surface_code(self, asdl_ast):
         return ast_to_prolog_expr(asdl_ast)

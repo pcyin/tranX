@@ -2,6 +2,7 @@
 
 from __future__ import print_function
 
+import torch
 import re
 import pickle
 import ast
@@ -11,13 +12,12 @@ import sys
 
 import numpy as np
 
-from asdl.asdl_ast import RealizedField
 from asdl.lang.py.py_asdl_helper import python_ast_to_asdl_ast, asdl_ast_to_python_ast
 from asdl.lang.py.py_transition_system import PythonTransitionSystem
 from asdl.hypothesis import *
 from asdl.lang.py.py_utils import tokenize_code
 
-from components.action_info import ActionInfo
+from components.action_info import ActionInfo, get_action_infos
 
 p_elif = re.compile(r'^elif\s?')
 p_else = re.compile(r'^else\s?')
@@ -28,29 +28,20 @@ p_decorator = re.compile(r'^@.*')
 
 QUOTED_STRING_RE = re.compile(r"(?P<quote>['\"])(?P<string>.*?)(?<!\\)(?P=quote)")
 
-def get_action_infos(src_query, tgt_actions, force_copy=False):
-    action_infos = []
-    hyp = Hypothesis()
-    for t, action in enumerate(tgt_actions):
-        action_info = ActionInfo(action)
-        action_info.t = t
-        if hyp.frontier_node:
-            action_info.parent_t = hyp.frontier_node.created_time
-            action_info.frontier_prod = hyp.frontier_node.production
-            action_info.frontier_field = hyp.frontier_field.field
 
-        if isinstance(action, GenTokenAction):
-            try:
-                tok_src_idx = src_query.index(str(action.token))
-                action_info.copy_from_src = True
-                action_info.src_token_position = tok_src_idx
-            except ValueError:
-                if force_copy: raise ValueError('cannot copy primitive token %s from source' % action.token)
+def replace_string_ast_nodes(py_ast, str_map):
+    for node in ast.walk(py_ast):
+        if isinstance(node, ast.Str):
+            str_val = node.s
 
-        hyp.apply_action(action)
-        action_infos.append(action_info)
-
-    return action_infos
+            if str_val in str_map:
+                node.s = str_map[str_val]
+            else:
+                # handle cases like `\n\t` in string literals
+                for key, val in str_map.items():
+                    str_literal_decoded = key.decode('string_escape')
+                    if str_literal_decoded == str_val:
+                        node.s = val
 
 
 class Django(object):
@@ -156,10 +147,13 @@ class Django(object):
         Django.canonicalize_str_nodes(ast_tree, str_map)
         canonical_code = astor.to_source(ast_tree)
 
-        # for str_literal, str_repr in str_map.items():
-        #     canonical_code = canonical_code.replace(str_literal, '\'' + str_repr + '\'')
-
         # sanity check
+        # decanonical_code = Django.decanonicalize_code(canonical_code, str_map)
+        # decanonical_code_tokens = tokenize_code(decanonical_code)
+        # raw_code_tokens = tokenize_code(code)
+        # if decanonical_code_tokens != raw_code_tokens:
+        #     pass
+
         # try:
         #     ast_tree = ast.parse(canonical_code).body[0]
         # except:
@@ -212,15 +206,15 @@ class Django(object):
             tgt_ast = python_ast_to_asdl_ast(python_ast, grammar)
             tgt_actions = transition_system.get_actions(tgt_ast)
 
-            print('+' * 60)
-            print('Example: %d' % idx)
-            print('Source: %s' % ' '.join(src_query_tokens))
-            if str_map:
-                print('Original String Map:')
-                for str_literal, str_repr in str_map.items():
-                    print('\t%s: %s' % (str_literal, str_repr))
-            print('Code:\n%s' % gold_source)
-            print('Actions:')
+            # print('+' * 60)
+            # print('Example: %d' % idx)
+            # print('Source: %s' % ' '.join(src_query_tokens))
+            # if str_map:
+            #     print('Original String Map:')
+            #     for str_literal, str_repr in str_map.items():
+            #         print('\t%s: %s' % (str_literal, str_repr))
+            # print('Code:\n%s' % gold_source)
+            # print('Actions:')
 
             # sanity check
             hyp = Hypothesis()
@@ -307,7 +301,7 @@ class Django(object):
 
     @staticmethod
     def process_django_dataset():
-        vocab_freq_cutoff = 5  # TODO: found the best cutoff threshold
+        vocab_freq_cutoff = 30  # TODO: found the best cutoff threshold
         annot_file = 'data/django/all.anno'
         code_file = 'data/django/all.code'
 
@@ -366,6 +360,21 @@ class Django(object):
         return code
 
 
+def generate_vocab_for_paraphrase_model(vocab_path, save_path):
+    from components.vocab import VocabEntry, Vocab
+
+    vocab = pickle.load(open(vocab_path))
+    para_vocab = VocabEntry()
+    for i in range(0, 10):
+        para_vocab.add('<unk_%d>' % i)
+    for word in vocab.source.word2id:
+        para_vocab.add(word)
+    for word in vocab.code.word2id:
+        para_vocab.add(word)
+
+    pickle.dump(para_vocab, open(save_path, 'w'))
+
+
 if __name__ == '__main__':
     # Django.run()
     # f1 = Field('hahah', ASDLPrimitiveType('123'), 'single')
@@ -374,9 +383,8 @@ if __name__ == '__main__':
     # # print(f1 == rf1)
     # a = {f1: 1}
     # print(a[rf1])
-    Django.generate_django_dataset()
-
-
+    Django.process_django_dataset()
+    # generate_vocab_for_paraphrase_model('data/django/vocab.freq10.bin', 'data/django/vocab.para.freq10.bin')
 
     # py_ast = ast.parse("""sorted(asf, reverse='k' 'k', k='re' % sdf)""")
     # canonicalize_py_ast(py_ast)

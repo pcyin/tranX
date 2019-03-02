@@ -1,0 +1,96 @@
+## ASDL's six builtin types are
+identifier, int, string, bytes, object, singleton
+
+
+mod = Module(stmt* body)
+    | Interactive(stmt* body)
+    | Expression(expr body)
+
+stmt = FunctionDef(identifier name, arguments args, stmt* body, expr* decorator_list, expr? returns)
+      | ClassDef(identifier name, expr* bases, keyword* keywords, stmt* body, expr* decorator_list)
+      | Return(expr? value)
+
+      | Delete(expr* targets)
+      | Assign(expr* targets, expr value)
+      | AugAssign(expr target, operator op, expr value)
+
+      | For(expr target, expr iter, stmt* body, stmt* orelse)
+      | While(expr test, stmt* body, stmt* orelse)
+      | If(expr test, stmt* body, stmt* orelse)
+      | With(withitem* items, stmt* body)
+
+      | Raise(expr? exc, expr? cause)
+      | Try(stmt* body, excepthandler* handlers, stmt* orelse, stmt* finalbody)
+      | Assert(expr test, expr? msg)
+
+      | Import(alias* names)
+      | ImportFrom(identifier? module, alias* names, int? level)
+
+      | Global(identifier* names)
+      | Nonlocal(identifier* names)
+      | Expr(expr value)
+      | Pass
+      | Break
+      | Continue
+
+
+expr = BoolOp(boolop op, expr* values)
+     | BinOp(expr left, operator op, expr right)
+     | UnaryOp(unaryop op, expr operand)
+     | Lambda(arguments args, expr body)
+     | IfExp(expr test, expr body, expr orelse)
+     | Dict(expr* keys, expr* values)
+     | Set(expr* elts)
+     | ListComp(expr elt, comprehension* generators)
+     | SetComp(expr elt, comprehension* generators)
+     | DictComp(expr key, expr value, comprehension* generators)
+     | GeneratorExp(expr elt, comprehension* generators)
+     | Await(expr value)
+     | Yield(expr? value)
+     | YieldFrom(expr value)
+     | Compare(expr left, cmpop* ops, expr* comparators)
+     | Call(expr func, expr* args, keyword* keywords)
+     ## a number as a PyObject.
+     | Num(object n)
+     ## need to specify raw, unicode, etc?
+     | Str(string s)
+     | Bytes(bytes s)
+     | NameConstant(singleton value)
+     | Ellipsis
+
+     ## the following expression can appear in assignment context
+     | Attribute(expr value, identifier attr)
+     | Subscript(expr value, slice slice)
+     | Starred(expr value)
+     | Name(identifier id)
+     | List(expr* elts)
+     | Tuple(expr* elts)
+
+expr_context = Load | Store | Del | AugLoad | AugStore | Param
+
+slice = Slice(expr? lower, expr? upper, expr? step)
+      | ExtSlice(slice* dims)
+      | Index(expr value)
+
+boolop = And | Or
+
+operator = Add | Sub | Mult | MatMult | Div | Mod | Pow | LShift
+             | RShift | BitOr | BitXor | BitAnd | FloorDiv
+
+unaryop = Invert | Not | UAdd | USub
+
+cmpop = Eq | NotEq | Lt | LtE | Gt | GtE | Is | IsNot | In | NotIn
+
+comprehension = comprehension(expr target, expr iter, expr* ifs)
+
+excepthandler = ExceptHandler(expr? type, identifier? name, stmt* body)
+
+arguments = arguments(arg* args, arg? vararg, arg* kwonlyargs, expr* kw_defaults, arg? kwarg, expr* defaults)
+
+arg = arg(identifier arg, expr? annotation)
+
+keyword = keyword(identifier? arg, expr value)
+
+alias = alias(identifier name, identifier? asname)
+
+withitem = withitem(expr context_expr, expr? optional_vars)

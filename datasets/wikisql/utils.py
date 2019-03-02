@@ -1,9 +1,7 @@
 # coding=utf-8
 import re
 from babel.numbers import parse_decimal, NumberFormatError
-
 from .lib.query import Query
-
 
 num_re = re.compile(r'[-+]?\d*\.\d+|\d+')
 

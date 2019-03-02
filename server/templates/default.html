@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" type="text/css" href="static/tree-viewer.css">
+    <title>tranX</title>
+
+    <style>
+        body {
+            padding-top: 5rem;
+        }
+
+        .starter-template {
+            padding: 1.5rem 1.5rem;
+            text-align: center;
+        }
+
+        .hyp-code {
+            margin-bottom: 0px;
+        }
+
+        .hypotheses{
+            margin-top: 20px;
+        }
+
+        .hypothesis{
+            margin-bottom: 10px;
+        }
+
+        .hyp-detail {
+            margin-top: 10px;
+        }
+    </style>
+  </head>
+  <body>
+	<a href="https://github.com/pcyin/tranX"><img style="position: absolute; top: 0; right: 0; border: 0; z-index: 1000000;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png" alt="Fork me on GitHub"></a>
+    <nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
+        <a class="navbar-brand" href="#">tranX</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarsExampleDefault">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+  
+        <div class="collapse navbar-collapse" id="navbarsExampleDefault">
+          <ul class="navbar-nav mr-auto">
+            <li class="nav-item active">
+              <a class="nav-link" href="https://github.com/pcyin/tranX">Project Homepage <span class="sr-only">(current)</span></a>
+            </li>
+          </ul>
+        </div>
+    </nav>
+  
+    <main role="main" class="container">
+
+    <div class="starter-template">
+        <!-- <h1>Bootstrap starter template</h1> -->
+        <div class="row" style="margin-bottom: 20px;">
+            <div class="col">
+            <div class="card text-left">
+                <div class="card-header">
+                    tranX: a transition-based abstract syntax parser
+                </div>
+                <div class="card-body">
+                    <h5 class="card-title">Try some examples from each dataset!</h5>
+                    <div>
+                        <div style="text-align:right; float: left; width: 80px">ATIS</div>
+                        <div style="float: left; margin-left: 20px; padding-left: 10px; border-left: 1px darkgray dashed">
+                                <p class="card-text"><a href="#" onclick="parse_example(this, 'atis');">show me monday morning flight from Pittsburgh to Seattle</a></p>
+                                <p class="card-text"><a href="#" onclick="parse_example(this, 'atis');">what is the latest flight to Boston</a></p>
+				<p class="card-text"><a href="#" onclick="parse_example(this, 'atis');">give me the cheapest round trip flights from indianapolis to orlando around december twenty fifth</a></p>
+                        </div>
+                        <div style="clear:both; margin-bottom: 10px"></div>
+                    </div>
+                    <div>
+                        <div style="text-align:right; float: left; width: 80px">GeoQuery</div>
+                        <div style="float: left; margin-left: 20px; padding-left: 10px; border-left: 1px darkgray dashed">
+                                <p class="card-text"><a href="#" onclick="parse_example(this, 'geo');">which state has the lowest population density</a></p>
+                                <p class="card-text"><a href="#" onclick="parse_example(this, 'geo');">what rivers traverses the state which borders the most states</a></p>
+				<p class="card-text"><a href="#" onclick="parse_example(this, 'geo');">how many people lived in austin</a></p>
+                        </div>
+                        <div style="clear:both; margin-bottom: 10px"></div>
+                    </div>
+                    <div>
+                        <div style="text-align:right; float: left; width: 80px">Django</div>
+                        <div style="float: left; margin-left: 20px; padding-left: 10px; border-left: 1px darkgray dashed">
+                                <p class="card-text"><a href="#" onclick="parse_example(this, 'django');">if emnlp_loc starts with 'Brussels'</a></p>
+                                <p class="card-text"><a href="#" onclick="parse_example(this, 'django');">join app_config.path and string 'locale' into a file path, substitute it for dir</a></p>
+				<p class="card-text"><a href="#" onclick="parse_example(this, 'django');">if my_var is true, substitute "UNIQUE" for my_var, otherwise it is an empty string.</a></p>
+                        </div>
+                        <div style="clear:both; margin-bottom: 10px"></div>
+                    </div>
+                </div>
+            </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col">
+            <div class="input-group">
+                <select class="form-control" id="sel_dataset">
+                    <option value="atis">ATIS</option>
+                    <option value="geo">GeoQuery</option>
+                    <option value="django">Django</option>
+                    <option value="conala">CoNaLa</option>
+                </select>
+                <input type="text" class="form-control" id="inputUtterance" placeholder="Enter query" style="width:70%;">
+                <button type="button" class="btn btn-primary" id="btn_parse">Parse</button>
+            </div>
+            </div>
+        </div>
+        <div class="hypotheses">
+            <!-- <div class="row">
+                <div class="col">
+                    <div class="card text-left">
+                        <div class="card-header">
+                            Hypothesis 1 [Score=0.00]
+                            <a class="float-right" data-toggle="collapse" href="#hyp_m1_detail" role="button">[Show]</a>
+                        </div>
+                        <div class="card-body">
+                            <pre class="hyp-code">asdfasd.sadf.asdf
+
+asdfsda</pre>
+                        </div>
+                        <div id="tree-container"></div>
+                        <div class="collapse multi-collapse card-body" id="hyp_m1_detail">
+                            <h3>Action Sequence</h3>
+                            <ul class="list-group">
+                                    <li class="list-group-item">Cras justo odio</li>
+                                    <li class="list-group-item">Dapibus ac facilisis in</li>
+                                    <li class="list-group-item">Morbi leo risus</li>
+                                    <li class="list-group-item">Porta ac consectetur ac</li>
+                                    <li class="list-group-item">Vestibulum at eros</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>    
+            </div> -->
+        </div>
+    </div>
+
+    </main><!-- /.container -->  
+
+    <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
+    <script src="http://d3js.org/d3.v3.min.js"></script>
+    <script src="static/parser.js"></script>
+    <script src="static/d3Tree.js"></script>
+    <script>
+        var loadingText = '<i class="fa fa-circle-o-notch fa-spin"></i> Parsing...';
+
+        var parse_example = function(e_ref, dataset) {
+            //alert($(e_ref).html());
+            utterance = $(e_ref).html()
+            $(`#sel_dataset option[value="${dataset}"]`).prop('selected', 'true')
+            $('#inputUtterance').val(utterance)
+            $('#btn_parse').click()
+            return false;
+        }
+
+        var on_parse = function(){
+            $('.hypotheses').empty()
+            $('#btn_parse').prop('disabled', true)
+            $('#btn_parse').html(loadingText)
+            input_utterance = $('#inputUtterance').val()
+            //alert(input_utterance)
+            dataset = $('#sel_dataset option:selected').val()
+            //alert(dataset)
+            post_url = '/parse/' + dataset + '/' + encodeURIComponent(input_utterance)
+
+            $.get(post_url, function(data){
+                //alert(data[0]['value'])
+                hypotheses = data['hypotheses']
+                for (i = 0; i < hypotheses.length; i++) { 
+                    hyp = hypotheses[i]
+                    
+                    action_seq_html = ''
+                    for (t = 0; t < hyp['actions'].length; t++) {
+                        action_t = hyp['actions'][t]
+                        action_seq_html += `<li class="list-group-item">${action_t}</li>` + '\n'
+                    }
+
+                    hyp_html = `<div class="row hypothesis">
+                <div class="col">
+                    <div class="card text-left">
+                        <div class="card-header">
+                            Hypothesis ${hyp['id']} [Score=${hyp['score']}]
+                            <a class="float-right" data-toggle="collapse" href="#hyp_${hyp['id']}_detail" role="button">[Show]</a>
+                        </div>
+                        <div class="card-body">
+                            <pre class="hyp-code">${hyp['value']}</pre>
+                            <div class="collapse multi-collapse hyp-detail" id="hyp_${hyp['id']}_detail">
+                                <h6 style="margin-top: 10px">Action Sequence</h6>
+                                <ul class="list-group">
+                                    ${action_seq_html}
+                                </ul>
+                                <h6 style="margin-top: 10px">AST Visualization</h6>
+                                <div id="tree_container_hyp${hyp['id']}"></div>
+                            </div>
+                        </div>
+                        
+                    </div>
+                </div>    
+            </div>`
+
+                    $('.hypotheses').append(hyp_html)
+
+                    // draw AST
+                    var tree_json_data = parse(hyp['tree_repr'].replace(/\\/g, "\\\\"))
+                    d3Tree(tree_json_data, hyp['id']);
+                }
+                
+                $('#btn_parse').prop('disabled', false)
+                $('#btn_parse').html('Parse')
+            })
+        }
+
+        $('#btn_parse').click(on_parse)
+    </script>
+  </body>
+</html>

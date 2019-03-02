@@ -91,12 +91,11 @@ class Seq2SeqWithCopy(Seq2SeqModel):
 
         return att_ves
 
-    def forward(self, src_sents_var, src_sents_len, tgt_sents_var, tgt_token_copy_pos, tgt_token_copy_mask, tgt_token_gen_mask):
+    def forward(self, src_sents_var, src_sents_len, tgt_sents_var, tgt_token_copy_idx_mask, tgt_token_gen_mask):
         """
         compute log p(y|x)
 
-        :param tgt_token_copy_pos: Variable(tgt_action_len, batch_size)
-        :param tgt_token_copy_mask: Variable(tgt_action_len, batch_size)
+        :param tgt_token_copy_idx_mask: Variable(tgt_action_len, batch_size, src_seq_len)
         :return: Variable(batch_size)
         """
 
@@ -117,19 +116,19 @@ class Seq2SeqWithCopy(Seq2SeqModel):
         # (tgt_sent_len - 1, batch_size, src_sent_len)
         token_copy_prob = self.src_pointer_net(src_encodings, src_sent_masks, att_vecs)
 
-        tgt_token_idx = tgt_sents_var[1:]  # remove leading </s>
-        tgt_token_copy_pos = tgt_token_copy_pos[1:]
+        tgt_token_idx = tgt_sents_var[1:]  # remove leading <s>
         tgt_token_gen_mask = tgt_token_gen_mask[1:]
-        tgt_token_copy_mask = tgt_token_copy_mask[1:]
+        tgt_token_copy_idx_mask = tgt_token_copy_idx_mask[1:]
 
         # (tgt_sent_len - 1, batch_size)
         tgt_token_gen_prob = torch.gather(token_gen_prob, dim=2,
                                           index=tgt_token_idx.unsqueeze(2)).squeeze(2) * tgt_token_gen_mask
 
         # (tgt_sent_len - 1, batch_size)
-        tgt_token_copy_prob = torch.gather(token_copy_prob, dim=2, index=tgt_token_copy_pos.unsqueeze(2)).squeeze(2) * tgt_token_copy_mask
+        tgt_token_copy_prob = torch.sum(token_copy_prob * tgt_token_copy_idx_mask, dim=-1)
+        # tgt_token_copy_prob = torch.gather(token_copy_prob, dim=2, index=tgt_token_copy_pos.unsqueeze(2)).squeeze(2) * tgt_token_copy_mask
 
-        tgt_token_mask = torch.gt(tgt_token_gen_mask + tgt_token_copy_mask, 0.).float()
+        tgt_token_mask = torch.gt(tgt_token_gen_mask + tgt_token_copy_idx_mask.sum(dim=-1), 0.).float()
         tgt_token_prob = torch.log(tgt_token_predictor[:, :, 0] * tgt_token_gen_prob +
                                    tgt_token_predictor[:, :, 1] * tgt_token_copy_prob +
                                    1.e-7 * (1. - tgt_token_mask))
@@ -193,8 +192,8 @@ class Seq2SeqWithCopy(Seq2SeqModel):
             hypotheses = [['<s>']]
             hypotheses_word_ids = [[self.tgt_vocab['<s>']]]
         else:
-            hypotheses = [['<s>'] for _ in xrange(sample_size)]
-            hypotheses_word_ids = [[self.tgt_vocab['<s>']] for _ in xrange(sample_size)]
+            hypotheses = [['<s>'] for _ in range(sample_size)]
+            hypotheses_word_ids = [[self.tgt_vocab['<s>']] for _ in range(sample_size)]
 
         att_tm1 = Variable(new_float_tensor(len(hypotheses), self.hidden_size).zero_(), volatile=True)
         hyp_scores = Variable(new_float_tensor(len(hypotheses)).zero_(), volatile=True)
@@ -236,7 +235,7 @@ class Seq2SeqWithCopy(Seq2SeqModel):
             # second, add the probability of copying the most probable unk word
             gentoken_new_hyp_unks = []
             if src_unk_pos_list:
-                for hyp_id in xrange(hyp_num):
+                for hyp_id in range(hyp_num):
                     unk_pos = token_copy_prob[hyp_id][src_unk_pos_list].data.cpu().numpy().argmax()
                     unk_pos = src_unk_pos_list[unk_pos]
                     token = src_sent[unk_pos]

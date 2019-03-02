@@ -17,6 +17,7 @@ class Seq2SeqModel(nn.Module):
     """
     def __init__(self, src_vocab, tgt_vocab, embed_size, hidden_size,
                  decoder_word_dropout=0., dropout=0.,
+                 label_smoothing=0.,
                  cuda=False,
                  src_embed_layer=None, tgt_embed_layer=None):
         super(Seq2SeqModel, self).__init__()
@@ -57,6 +58,11 @@ class Seq2SeqModel(nn.Module):
         # dropout layer
         self.dropout = nn.Dropout(dropout)
         self.decoder_word_dropout = decoder_word_dropout
+
+        # label smoothing
+        self.label_smoothing = label_smoothing
+        if label_smoothing:
+            self.label_smoothing_layer = nn_utils.LabelSmoothing(label_smoothing, len(tgt_vocab), ignore_indices=[0])
 
         self.cuda = cuda
 
@@ -144,28 +150,27 @@ class Seq2SeqModel(nn.Module):
     def score_decoding_results(self, scores, tgt_sents_var):
         """
         :param scores: Variable(src_sent_len, batch_size, tgt_vocab_size)
-        :param tgt_sents_var:
+        :param tgt_sents_var: Variable(src_sent_len, batch_size)
         :return:
             tgt_sent_log_scores: Variable(batch_size)
         """
         batch_size = scores.size(1)
 
-        # (tgt_sent_len * batch_size, tgt_vocab_size)
-        log_scores = F.log_softmax(scores.view(-1, scores.size(2)))
-        # remove leading <s> in tgt sent, which is not used as the target
-        flattened_tgt_sents = tgt_sents_var[1:].view(-1)
+        # (tgt_sent_len, batch_size, tgt_vocab_size)
+        log_scores = F.log_softmax(scores, dim=-1)
+        tgt_sents_var_sos_omitted = tgt_sents_var[1:]   # remove leading <s> in tgt sent, which is not used as the target
 
-        # tgt_sent_len * batch_size
-        tgt_sent_log_scores = torch.gather(log_scores, 1, flattened_tgt_sents.unsqueeze(1)).squeeze(1)
-        tgt_sent_log_scores = tgt_sent_log_scores * (1. - torch.eq(flattened_tgt_sents, 0).float())  # 0 is pad
+        if self.training and self.label_smoothing:
+            # (tgt_sent_len, batch_size)
+            tgt_sent_log_scores = -self.label_smoothing_layer(log_scores, tgt_sents_var_sos_omitted)
+        else:
+            # (tgt_sent_len, batch_size)
+            tgt_sent_log_scores = torch.gather(log_scores, -1, tgt_sents_var_sos_omitted.unsqueeze(-1)).squeeze(-1)
+
+        tgt_sent_log_scores = tgt_sent_log_scores * (1. - torch.eq(tgt_sents_var_sos_omitted, 0).float())  # 0 is pad
+
         # (batch_size)
-        tgt_sent_log_scores = tgt_sent_log_scores.view(-1, batch_size).sum(dim=0)
-
-        return tgt_sent_log_scores
-
-    def score(self, src_sents_var, src_sents_len, tgt_sents_var):
-        tgt_token_scores = self.forward(src_sents_var, src_sents_len, tgt_sents_var)
-        tgt_sent_log_scores = self.score_decoding_results(tgt_token_scores, tgt_sents_var)
+        tgt_sent_log_scores = tgt_sent_log_scores.sum(dim=0)
 
         return tgt_sent_log_scores
 
@@ -190,7 +195,7 @@ class Seq2SeqModel(nn.Module):
 
     def forward(self, src_sents_var, src_sents_len, tgt_sents_var):
         """
-        encode source sequence and compute the final softmax layer at each decoding time step
+        encode source sequence and compute the decoding log likelihood
         :param src_sents_var: Variable(src_sent_len, batch_size)
         :param src_sents_len: list[int]
         :param tgt_sents_var: Variable(tgt_sent_len, batch_size)
@@ -200,9 +205,10 @@ class Seq2SeqModel(nn.Module):
 
         src_encodings, (last_state, last_cell) = self.encode(src_sents_var, src_sents_len)
         dec_init_vec = self.init_decoder_state(last_state, last_cell)
-        tgt_token_scores = self.decode(src_encodings, src_sents_len, dec_init_vec, tgt_sents_var)
+        tgt_token_logits = self.decode(src_encodings, src_sents_len, dec_init_vec, tgt_sents_var)
+        tgt_sent_log_scores = self.score_decoding_results(tgt_token_logits, tgt_sents_var)
 
-        return tgt_token_scores
+        return tgt_sent_log_scores
 
     @staticmethod
     def dot_prod_attention(h_t, src_encoding, src_encoding_att_linear, mask=None):
@@ -216,7 +222,7 @@ class Seq2SeqModel(nn.Module):
         att_weight = torch.bmm(src_encoding_att_linear, h_t.unsqueeze(2)).squeeze(2)
         if mask is not None:
             att_weight.data.masked_fill_(mask, -float('inf'))
-        att_weight = F.softmax(att_weight)
+        att_weight = F.softmax(att_weight, dim=-1)
 
         att_view = (att_weight.size(0), 1, att_weight.size(1))
         # (batch_size, hidden_size)

@@ -8,20 +8,13 @@ from asdl.lang.py.py_asdl_helper import asdl_ast_to_python_ast, python_ast_to_as
 from asdl.lang.py.py_utils import tokenize_code
 from asdl.transition_system import TransitionSystem, GenTokenAction
 
+from common.registerable import Registrable
 
+
+@Registrable.register('python2')
 class PythonTransitionSystem(TransitionSystem):
     def tokenize_code(self, code, mode=None):
         return tokenize_code(code, mode)
-
-    def hyp_correct(self, hyp, example):
-        ref_code = example.tgt_code
-        ref_py_ast = ast.parse(ref_code).body[0]
-        ref_reformatted_code = astor.to_source(ref_py_ast).strip()
-
-        ref_code_tokens = tokenize_code(ref_reformatted_code)
-        hyp_code_tokens = tokenize_code(hyp.code)
-
-        return ref_code_tokens == hyp_code_tokens
 
     def surface_code_to_ast(self, code):
         py_ast = ast.parse(code).body[0]
@@ -62,3 +55,12 @@ class PythonTransitionSystem(TransitionSystem):
                 actions.append(GenTokenAction(tok))
 
         return actions
+
+    def is_valid_hypothesis(self, hyp, **kwargs):
+        try:
+            hyp_code = self.ast_to_surface_code(hyp.tree)
+            ast.parse(hyp_code)
+            self.tokenize_code(hyp_code)
+        except:
+            return False
+        return True

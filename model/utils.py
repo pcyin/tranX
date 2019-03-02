@@ -1,6 +1,7 @@
 # coding=utf-8
 
 
+import math
 import numpy as np
 from torch.autograd import Variable
 
@@ -47,3 +48,28 @@ class GloveHelper(object):
             for line in f:
                 tokens = line.split()
                 yield tokens[0]
+
+
+def batch_iter(examples, batch_size, shuffle=False):
+    batch_num = int(math.ceil(len(examples) / float(batch_size)))
+    index_array = list(range(len(examples)))
+
+    if shuffle:
+        np.random.shuffle(index_array)
+
+    for i in range(batch_num):
+        indices = index_array[i * batch_size: (i + 1) * batch_size]
+        batch_examples = [examples[idx] for idx in indices]
+
+        yield batch_examples
+
+
+def get_parser_class(lang):
+    if lang in ['python', 'lambda_dcs', 'prolog', 'python3']:
+        from model.parser import Parser
+        return Parser
+    elif lang == 'wikisql':
+        from model.wikisql.parser import WikiSqlParser
+        return WikiSqlParser
+    else:
+        raise ValueError('unknown parser class for %s' % lang)

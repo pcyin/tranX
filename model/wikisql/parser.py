@@ -20,8 +20,10 @@ from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
 from model.pointer_net import PointerNet
 from model.wikisql.dataset import WikiSqlBatch
+from common.registerable import Registrable
 
 
+@Registrable.register('wikisql_parser')
 class WikiSqlParser(Parser):
     def __init__(self, args, vocab, transition_system):
         super(WikiSqlParser, self).__init__(args, vocab, transition_system)

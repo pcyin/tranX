@@ -1,4 +1,5 @@
 # coding=utf-8
+import copy
 
 try:
     from cStringIO import StringIO
@@ -48,6 +49,31 @@ def parse_lambda_expr_helper(s, offset):
 
 def parse_lambda_expr(s):
     return parse_lambda_expr_helper(s, 0)[0]
+
+
+def get_canonical_order_of_logical_form(lf, order_by='alphabet', _get_order=None):
+    lf_copy = copy.deepcopy(lf)
+
+    if _get_order is None:
+        def _get_order(name):
+            if name == 'flight':
+                return -200
+            elif name == 'from':
+                return -199
+            elif name == 'to':
+                return -198
+
+            return name
+
+    def _order(_lf):
+        if _lf.name in ('and', 'or'):
+            _lf.children = sorted(_lf.children, key=lambda x: _get_order(x.name))
+        for child in _lf.children:
+            _order(child)
+
+    _order(lf_copy)
+
+    return lf_copy
 
 
 class Node(object):

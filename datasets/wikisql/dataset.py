@@ -11,11 +11,11 @@ import numpy as np
 
 from asdl.asdl import ASDLGrammar
 from asdl.hypothesis import Hypothesis
-from asdl.lang.sql.lib.common import detokenize
-from asdl.lang.sql.lib.dbengine import DBEngine
-from asdl.lang.sql.lib.query import Query
+from datasets.wikisql.lib.common import detokenize
+from datasets.wikisql.lib.dbengine import DBEngine
+from datasets.wikisql.lib.query import Query
 from asdl.lang.sql.sql_transition_system import SqlTransitionSystem, sql_query_to_asdl_ast, asdl_ast_to_sql_query
-from asdl.lang.sql.utils import my_detokenize, find_sub_sequence
+from datasets.wikisql.utils import my_detokenize, find_sub_sequence
 from asdl.transition_system import GenTokenAction
 from components.action_info import ActionInfo
 from components.vocab import VocabEntry, Vocab
@@ -195,11 +195,10 @@ def load_dataset(transition_system, dataset_file, table_file):
     return examples
 
 
-def prepare_dataset():
+def prepare_dataset(data_path):
     grammar = ASDLGrammar.from_text(open('asdl/lang/sql/sql_asdl.txt').read())
     transition_system = SqlTransitionSystem(grammar)
 
-    data_path = '/Users/yinpengcheng/Research/SemanticParsing/WikiSQL/annotated'
     datasets = []
     for file in ['dev', 'test', 'train']:
         print('processing %s' % file, file=sys.stderr)
@@ -210,7 +209,7 @@ def prepare_dataset():
 
         datasets.append(dataset)
 
-    train_set = datasets[-1]
+    train_set = datasets[2]
     dev_set = datasets[0]
     test_set = datasets[1]
     # generate vocabulary
@@ -230,6 +229,7 @@ def prepare_dataset():
 
 
 if __name__ == '__main__':
+    # play ground..
     # data_file = '/Users/yinpengcheng/Research/SemanticParsing/WikiSQL/data/dev.jsonl'
     # engine = DBEngine('/Users/yinpengcheng/Research/SemanticParsing/WikiSQL/data/dev.db')
     # for line in open(data_file):
@@ -238,4 +238,4 @@ if __name__ == '__main__':
     #     result = engine.execute_query(example['table_id'], query)
     #     pass
 
-    prepare_dataset()
+    prepare_dataset(data_path='/Users/yinpengcheng/Research/SemanticParsing/WikiSQL/annotated')

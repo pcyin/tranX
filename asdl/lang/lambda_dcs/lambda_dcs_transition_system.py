@@ -4,13 +4,13 @@ from asdl.transition_system import TransitionSystem, GenTokenAction, ReduceActio
 
 from .logical_form import ast_to_logical_form, logical_form_to_ast, Node, parse_lambda_expr
 
+from common.registerable import Registrable
 
+
+@Registrable.register('lambda_dcs')
 class LambdaCalculusTransitionSystem(TransitionSystem):
     def tokenize_code(self, code, mode=None):
         return code.strip().split(' ')
-
-    def hyp_correct(self, hyp, example):
-        return self.compare_ast(hyp.tree, example.tgt_ast)
 
     def surface_code_to_ast(self, code):
         return logical_form_to_ast(self.grammar, parse_lambda_expr(code))
@@ -33,3 +33,6 @@ class LambdaCalculusTransitionSystem(TransitionSystem):
             return [GenTokenAction(realized_field.value)]
         else:
             return []
+
+    def is_valid_hypothesis(self, hyp, **kwargs):
+        return True

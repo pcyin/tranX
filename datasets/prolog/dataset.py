@@ -5,7 +5,7 @@ import sys
 from asdl.hypothesis import Hypothesis, ApplyRuleAction
 from asdl.lang.prolog.prolog_transition_system import *
 from asdl.asdl import ASDLGrammar
-from asdl.lang.py.dataset import get_action_infos
+from components.action_info import get_action_infos
 from components.dataset import Example
 from components.vocab import VocabEntry, Vocab
 
