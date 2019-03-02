@@ -51,18 +51,19 @@ def parse_lambda_expr(s):
     return parse_lambda_expr_helper(s, 0)[0]
 
 
-def get_canonical_order_of_logical_form(lf, order_by='alphabet'):
+def get_canonical_order_of_logical_form(lf, order_by='alphabet', _get_order=None):
     lf_copy = copy.deepcopy(lf)
 
-    def _get_order(name):
-        if name == 'flight':
-            return -200
-        elif name == 'from':
-            return -199
-        elif name == 'to':
-            return -198
+    if _get_order is None:
+        def _get_order(name):
+            if name == 'flight':
+                return -200
+            elif name == 'from':
+                return -199
+            elif name == 'to':
+                return -198
 
-        return name
+            return name
 
     def _order(_lf):
         if _lf.name in ('and', 'or'):

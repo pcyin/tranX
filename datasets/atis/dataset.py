@@ -177,6 +177,6 @@ if __name__ == '__main__':
     grammar = ASDLGrammar.from_text(open('asdl/lang/lambda_dcs/lambda_asdl.txt').read())
     transition_system = LambdaCalculusTransitionSystem(grammar)
     # load_dataset(transition_system, 'data/atis/train.txt')
-    # prepare_geo_dataset()
+    prepare_geo_dataset()
     # prepare_atis_dataset()
-    generate_vocab_for_paraphrase_model('data/atis/vocab.freq2.bin', 'data/atis/vocab.para.freq2.bin')
+    # generate_vocab_for_paraphrase_model('data/atis/vocab.freq2.bin', 'data/atis/vocab.para.freq2.bin')

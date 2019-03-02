@@ -309,9 +309,9 @@ class Django(object):
                                                                 'asdl/lang/py/py_asdl.txt',
                                                                 vocab_freq_cutoff=vocab_freq_cutoff)
 
-        # pickle.dump(train, open('data/django/train.bin', 'w'))
-        # pickle.dump(dev, open('data/django/dev.bin', 'w'))
-        # pickle.dump(test, open('data/django/test.bin', 'w'))
+        pickle.dump(train, open('data/django/train.bin', 'w'))
+        pickle.dump(dev, open('data/django/dev.bin', 'w'))
+        pickle.dump(test, open('data/django/test.bin', 'w'))
         pickle.dump(vocab, open('data/django/vocab.freq%d.bin' % vocab_freq_cutoff, 'w'))
 
     @staticmethod
@@ -383,8 +383,8 @@ if __name__ == '__main__':
     # # print(f1 == rf1)
     # a = {f1: 1}
     # print(a[rf1])
-    # Django.process_django_dataset()
-    generate_vocab_for_paraphrase_model('data/django/vocab.freq10.bin', 'data/django/vocab.para.freq10.bin')
+    Django.process_django_dataset()
+    # generate_vocab_for_paraphrase_model('data/django/vocab.freq10.bin', 'data/django/vocab.para.freq10.bin')
 
     # py_ast = ast.parse("""sorted(asf, reverse='k' 'k', k='re' % sdf)""")
     # canonicalize_py_ast(py_ast)
