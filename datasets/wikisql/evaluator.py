@@ -12,16 +12,46 @@ class WikiSQLEvaluator(Evaluator):
         super(WikiSQLEvaluator, self).__init__(transition_system=transition_system)
 
         self.execution_engine = DBEngine(args.sql_db_file)
+        self.answer_prune = args.answer_prune
 
     def is_hyp_correct(self, example, hyp):
         hyp_query = asdl_ast_to_sql_query(hyp.tree)
-        ref_query = Query.from_tokenized_dict(example.meta['query'])
         detokenized_hyp_query = detokenize_query(hyp_query, example.meta, example.table)
 
-        # result = detokenized_hyp_query == ref_query
-        ref_answer = self.execution_engine.execute_query(example.meta['table_id'], ref_query, lower=True)
         hyp_answer = self.execution_engine.execute_query(example.meta['table_id'], detokenized_hyp_query, lower=True)
+
+        ref_query = Query.from_tokenized_dict(example.meta['query'])
+        ref_answer = self.execution_engine.execute_query(example.meta['table_id'], ref_query, lower=True)
 
         result = ref_answer == hyp_answer
 
         return result
+
+    def evaluate_dataset(self, examples, decode_results, fast_mode=False):
+        if self.answer_prune:
+            filtered_decode_results = []
+            for example, hyp_list in zip(examples, decode_results):
+                pruned_hyps = []
+                if hyp_list:
+                    for hyp_id, hyp in enumerate(hyp_list):
+                        try:
+                            # check if it is executable
+                            hyp_query = asdl_ast_to_sql_query(hyp.tree)
+                            detokenized_hyp_query = detokenize_query(hyp_query, example.meta, example.table)
+                            hyp_answer = self.execution_engine.execute_query(example.meta['table_id'],
+                                                                             detokenized_hyp_query, lower=True)
+                            if len(hyp_answer) == 0:
+                                continue
+
+                            pruned_hyps.append(hyp)
+                            if fast_mode: break
+                        except:
+                            continue
+
+                filtered_decode_results.append(pruned_hyps)
+
+            decode_results = filtered_decode_results
+
+        eval_results = Evaluator.evaluate_dataset(self, examples, decode_results, fast_mode)
+
+        return eval_results
