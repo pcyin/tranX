@@ -45,8 +45,6 @@ class Evaluator(object):
                 oracle_array.append(False)
 
         acc = np.average(correct_array)
-        if fast_mode:
-            return acc
 
         oracle_acc = np.average(oracle_array)
         eval_results = dict(accuracy=acc,
