@@ -248,11 +248,6 @@ def interactive_mode(args):
     """Interactive mode"""
     print('Start interactive mode', file=sys.stderr)
 
-    from datasets.conala.example_processor import ConalaExampleProcessor
-    from datasets.atis.example_processor import ATISExampleProcessor
-    from datasets.geo.example_processor import GeoQueryExampleProcessor
-    from datasets.django.example_processor import DjangoExampleProcessor
-
     parser = StandaloneParser(args.parser,
                               args.load_model,
                               args.example_preprocessor,

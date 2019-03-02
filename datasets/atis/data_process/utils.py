@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import re
+import codecs
 from nltk.stem import WordNetLemmatizer
 from nltk.stem.snowball import SnowballStemmer
 from .misspellings import _misspelling_dict
@@ -19,8 +20,8 @@ def read_airline_mapping(fn='data/atis/airline_code.txt'):
   al_dict = {}
   al_set = set(('aa', 'ua', 'us', 'co', 'nw', 'dl', 'tw', 'cp', 'ac', 'yx',
                 'ea', 'hp', 'as', 'nx', 'ir', 'ta', 'wn', 'ff', 'ml', 'al', 'lh', 'kw', 'ji'))
-  with open(fn, 'r') as f_in:
-    for l in filter(lambda x: len(x) > 0, map(lambda x: x.strip().lower(), f_in.read().decode('utf-8').split('\n'))):
+  with codecs.open(fn, encoding='utf-8') as f_in:
+    for l in filter(lambda x: len(x) > 0, map(lambda x: x.strip().lower(), f_in.read().split('\n'))):
       l_list = l.split('\t')
       if l_list[0] in al_set:
         for it in l_list[1:]:
@@ -44,8 +45,8 @@ def sort_entity_list(e_list):
 
 def read_iata_mapping(e2m_dict, e2type_dict, fn='data/atis/iata.txt'):
   # IATA code crawled from wikipedia
-  with open(fn, 'r') as f_in:
-    for l in filter(lambda x: len(x) > 0, map(lambda x: x.strip().lower(), f_in.read().decode('utf-8').split('\n'))):
+  with codecs.open(fn, encoding='utf-8') as f_in:
+    for l in filter(lambda x: len(x) > 0, map(lambda x: x.strip().lower(), f_in.read().split('\n'))):
       l_list = l.split('\t')
       k = '%s:ap' % (l_list[0],)
       e2m_dict[k] = l_list[1:]
@@ -63,15 +64,15 @@ def read_iata_mapping(e2m_dict, e2type_dict, fn='data/atis/iata.txt'):
 def read_entity_mention_mapping(fn='data/atis/entity_mention.txt'):
   e2m_dict, m2e_dict, e2type_dict = {}, {}, {}
 
-  with open(fn, 'r') as f_in:
-    for l in filter(lambda x: len(x) > 0, map(lambda x: x.strip(), f_in.read().decode('utf-8').split('\n'))):
+  with codecs.open(fn, encoding='utf-8') as f_in:
+    for l in filter(lambda x: len(x) > 0, map(lambda x: x.strip(), f_in.read().split('\n'))):
       l_list = l.split('\t')
       e2m_dict[l_list[0]] = l_list[1:]
       e2type_dict[l_list[0]] = l_list[0].split(':')[-1]
 
   read_iata_mapping(e2m_dict, e2type_dict)
 
-  for k, v in e2m_dict.iteritems():
+  for k, v in e2m_dict.items():
     for it in v:
       m2e_dict[it]=k
 
@@ -82,7 +83,7 @@ def norm_word(w):
   if w == None or len(w) == 0:
     return ''
   w = w.lower()
-  if _misspelling_dict.has_key(w):
+  if w in _misspelling_dict:
     w = _misspelling_dict[w][0]
 
   w_stem = stemmer.stem(w)
@@ -103,13 +104,13 @@ def norm_airline(_w_list):
   i = 0
   while i < len(_w_list):
     w = _w_list[i]
-    if (i + 2 < len(_w_list)) and al_dict.has_key(' '.join(_w_list[i:i + 3])):
+    if (i + 2 < len(_w_list)) and (' '.join(_w_list[i:i + 3])) in al_dict:
       w_list.append('_al_' + al_dict[' '.join(_w_list[i:i + 3])])
       i += 2
-    elif (i + 1 < len(_w_list)) and al_dict.has_key(' '.join(_w_list[i:i + 2])):
+    elif (i + 1 < len(_w_list)) and (' '.join(_w_list[i:i + 2])) in al_dict:
       w_list.append('_al_' + al_dict[' '.join(_w_list[i:i + 2])])
       i += 1
-    elif al_dict.has_key(w):
+    elif w in al_dict:
       if (w == 'as') and (i + 1 < len(_w_list)) and cannot_follow_as(_w_list[i+1]):
         w_list.append(w)
       else:
@@ -127,7 +128,7 @@ def norm_lambda_variable(f):
   for i in range(len(f_list)):
     w = f_list[i]
     if w.startswith('$') or ((i - 1 >= 0) and (f_list[i - 1] == 'lambda')):
-      if not v_dict.has_key(w):
+      if not w in v_dict:
         v_dict[w] = '$%d' % (len(v_dict),)
 
   # missing ')'
@@ -143,9 +144,9 @@ def norm_lambda_variable(f):
 
 def read_ci2ap_dict(fn='data/atis/ci_ap_mapping.txt'):
   ci2ap_dict = {}
-  with open(fn,'r') as f_in:
+  with codecs.open(fn, encoding='utf-8') as f_in:
     for l in f_in:
-      ci,ap=l.decode('utf-8').strip().split('\t')
+      ci,ap=l.strip().split('\t')
       ci2ap_dict[ci]=ap
   ap2ci_dict = dict([(v,k) for k,v in ci2ap_dict.items()])
   return ci2ap_dict, ap2ci_dict
@@ -153,7 +154,7 @@ ci2ap_dict, ap2ci_dict=read_ci2ap_dict()
 
 
 def fix_form_type_entity_mismatch(f):
-  f_list = filter(lambda x: len(x) > 0, f.strip().split(' '))
+  f_list = list(filter(lambda x: len(x) > 0, f.strip().split(' ')))
   for i in range(0, len(f_list) - 2):
     if (f_list[i]=='from_airport') and f_list[i+1].startswith('$') and f_list[i+2].endswith(':ci'):
       f_list[i+2]=ci2ap_dict.get(f_list[i+2], f_list[i+2])

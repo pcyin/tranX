@@ -1,4 +1,6 @@
 from __future__ import print_function
+import six
+import argparse
 import sys
 from flask import Flask, url_for, jsonify, render_template
 import json
@@ -6,29 +8,19 @@ import json
 from components.standalone_parser import StandaloneParser
 
 app = Flask(__name__)
+parsers = dict()
 
 
-parsers = {
-    # 'atis': StandaloneParser('atis',
-    #                          'saved_models/atis/'
-    #                          'model.atis.sup.lstm.hidden200.embed128.action128.field32.type32.dropout0.3.lr_decay0.5.beam5.vocab.bin.train.bin.glorot.par_state_w_field_embed.seed0.bin',
-    #                          beam_size=5,
-    #                          cuda=False),
-    # 'geo': StandaloneParser('geo',
-    #                         'saved_models/geo/'
-    #                         'model.geo.sup.lstm.hid256.embed128.act128.field32.type32.drop0.5.lr_decay0.985.lr_dec_aft20.beam5.vocab.freq2.bin.train.bin.pat1000.max_ep200.batch10.lr0.002.glorot.no_par_info.seed2.cu90.bin',
-    #                         beam_size=5,
-    #                         cuda=False),
-    # 'django': StandaloneParser('django',
-    #                            'saved_models/django/'
-    #                            'model.sup.django.lstm.hidden256.embed128.action128.field64.type64.dropout0.3.lr0.001.lr_decay0.5.beam_size15.vocab.0513.freq5.bin.train.0513.bin.glorot.par_state_w_field_embe.seed0.bin',
-    #                            beam_size=15, cuda=False),
-    'conala': StandaloneParser('conala',
-                              'saved_models/conala/'
-                              'model.sup.conala.lstm.hidden256.embed128.action128.field64.type64.dr0.3.lr0.001.lr_de0.5.lr_da15.beam15.vocab.var_str_sep.new_dev.src_freq3.code_freq3.bin.train.var_str_sep.new_dev.bin.glorot.par_state.seed1.bin',
-                              beam_size=15,
-                              cuda=False)
-}
+def init_arg_parser():
+    arg_parser = argparse.ArgumentParser()
+
+    #### General configuration ####
+    arg_parser.add_argument('--cuda', action='store_true', default=False, help='Use gpu')
+    arg_parser.add_argument('--config_file', type=str, required=True,
+                            help='Config file that specifies model to load, see online doc for an example')
+    arg_parser.add_argument('--port', type=int, required=False, default=8081)
+
+    return arg_parser
 
 
 @app.route("/")
@@ -37,11 +29,11 @@ def default():
 
 
 @app.route('/parse/<dataset>/<utterance>', methods=['GET'])
-def parse(utterance, dataset='atis'):
+def parse(utterance, dataset):
 
     parser = parsers[dataset]
 
-    if sys.version_info < (3, 0):
+    if six.PY2:
         utterance = utterance.encode('utf-8', 'ignore')
 
     hypotheses = parser.parse(utterance, debug=True)
@@ -71,4 +63,16 @@ def parse(utterance, dataset='atis'):
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8081, debug=True)
+    args = init_arg_parser().parse_args()
+    config_dict = json.load(open(args.config_file))
+
+    for parser_id, config in config_dict.items():
+        parser = StandaloneParser(parser_name=config['parser'],
+                                  model_path=config['model_path'],
+                                  example_processor_name=config['example_processor'],
+                                  beam_size=config['beam_size'],
+                                  cuda=args.cuda)
+
+        parsers[parser_id] = parser
+
+    app.run(host='0.0.0.0', port=args.port, debug=True)

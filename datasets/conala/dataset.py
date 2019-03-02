@@ -4,7 +4,6 @@ import numpy as np
 import pickle
 
 from components.action_info import get_action_infos
-from datasets import ConalaEvaluator
 from datasets.conala.util import *
 from asdl.lang.py3.py3_transition_system import python_ast_to_asdl_ast, asdl_ast_to_python_ast, Python3TransitionSystem
 
