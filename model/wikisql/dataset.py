@@ -25,7 +25,7 @@ class WikiSqlTable(object):
 
 class WikiSqlBatch(Batch):
     def __init__(self, examples, grammar, vocab, cuda=False):
-        super(WikiSqlBatch, self).__init__(examples, grammar, vocab, cuda)
+        super(WikiSqlBatch, self).__init__(examples, grammar, vocab, cuda=cuda, copy=True)
 
     def init_index_tensors(self):
         pass
