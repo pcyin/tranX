@@ -22,7 +22,6 @@ from asdl import *
 from asdl.asdl import ASDLGrammar
 from common.registerable import Registrable
 from components.dataset import Dataset, Example
-from components.standalone_parser import StandaloneParser
 from common.utils import update_args, init_arg_parser
 from datasets import *
 from model import nn_utils, utils
@@ -244,29 +243,6 @@ def test(args):
         pickle.dump(decode_results, open(args.save_decode_to, 'wb'))
 
 
-def interactive_mode(args):
-    """Interactive mode"""
-    print('Start interactive mode', file=sys.stderr)
-
-    parser = StandaloneParser(args.parser,
-                              args.load_model,
-                              args.example_preprocessor,
-                              beam_size=args.beam_size,
-                              cuda=args.cuda)
-
-    while True:
-        utterance = input('Query:').strip()
-        hypotheses = parser.parse(utterance, debug=True)
-
-        for hyp_id, hyp in enumerate(hypotheses):
-            print('------------------ Hypothesis %d ------------------' % hyp_id)
-            print(hyp.code)
-            print(hyp.tree.to_string())
-            print('Actions:')
-            for action_t in hyp.action_infos:
-                print(action_t.__repr__(True))
-
-
 if __name__ == '__main__':
     arg_parser = init_arg_parser()
     args = init_config()
@@ -275,7 +251,5 @@ if __name__ == '__main__':
         train(args)
     elif args.mode == 'test':
         test(args)
-    elif args.mode == 'interactive':
-        interactive_mode(args)
     else:
         raise RuntimeError('unknown mode')
