@@ -14,7 +14,7 @@ class WikiSQLEvaluator(Evaluator):
     def __init__(self, transition_system, args):
         super(WikiSQLEvaluator, self).__init__(transition_system=transition_system)
 
-        print(f'log database {args.sql_db_file}', file=sys.stderr)
+        print(f'load evaluation database {args.sql_db_file}', file=sys.stderr)
         self.execution_engine = DBEngine(args.sql_db_file)
         self.answer_prune = args.answer_prune
 

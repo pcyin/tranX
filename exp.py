@@ -29,6 +29,12 @@ from model import nn_utils, utils
 from model.parser import Parser
 from model.utils import GloveHelper, get_parser_class
 
+if six.PY3:
+    # import additional packages for wikisql dataset (works only under Python 3)
+    from model.wikisql.dataset import WikiSqlExample, WikiSqlTable, TableColumn
+    from model.wikisql.parser import WikiSqlParser
+    from datasets.wikisql.dataset import Query, DBEngine
+
 
 def init_config():
     args = arg_parser.parse_args()
@@ -44,12 +50,6 @@ def init_config():
 
 def train(args):
     """Maximum Likelihood Estimation"""
-
-    if args.parser == 'wikisql_parser':
-        # import additional packages for wikisql dataset (works only under Python 3)
-        from model.wikisql.dataset import WikiSqlExample, WikiSqlTable, TableColumn
-        from model.wikisql.parser import WikiSqlParser
-        from datasets.wikisql.dataset import Query, DBEngine
 
     # load in train/dev set
     train_set = Dataset.from_bin_file(args.train_file)
