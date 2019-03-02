@@ -796,8 +796,8 @@ class Parser(nn.Module):
         }
         torch.save(params, path)
 
-    @staticmethod
-    def load(model_path, cuda=False):
+    @classmethod
+    def load(cls, model_path, cuda=False):
         params = torch.load(model_path, map_location=lambda storage, loc: storage)
         vocab = params['vocab']
         transition_system = params['transition_system']
@@ -807,7 +807,7 @@ class Parser(nn.Module):
         saved_state = params['state_dict']
         saved_args.cuda = cuda
 
-        parser = Parser(saved_args, vocab, transition_system)
+        parser = cls(saved_args, vocab, transition_system)
 
         parser.load_state_dict(saved_state)
 
