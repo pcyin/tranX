@@ -3,14 +3,16 @@ from __future__ import print_function
 import multiprocessing
 import math
 import itertools
+import re
 import sys, os
+import six
 import torch
 import torch.nn as nn
 from collections import OrderedDict
 
 import numpy as np
 
-from common.evaluator import CachedExactMatchEvaluator
+from components.evaluator import CachedExactMatchEvaluator
 from common.registerable import Registrable
 from common.savable import Savable
 from datasets.conala.conala_eval import tokenize_for_bleu_eval
@@ -18,8 +20,12 @@ from datasets.conala import evaluator as conala_evaluator
 from model import utils
 from components.dataset import Example
 
+if six.PY3:
+    from asdl import Python3TransitionSystem
+else:
+    from asdl import PythonTransitionSystem
+
 import xgboost as xgb
-from sklearn import preprocessing
 
 
 # shared across processes for multi-processed reranking
@@ -61,6 +67,38 @@ class RerankingFeature(object):
         raise NotImplementedError
 
 
+@Registrable.register('parser_score')
+class ParserScore(RerankingFeature):
+    @property
+    def feature_name(self):
+        return 'parser_score'
+
+    @property
+    def is_batched(self):
+        return False
+
+    def get_feat_value(self, example, hyp, **kwargs):
+        return float(hyp.score)
+
+
+@Registrable.register('normalized_parser_score_by_action')
+class NormalizedParserScoreByAction(RerankingFeature):
+    def __init__(self):
+        pass
+
+    @property
+    def feature_name(self):
+        return 'normalized_parser_score'
+
+    @property
+    def is_batched(self):
+        return False
+
+    def get_feat_value(self, example, hyp, **kwargs):
+        # return float(hyp.score) / len(kwargs['transition_system'].tokenize_code(hyp.code))
+        return float(hyp.score) / len(hyp.actions)
+
+
 @Registrable.register('normalized_parser_score')
 class NormalizedParserScore(RerankingFeature):
     def __init__(self):
@@ -75,21 +113,36 @@ class NormalizedParserScore(RerankingFeature):
         return False
 
     def get_feat_value(self, example, hyp, **kwargs):
-        return float(hyp.score) / hyp.code_token_count
+        return float(hyp.score) / HypCodeTokensCount().get_feat_value(example, hyp, **kwargs)
 
 
-@Registrable.register('code_token_count')
+@Registrable.register('word_cnt')
 class HypCodeTokensCount(RerankingFeature):
     @property
     def feature_name(self):
-        return 'code_token_count'
+        return 'word_cnt'
 
     @property
     def is_batched(self):
         return False
 
     def get_feat_value(self, example, hyp, **kwargs):
-        return float(hyp.code_token_count)
+        # TODO: this is dataset specific, we should fix it
+        if hasattr(hyp, 'decanonical_code_tokens'):
+            # we use the tokenization for BLEU calculation
+            code_tokens = ['#NEWLINE#' if c == '\n' else c for c in hyp.decanonical_code_tokens]
+            return float(len(code_tokens))
+        # else:
+        #     return len(hyp.actions)
+        elif six.PY2 and isinstance(kwargs['transition_system'], PythonTransitionSystem):
+            code_tokens = [c.replace('\r\n', '#NEWLINE#').replace('\r', '#NEWLINE#').replace('\n', '#NEWLINE#')
+                           for c in kwargs['transition_system'].tokenize_code(hyp.code)]
+            # remove consecutive spaces
+            code_tokens = re.sub(r'\s+', ' ', ' '.join(code_tokens)).strip().split(' ')
+            code_tokens = list(filter(lambda x: len(x) > 0, code_tokens))
+            return float(len(code_tokens))
+
+        return len(kwargs['transition_system'].tokenize_code(hyp.code))
 
 
 @Registrable.register('is_2nd_hyp_and_margin_with_top_hyp')
@@ -142,7 +195,7 @@ class Reranker(Savable):
             self._add_feature(feat)
 
         if parameter is not None:
-            self.parameter = np.array(parameter)
+            self.parameter = parameter
         else:
             self.parameter = np.zeros(self.feature_num)
 
@@ -181,7 +234,8 @@ class Reranker(Savable):
                                       tgt_actions=None,
                                       tgt_ast=None)
                 hyp_examples.append(hyp_example)
-                hyp.code_token_count = len(self.transition_system.tokenize_code(hyp.code))
+                # hyp.tokenized_code = len(self.transition_system.tokenize_code(hyp.code))
+                # hyp.code_token_count = len(hyp.code.split(' '))
 
                 feat_vals = OrderedDict()
                 hyp.rerank_feature_values = feat_vals
@@ -203,7 +257,9 @@ class Reranker(Savable):
             for hyp_id, hyp in enumerate(hyps):
                 for feat_name, feat in self.feat_map.items():
                     if not feat.is_batched:
-                        feat_val = feat.get_feat_value(example, hyp, hyp_id=hyp_id, all_hyps=hyps)
+                        feat_val = feat.get_feat_value(example, hyp,
+                                                       hyp_id=hyp_id, all_hyps=hyps,
+                                                       transition_system=self.transition_system)
                         hyp.rerank_feature_values[feat_name] = feat_val
 
     def get_rerank_score(self, hyp, param):
@@ -323,6 +379,62 @@ class Reranker(Savable):
         reranker = cls(features, params['parameter'], params['transition_system'])
 
         return reranker
+
+
+class LinearReranker(Reranker):
+    """a reranker using linear features"""
+
+    def get_rerank_score(self, hyp, param=None):
+        if param is None:
+            param = self.parameter
+
+        score = sum(feat_weight * hyp.rerank_feature_values[feat_name] for feat_name, feat_weight in param.items())
+
+        return score
+
+    def generate_nbest_list(self, examples, decode_results, nbest_file_name, target_tokenizer, hyp_tokenizer):
+        f_src = open(nbest_file_name + '.src', 'w')
+        f_tgt = open(nbest_file_name + '.tgt', 'w')
+        f_hyp = open(nbest_file_name + '.hyp', 'w')
+
+        self.filter_hyps_and_initialize_features(examples, decode_results)
+
+        for e_id, (example, hyp_list) in enumerate(zip(examples, decode_results)):
+            f_src.write(' '.join(example.src_sent) + '\n')
+            f_tgt.write(' '.join(target_tokenizer(example)) + '\n')
+
+            if not hyp_list:
+                hyp_str = "{e_id} ||| pass ||| 0. |||".format(e_id=e_id)
+                for feat_name in self.feat_map:
+                    hyp_str += ' {}=0.0'.format(feat_name)
+                hyp_str += '\n'
+                f_hyp.write(hyp_str)
+
+                continue
+
+            # new_hyp_scores = [self.get_rerank_score(hyp) for hyp in hyp_list]
+
+            # hyp_ranks = np.argsort(new_hyp_scores)[::-1]
+
+            # for i, hyp_id in enumerate(hyp_ranks):
+            for hyp_id in range(len(hyp_list)):
+                hyp = hyp_list[hyp_id]
+                code_tokens = hyp_tokenizer(hyp)
+                # reranker_score = new_hyp_scores[hyp_id]
+
+                # code_token_count={code_token_count_feat.get_feat_value(example, hyp)}
+                hyp_str = "{e_id} ||| {code_tokens} ||| {hyp_score} |||".format(e_id=e_id, code_tokens=' '.join(code_tokens), hyp_score=hyp.score)
+                for feat_name in self.parameter.keys():
+                    hyp_str += ' {feat_name}={feat_val}'.format(feat_name=feat_name, feat_val=hyp.rerank_feature_values[feat_name])
+                hyp_str += '\n'
+                f_hyp.write(hyp_str)
+
+        f_src.close()
+        f_tgt.close()
+        f_hyp.close()
+
+    def train(self, examples, decode_results, initial_performance=0., metric='accuracy'):
+        raise NotImplementedError
 
 
 class GridSearchReranker(Reranker):
