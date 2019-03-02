@@ -1,3 +1,6 @@
+import sys
+import traceback
+
 from components.evaluator import Evaluator
 from common.registerable import Registrable
 from datasets.wikisql.lib.query import Query
@@ -11,6 +14,7 @@ class WikiSQLEvaluator(Evaluator):
     def __init__(self, transition_system, args):
         super(WikiSQLEvaluator, self).__init__(transition_system=transition_system)
 
+        print(f'log database {args.sql_db_file}', file=sys.stderr)
         self.execution_engine = DBEngine(args.sql_db_file)
         self.answer_prune = args.answer_prune
 
@@ -36,8 +40,7 @@ class WikiSQLEvaluator(Evaluator):
                     for hyp_id, hyp in enumerate(hyp_list):
                         try:
                             # check if it is executable
-                            hyp_query = asdl_ast_to_sql_query(hyp.tree)
-                            detokenized_hyp_query = detokenize_query(hyp_query, example.meta, example.table)
+                            detokenized_hyp_query = detokenize_query(hyp.code, example.meta, example.table)
                             hyp_answer = self.execution_engine.execute_query(example.meta['table_id'],
                                                                              detokenized_hyp_query, lower=True)
                             if len(hyp_answer) == 0:
@@ -46,7 +49,19 @@ class WikiSQLEvaluator(Evaluator):
                             pruned_hyps.append(hyp)
                             if fast_mode: break
                         except:
-                            continue
+                            print("Exception in converting tree to code:", file=sys.stdout)
+                            print('-' * 60, file=sys.stdout)
+                            print('Example: %s\nIntent: %s\nTarget Code:\n%s\nHypothesis[%d]:\n%s' % (example.idx,
+                                                                                                      ' '.join(
+                                                                                                          example.src_sent),
+                                                                                                      example.tgt_code,
+                                                                                                      hyp_id,
+                                                                                                      hyp.tree.to_string()),
+                                  file=sys.stdout)
+                            print()
+                            print(hyp.code)
+                            traceback.print_exc(file=sys.stdout)
+                            print('-' * 60, file=sys.stdout)
 
                 filtered_decode_results.append(pruned_hyps)
 
