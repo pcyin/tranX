@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "download dataset"
-data_file="release.0.2.0.zip"
+data_file="tranx.0.2.0.zip"
 wget -c http://http://www.cs.cmu.edu/~pengchey/${data_file}
 unzip ${data_file}
 rm ${data_file}
