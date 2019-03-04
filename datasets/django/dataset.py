@@ -301,7 +301,7 @@ class Django(object):
 
     @staticmethod
     def process_django_dataset():
-        vocab_freq_cutoff = 30  # TODO: found the best cutoff threshold
+        vocab_freq_cutoff = 15  # TODO: found the best cutoff threshold
         annot_file = 'data/django/all.anno'
         code_file = 'data/django/all.code'
 
