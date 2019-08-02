@@ -98,3 +98,6 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+# data downloaded automatically using pull_data.sh
+data/
