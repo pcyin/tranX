@@ -629,14 +629,14 @@ class Parser(nn.Module):
                         productions = self.transition_system.get_valid_continuating_productions(hyp)
                         for production in productions:
                             prod_id = self.grammar.prod2id[production]
-                            prod_score = apply_rule_log_prob[hyp_id, prod_id].data[0]
+                            prod_score = apply_rule_log_prob[hyp_id, prod_id].data.item()
                             new_hyp_score = hyp.score + prod_score
 
                             applyrule_new_hyp_scores.append(new_hyp_score)
                             applyrule_new_hyp_prod_ids.append(prod_id)
                             applyrule_prev_hyp_ids.append(hyp_id)
                     elif action_type == ReduceAction:
-                        action_score = apply_rule_log_prob[hyp_id, len(self.grammar)].data[0]
+                        action_score = apply_rule_log_prob[hyp_id, len(self.grammar)].data.item()
                         new_hyp_score = hyp.score + action_score
 
                         applyrule_new_hyp_scores.append(new_hyp_score)
@@ -657,10 +657,10 @@ class Parser(nn.Module):
                                     token_id = primitive_vocab[token]
                                     primitive_prob[hyp_id, token_id] = primitive_prob[hyp_id, token_id] + gated_copy_prob
 
-                                    hyp_copy_info[token] = (token_pos_list, gated_copy_prob.data[0])
+                                    hyp_copy_info[token] = (token_pos_list, gated_copy_prob.data.item())
                                 else:
                                     hyp_unk_copy_info.append({'token': token, 'token_pos_list': token_pos_list,
-                                                              'copy_prob': gated_copy_prob.data[0]})
+                                                              'copy_prob': gated_copy_prob.data.item()})
 
                         if args.no_copy is False and len(hyp_unk_copy_info) > 0:
                             unk_i = np.array([x['copy_prob'] for x in hyp_unk_copy_info]).argmax()
@@ -732,7 +732,7 @@ class Parser(nn.Module):
                         else:
                             token = primitive_vocab.id2word[primitive_vocab.unk_id]
                     else:
-                        token = primitive_vocab.id2word[token_id]
+                        token = primitive_vocab.id2word[token_id.item()]
 
                     action = GenTokenAction(token)
 
@@ -743,11 +743,11 @@ class Parser(nn.Module):
                     if debug:
                         action_info.gen_copy_switch = 'n/a' if args.no_copy else primitive_predictor_prob[prev_hyp_id, :].log().cpu().data.numpy()
                         action_info.in_vocab = token in primitive_vocab
-                        action_info.gen_token_prob = gen_from_vocab_prob[prev_hyp_id, token_id].log().cpu().data[0] \
+                        action_info.gen_token_prob = gen_from_vocab_prob[prev_hyp_id, token_id].log().cpu().data.item() \
                             if token in primitive_vocab else 'n/a'
                         action_info.copy_token_prob = torch.gather(primitive_copy_prob[prev_hyp_id],
                                                                    0,
-                                                                   Variable(T.LongTensor(action_info.src_token_position))).sum().log().cpu().data[0] \
+                                                                   Variable(T.LongTensor(action_info.src_token_position))).sum().log().cpu().data.item() \
                             if args.no_copy is False and action_info.copy_from_src else 'n/a'
 
                 action_info.action = action

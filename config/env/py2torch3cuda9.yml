@@ -1,0 +1,59 @@
+name: py2torch3cuda9
+channels:
+- pytorch
+- defaults
+dependencies:
+- backports=1.0=py27h63c9359_1
+- backports.shutil_get_terminal_size=1.0.0=py27h5bc021e_2
+- ca-certificates=2018.03.07=0
+- certifi=2018.4.16=py27_0
+- cffi=1.11.5=py27h9745a5d_0
+- decorator=4.3.0=py27_0
+- enum34=1.1.6=py27h99a27e9_1
+- intel-openmp=2018.0.0=8
+- ipython=5.7.0=py27_0
+- ipython_genutils=0.2.0=py27h89fb69b_0
+- libedit=3.1.20170329=h6b74fdf_2
+- libffi=3.2.1=hd88cf55_4
+- libgcc-ng=7.2.0=hdf63c60_3
+- libgfortran-ng=7.2.0=hdf63c60_3
+- libstdcxx-ng=7.2.0=hdf63c60_3
+- mkl=2018.0.2=1
+- mkl_fft=1.0.1=py27h3010b51_0
+- mkl_random=1.0.1=py27h629b387_0
+- ncurses=6.1=hf484d3e_0
+- numpy=1.14.3=py27h14a74c5_0
+- numpy-base=1.14.3=py27hdbf6ddf_0
+- openssl=1.0.2o=h20670df_0
+- pathlib2=2.3.2=py27_0
+- pexpect=4.5.0=py27_0
+- pickleshare=0.7.4=py27h09770e1_0
+- pip=10.0.1=py27_0
+- prompt_toolkit=1.0.15=py27h1b593e1_0
+- ptyprocess=0.5.2=py27h4ccb14c_0
+- pycparser=2.18=py27hefa08c5_1
+- pygments=2.2.0=py27h4a8b6f5_0
+- python=2.7.15=h1571d57_0
+- readline=7.0=ha6073c6_4
+- scandir=1.7=py27h14c3975_0
+- setuptools=39.1.0=py27_0
+- simplegeneric=0.8.1=py27_2
+- six=1.11.0=py27h5f960f1_1
+- sqlite=3.23.1=he433501_0
+- tk=8.6.7=hc745277_3
+- traitlets=4.3.2=py27hd6ce930_0
+- wcwidth=0.1.7=py27h9e3e1ab_0
+- wheel=0.31.0=py27_0
+- zlib=1.2.11=ha838bed_2
+- cuda90=1.0=h6433d27_0
+- pytorch=0.3.1=py27_cuda9.0.176_cudnn7.0.5_2
+- pip:
+  - astor==0.6
+  - backports.shutil-get-terminal-size==1.0.0
+  - ipython-genutils==0.2.0
+  - line-profiler==2.1.2
+  - mkl-fft==1.0.0
+  - mkl-random==1.0.1
+  - prompt-toolkit==1.0.15
+  - torch==0.3.1.post2
+prefix: /home/pengchey/anaconda2/envs/py2torch3cuda9

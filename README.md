@@ -82,7 +82,7 @@ cd tranX
 
 ./pull_data.sh  # get datasets and pre-trained models
 
-conda env create -f config/env/py3torch3cuda9.yml  # create conda Python environment.
+conda env create -f config/env/tranx.yml  # create conda Python environment.
 
 ./scripts/atis/train.sh 0  # train on ATIS semantic parsing dataset with random seed 0
 ./scripts/geo/train.sh 0  # train on GEO dataset
@@ -99,7 +99,7 @@ conda env create -f config/env/py3torch3cuda9.yml  # create conda Python environ
 To start the web server, simply run:
 
 ```
-source activate py3torch3cuda9
+source activate tranx
 PYTHONPATH=../ python app.py --config_file config/server/config_py3.json
 ```
 
@@ -120,17 +120,14 @@ http://<IP Address>:8081/parse/<dataset_name>/<utterance>
 ### Conda Environments
 
 TranX supports both Python 2.7 and 3.5. Please note that 
-some datasets only support Python 2.7 (e.g., Django) or Python 3+ (e.g., WikiSQL). We provide example
-conda environments (`config/env/(py2torch3cuda9.yml|py3torch3cuda9.yml)`) for both Python versions.
+some datasets only support Python 2.7 (e.g., Django) or Python 3+ (e.g., WikiSQL).
+The main example conda environment (`config/env/tranx.yml`) supports Python 3, but
+we also provide one for Python 2 (`config/env/tranx-py2.yml`).
 You can export the enviroments using the following command:
 
 ```bash
-conda env create -f config/env/(py2torch3cuda9.yml|py3torch3cuda9.yml)
+conda env create -f config/env/(tranx.yml,tranx-py2.yml)
 ```
-
-**Note** The conda enviroments are generated on a Ubuntu 16.04 machine. If you are unable to import the enviroment with error message like `cannot found package numpy=1.14.3=py36h14a74c5_0`, please try removing the sha after the version number (e.g., `=py36h14a74c5_0`), since it might be different on different platforms. We keep the detailed version number with sha to ensure reproducibility.
-
-
 
 ## FAQs
 

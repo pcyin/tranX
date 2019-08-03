@@ -8,7 +8,6 @@ __pycache__/
 
 # Distribution / packaging
 .Python
-env/
 build/
 develop-eggs/
 dist/
@@ -101,3 +100,6 @@ ENV/
 
 # data downloaded automatically using pull_data.sh
 data/
+
+# saved model files
+saved_models/
