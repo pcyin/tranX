@@ -1,0 +1,123 @@
+name: tranx
+channels:
+- pytorch
+- defaults
+dependencies:
+- backcall
+- blas
+- bleach
+- ca-certificates
+- certifi
+- cffi
+- dbus
+- decorator
+- entrypoints
+- expat
+- fontconfig
+- freetype
+- glib
+- gmp
+- gst-plugins-base
+- gstreamer
+- html5lib
+- icu
+- intel-openmp
+- ipykernel
+- ipython
+- ipython_genutils
+- ipywidgets
+- jedi
+- jinja2
+- jpeg
+- jsonschema
+- jupyter
+- jupyter_client
+- jupyter_console
+- jupyter_core
+- libedit
+- libffi
+- libgcc-ng
+- libgfortran-ng
+- libpng
+- libsodium
+- libstdcxx-ng
+- libuuid
+- libxcb
+- libxml2
+- markupsafe
+- mistune
+- mkl
+- mkl_fft
+- mkl_random
+- nbconvert
+- nbformat
+- ncurses
+- notebook
+- numpy
+- numpy-base
+- openssl
+- pandoc
+- pandocfilters
+- parso
+- pcre
+- pexpect
+- pickleshare
+- pip
+- prompt_toolkit
+- ptyprocess
+- pycparser
+- pygments
+- pyqt
+- python=2
+- python-dateutil
+- pyzmq
+- qt
+- qtconsole
+- readline
+- send2trash
+- setuptools
+- simplegeneric
+- sip
+- six
+- sqlite
+- terminado
+- testpath
+- tk
+- tornado
+- traitlets
+- wcwidth
+- webencodings
+- wheel
+- widgetsnbextension
+- xz
+- zeromq
+- zlib
+- cudatoolkit
+- pytorch
+- pip:
+  - babel
+  - docopt
+  - et-xmlfile
+  - ipython-genutils
+  - jdcal
+  - jupyter-client
+  - jupyter-console
+  - jupyter-core
+  - mkl-fft
+  - mkl-random
+  - odfpy
+  - openpyxl
+  - prompt-toolkit
+  - pytz
+  - pyyaml
+  - records
+  - sqlalchemy
+  - tablib
+  - tabulate
+  - torch
+  - tqdm
+  - unicodecsv
+  - xlrd
+  - xlwt
+  - nltk
+  - astor
