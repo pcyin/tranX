@@ -112,7 +112,7 @@ This will start a web server at port 8081 with ATIS/GEO/CoNaLa datasets.
 ```
 http://<IP Address>:8081/parse/<dataset_name>/<utterance>
 
-# e.g., http://localhost:8081/parser/atis/show me flight from Pittsburgh to Seattle
+# e.g., http://localhost:8081/parse/atis/show me flight from Pittsburgh to Seattle
 ```
 
 
