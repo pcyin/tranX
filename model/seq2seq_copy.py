@@ -150,7 +150,7 @@ class Seq2SeqWithCopy(Seq2SeqModel):
                                                      src_encodings, src_encodings_att_linear,
                                                      mask=src_sent_masks)
 
-        att_t = F.tanh(self.att_vec_linear(torch.cat([h_t, ctx_t], 1)))  # E.q. (5)
+        att_t = torch.tanh(self.att_vec_linear(torch.cat([h_t, ctx_t], 1)))  # E.q. (5)
         att_t = self.dropout(att_t)
 
         return (h_t, cell_t), att_t

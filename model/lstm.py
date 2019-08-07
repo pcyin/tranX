@@ -98,9 +98,9 @@ class RecurrentDropoutLSTMCell(RNNCellBase):
         else:
             i_t = F.sigmoid(xi_t + self.bias_ih[:self.hidden_size] + hi_t + self.bias_hh[:self.hidden_size])
             f_t = F.sigmoid(xf_t + self.bias_ih[self.hidden_size:2 * self.hidden_size] + hf_t + self.bias_hh[self.hidden_size:2 * self.hidden_size])
-            c_t = f_t * c_tm1 + i_t * F.tanh(xc_t + self.bias_ih[2 * self.hidden_size:3 * self.hidden_size] + hc_t + self.bias_hh[2 * self.hidden_size:3 * self.hidden_size])
+            c_t = f_t * c_tm1 + i_t * torch.tanh(xc_t + self.bias_ih[2 * self.hidden_size:3 * self.hidden_size] + hc_t + self.bias_hh[2 * self.hidden_size:3 * self.hidden_size])
             o_t = F.sigmoid(xo_t + self.bias_ih[3 * self.hidden_size:4 * self.hidden_size] + ho_t + self.bias_hh[3 * self.hidden_size:4 * self.hidden_size])
-            h_t = o_t * F.tanh(c_t)
+            h_t = o_t * torch.tanh(c_t)
 
         return h_t, c_t
     
@@ -168,10 +168,10 @@ class ParentFeedingLSTMCell(RNNCellBase):
         f_t_p = F.sigmoid(xf_t + F.linear(h_tm1_p, self.U_f_p) + self.b_f_p)
 
         xc_t = F.linear(input, self.W_c) + F.linear(h_tm1, self.U_c) + F.linear(h_tm1_p, self.U_c_p) + self.b_c
-        c_t = f_t * c_tm1 + f_t_p * c_tm1_p + i_t * F.tanh(xc_t)
+        c_t = f_t * c_tm1 + f_t_p * c_tm1_p + i_t * torch.tanh(xc_t)
 
         o_t = F.sigmoid(F.linear(input, self.W_o) + F.linear(h_tm1, self.U_o) + F.linear(h_tm1_p, self.U_o_p) + self.b_o)
-        h_t = o_t * F.tanh(c_t)
+        h_t = o_t * torch.tanh(c_t)
 
         return h_t, c_t
 

@@ -124,7 +124,7 @@ def train(args):
 
             # clip gradient
             if args.clip_grad > 0.:
-                grad_norm = torch.nn.utils.clip_grad_norm(model.parameters(), args.clip_grad)
+                grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip_grad)
 
             optimizer.step()
 

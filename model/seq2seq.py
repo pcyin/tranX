@@ -90,7 +90,7 @@ class Seq2SeqModel(nn.Module):
 
     def init_decoder_state(self, enc_last_state, enc_last_cell):
         dec_init_cell = self.decoder_cell_init(enc_last_cell)
-        dec_init_state = F.tanh(dec_init_cell)
+        dec_init_state = torch.tanh(dec_init_cell)
 
         return dec_init_state, dec_init_cell
 
@@ -185,7 +185,7 @@ class Seq2SeqModel(nn.Module):
                                                          src_encodings, src_encodings_att_linear,
                                                          mask=src_sent_masks)
 
-        att_t = F.tanh(self.att_vec_linear(torch.cat([h_t, ctx_t], 1)))  # E.q. (5)
+        att_t = torch.tanh(self.att_vec_linear(torch.cat([h_t, ctx_t], 1)))  # E.q. (5)
         att_t = self.dropout(att_t)
 
         # (batch_size, tgt_vocab_size)

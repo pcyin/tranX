@@ -28,7 +28,7 @@ class LSTMLanguageModel(nn.Module):
         self.read_out = nn.Linear(hidden_size, len(vocab))
         self.dropout = nn.Dropout(dropout)
 
-        self.cross_entropy_loss = nn.CrossEntropyLoss(ignore_index=vocab['<pad>'], size_average=False, reduce=False)
+        self.cross_entropy_loss = nn.CrossEntropyLoss(ignore_index=vocab['<pad>'], reduction='none')
 
     def forward(self, sent_var):
         """

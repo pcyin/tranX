@@ -151,7 +151,7 @@ def uniform_init(lower, upper, params):
 def glorot_init(params):
     for p in params:
         if len(p.data.size()) > 1:
-            init.xavier_normal(p.data)
+            init.xavier_normal_(p.data)
 
 
 def identity(x):
@@ -169,7 +169,7 @@ class LabelSmoothing(nn.Module):
 
         super(LabelSmoothing, self).__init__()
 
-        self.criterion = nn.KLDivLoss(size_average=False, reduce=False)
+        self.criterion = nn.KLDivLoss(reduction='none')
         smoothing_value = smoothing / float(tgt_vocab_size - 1 - len(ignore_indices))
         one_hot = torch.zeros((tgt_vocab_size,)).fill_(smoothing_value)
         for idx in ignore_indices:
