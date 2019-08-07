@@ -1,8 +1,6 @@
 #!/bin/bash
 set -e
 
-source activate py3torch3cuda9
-
 seed=${1:-0}
 vocab="data/geo/vocab.freq2.bin"
 train_file="data/geo/train.bin"

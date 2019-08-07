@@ -1,8 +1,6 @@
 #!/bin/bash
 set -e
 
-source activate py2torch3cuda9
-
 seed=${1:-0}
 vocab="data/django/vocab.freq15.bin"
 train_file="data/django/train.bin"

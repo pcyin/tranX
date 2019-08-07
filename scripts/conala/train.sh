@@ -1,8 +1,6 @@
 #!/bin/bash
 set -e
 
-source activate py3torch3cuda9
-
 seed=${1:-0}
 vocab="data/conala/vocab.var_str_sep.src_freq3.code_freq3.bin"
 train_file="data/conala/train.var_str_sep.bin"
