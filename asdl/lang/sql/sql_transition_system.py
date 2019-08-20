@@ -130,7 +130,7 @@ class SqlTransitionSystem(TransitionSystem):
             return ApplyRuleAction,
 
     def get_primitive_field_actions(self, realized_field):
-        if realized_field.type.name == 'column_idx' is not None:
+        if realized_field.type.name == 'column_idx':
             return [WikiSqlSelectColumnAction(int(realized_field.value))]
         elif realized_field.type.name == 'string':
             tokens = str(realized_field.value).split(' ') + ['</primitive>']
