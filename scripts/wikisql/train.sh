@@ -1,8 +1,6 @@
 #!/bin/bash
 set -e
 
-source activate py3torch3cuda9
-
 seed=${1:-0}
 vocab="vocab.bin"
 train_file="train.bin"
@@ -19,6 +17,8 @@ lstm='lstm'
 col_att='affine'
 model_name=model.wikisql.sup.exe_acc.${lstm}.hidden${hidden_size}.embed${embed_size}.action${action_embed_size}.field${field_embed_size}.type${type_embed_size}.dropout${dropout}.lr_decay${lr_decay}.pat${patience}.beam${beam_size}.${vocab}.${train_file}.col_att_${col_att}.glorot.no_par_info.seed${seed}
 
+echo "**** Writing results to logs/wikisql/${model_name}.log ****"
+mkdir -p logs/wikisql
 echo commit hash: `git rev-parse HEAD` > logs/wikisql/${model_name}.log
 
 echo `which python`
@@ -57,6 +57,6 @@ python -u exp.py \
     --eval_top_pred_only \
     --decode_max_time_step 50 \
     --log_every 10 \
-    --save_to saved_models/wikisql/${model_name} 2>>logs/wikisql/${model_name}.log
+    --save_to saved_models/wikisql/${model_name} 2>&1 | tee -a logs/wikisql/${model_name}.log
 
-. scripts/wikisql/test.sh saved_models/wikisql/${model_name}.bin 2>>logs/wikisql/${model_name}.log
+. scripts/wikisql/test.sh saved_models/wikisql/${model_name}.bin 2>&1 | tee -a logs/wikisql/${model_name}.log

@@ -1,7 +1,5 @@
 #!/bin/bash
 
-source activate py3torch3cuda9
-
 test_file="data/conala/test.var_str_sep.bin"
 
 python exp.py \

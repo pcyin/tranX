@@ -98,5 +98,11 @@ ENV/
 # mypy
 .mypy_cache/
 
+# PyCharm files
+.idea/
+
 # data downloaded automatically using pull_data.sh
 data/
+
+# saved model files
+saved_models/

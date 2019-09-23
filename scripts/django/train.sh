@@ -1,8 +1,6 @@
 #!/bin/bash
 set -e
 
-source activate py2torch3cuda9
-
 seed=${1:-0}
 vocab="data/django/vocab.freq15.bin"
 train_file="data/django/train.bin"
@@ -20,6 +18,10 @@ lr_decay=0.5
 beam_size=15
 lstm='lstm'  # lstm
 model_name=model.sup.django.${lstm}.hidden${hidden_size}.embed${embed_size}.action${action_embed_size}.field${field_embed_size}.type${type_embed_size}.dropout${dropout}.lr${lr}.lr_decay${lr_decay}.beam_size${beam_size}.$(basename ${vocab}).$(basename ${train_file}).glorot.par_state_w_field_embe.seed${seed}
+
+echo "**** Writing results to logs/django/${model_name}.log ****"
+mkdir -p logs/django
+echo commit hash: `git rev-parse HEAD` > logs/django/${model_name}.log
 
 python exp.py \
     --cuda \
@@ -48,6 +50,6 @@ python exp.py \
     --lr_decay ${lr_decay} \
     --beam_size ${beam_size} \
     --log_every 50 \
-    --save_to saved_models/django/${model_name} 2>logs/django/${model_name}.log
+    --save_to saved_models/django/${model_name} 2>&1 | tee -a logs/django/${model_name}.log
 
-. scripts/django/test.sh saved_models/django/${model_name}.bin 2>>logs/django/${model_name}.log
+. scripts/django/test.sh saved_models/django/${model_name}.bin 2>&1 | tee -a logs/django/${model_name}.log

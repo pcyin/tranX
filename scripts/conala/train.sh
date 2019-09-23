@@ -1,8 +1,6 @@
 #!/bin/bash
 set -e
 
-source activate py3torch3cuda9
-
 seed=${1:-0}
 vocab="data/conala/vocab.var_str_sep.src_freq3.code_freq3.bin"
 train_file="data/conala/train.var_str_sep.bin"
@@ -20,6 +18,10 @@ beam_size=15
 lstm='lstm'  # lstm
 lr_decay_after_epoch=15
 model_name=model.sup.conala.${lstm}.hidden${hidden_size}.embed${embed_size}.action${action_embed_size}.field${field_embed_size}.type${type_embed_size}.dr${dropout}.lr${lr}.lr_de${lr_decay}.lr_da${lr_decay_after_epoch}.beam${beam_size}.$(basename ${vocab}).$(basename ${train_file}).glorot.par_state.seed${seed}
+
+echo "**** Writing results to logs/conala/${model_name}.log ****"
+mkdir -p logs/conala
+echo commit hash: `git rev-parse HEAD` > logs/conala/${model_name}.log
 
 python -u exp.py \
     --cuda \
@@ -50,6 +52,6 @@ python -u exp.py \
     --max_epoch 50 \
     --beam_size ${beam_size} \
     --log_every 50 \
-    --save_to saved_models/conala/${model_name} 2>logs/conala/${model_name}.log
+    --save_to saved_models/conala/${model_name} 2>&1 | tee logs/conala/${model_name}.log
 
-. scripts/conala/test.sh saved_models/conala/${model_name}.bin 2>>logs/conala/${model_name}.log
+. scripts/conala/test.sh saved_models/conala/${model_name}.bin 2>&1 | tee -a logs/conala/${model_name}.log

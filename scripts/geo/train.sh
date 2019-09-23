@@ -1,8 +1,6 @@
 #!/bin/bash
 set -e
 
-source activate py3torch3cuda9
-
 seed=${1:-0}
 vocab="data/geo/vocab.freq2.bin"
 train_file="data/geo/train.bin"
@@ -22,6 +20,10 @@ lr=0.0025
 ls=0.1
 lstm='lstm'
 model_name=model.geo.sup.${lstm}.hid${hidden_size}.embed${embed_size}.act${action_embed_size}.field${field_embed_size}.type${type_embed_size}.drop${dropout}.lr_decay${lr_decay}.lr_dec_aft${lr_decay_after_epoch}.beam${beam_size}.$(basename ${vocab}).$(basename ${train_file}).pat${patience}.max_ep${max_epoch}.batch${batch_size}.lr${lr}.glorot.no_par_info.no_copy.ls${ls}.seed${seed}
+
+echo "**** Writing results to logs/geo/${model_name}.log ****"
+mkdir -p logs/geo
+echo commit hash: `git rev-parse HEAD` > logs/geo/${model_name}.log
 
 python -u exp.py \
     --cuda \
@@ -55,6 +57,6 @@ python -u exp.py \
     --beam_size ${beam_size} \
     --decode_max_time_step 110 \
     --log_every 50 \
-    --save_to saved_models/geo/${model_name} 2>logs/geo/${model_name}.log
+    --save_to saved_models/geo/${model_name} 2>&1 | tee -a logs/geo/${model_name}.log
 
-. scripts/geo/test.sh saved_models/geo/${model_name}.bin 2>>logs/geo/${model_name}.log
+. scripts/geo/test.sh saved_models/geo/${model_name}.bin 2>&1 | tee -a logs/geo/${model_name}.log

@@ -54,7 +54,7 @@ def parse(utterance, dataset):
         hyp_entry = dict(id=hyp_id + 1,
                          value=hyp.code,
                          tree_repr=hyp.tree.to_string(),
-                         score=hyp.score,
+                         score=hyp.score.item(),
                          actions=actions_repr)
 
         responses['hypotheses'].append(hyp_entry)

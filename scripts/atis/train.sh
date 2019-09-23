@@ -1,8 +1,6 @@
 #!/bin/bash
 set -e
 
-source activate py3torch3cuda9
-
 seed=${1:-0}
 vocab="vocab.freq2.bin"
 train_file="train.bin"
@@ -19,6 +17,9 @@ lstm='lstm'
 ls=0.1
 model_name=model.atis.sup.${lstm}.hidden${hidden_size}.embed${embed_size}.action${action_embed_size}.field${field_embed_size}.type${type_embed_size}.dropout${dropout}.lr_decay${lr_decay}.beam${beam_size}.${vocab}.${train_file}.glorot.with_par_info.no_copy.ls${ls}.seed${seed}
 
+echo "**** Writing results to logs/atis/${model_name}.log ****"
+mkdir -p logs/atis
+echo commit hash: `git rev-parse HEAD` > logs/atis/${model_name}.log
 
 python -u exp.py \
     --cuda \
@@ -49,6 +50,6 @@ python -u exp.py \
     --beam_size ${beam_size} \
     --decode_max_time_step 110 \
     --log_every 50 \
-    --save_to saved_models/atis/${model_name} 2>logs/atis/${model_name}.log
+    --save_to saved_models/atis/${model_name} 2>&1 | tee -a logs/atis/${model_name}.log
 
-. scripts/atis/test.sh saved_models/atis/${model_name}.bin 2>>logs/atis/${model_name}.log
+. scripts/atis/test.sh saved_models/atis/${model_name}.bin 2>&1 | tee -a logs/atis/${model_name}.log
