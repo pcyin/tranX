@@ -1,0 +1,54 @@
+name: py2torch3
+channels:
+- pytorch
+- defaults
+dependencies:
+- backports=1.0
+- backports.shutil_get_terminal_size=1.0.0
+- ca-certificates=2018.03.07
+- certifi=2018.4.16
+- cffi=1.11.5
+- decorator=4.3.0
+- enum34=1.1.6
+- intel-openmp=2018.0.0
+- ipython=5.7.0
+- ipython_genutils=0.2.0
+- libedit=3.1.20170329
+- libffi=3.2.1
+- mkl=2018.0.2
+- mkl_fft=1.0.1
+- mkl_random=1.0.1
+- ncurses=6.1
+- numpy=1.14.3
+- numpy-base=1.14.3
+- openssl=1.0.2o
+- pathlib2=2.3.2
+- pexpect=4.5.0
+- pickleshare=0.7.4
+- pip=10.0.1
+- prompt_toolkit=1.0.15
+- ptyprocess=0.5.2
+- pycparser=2.18
+- pygments=2.2.0
+- python=2.7.15
+- readline=7.0
+- scandir=1.7
+- setuptools=39.1.0
+- simplegeneric
+- six=1.11.0
+- sqlite=3.23.1
+- tk=8.6.7
+- traitlets=4.3.
+- wcwidth=0.1.7
+- wheel=0.31.0
+- zlib=1.2.11
+- pytorch=0.3.1
+- pip:
+  - astor==0.6
+  - backports.shutil-get-terminal-size==1.0.0
+  - ipython-genutils==0.2.0
+  - line-profiler==2.1.2
+  - mkl-fft==1.0.0
+  - mkl-random==1.0.1
+  - prompt-toolkit==1.0.15
+  - torch==0.3.1.post2

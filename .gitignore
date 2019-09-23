@@ -8,7 +8,6 @@ __pycache__/
 
 # Distribution / packaging
 .Python
-env/
 build/
 develop-eggs/
 dist/
@@ -98,3 +97,6 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+# data downloaded automatically using pull_data.sh
+data/

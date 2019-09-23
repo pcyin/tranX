@@ -80,9 +80,9 @@ Here is a list of performance results on six datasets using pretrained models in
 git clone https://github.com/pcyin/tranX
 cd tranX
 
-./pull_data.sh  # get datasets, training scripts, and pre-trained models
+./pull_data.sh  # get datasets and pre-trained models
 
-conda env create -f data/env/py3torch3cuda9.yml  # create conda Python environment
+conda env create -f config/env/py3torch3cuda9.yml  # create conda Python environment.
 
 ./scripts/atis/train.sh 0  # train on ATIS semantic parsing dataset with random seed 0
 ./scripts/geo/train.sh 0  # train on GEO dataset
@@ -100,7 +100,7 @@ To start the web server, simply run:
 
 ```
 source activate py3torch3cuda9
-PYTHONPATH=../ python app.py --config_file data/server/config_py3.json
+PYTHONPATH=../ python app.py --config_file config/server/config_py3.json
 ```
 
 This will start a web server at port 8081 with ATIS/GEO/CoNaLa datasets.
@@ -121,11 +121,11 @@ http://<IP Address>:8081/parse/<dataset_name>/<utterance>
 
 TranX supports both Python 2.7 and 3.5. Please note that 
 some datasets only support Python 2.7 (e.g., Django) or Python 3+ (e.g., WikiSQL). We provide example
-conda environments (`data/env/(py2torch3cuda9.yml|py3torch3cuda9.yml)`) for both Python versions.
+conda environments (`config/env/(py2torch3cuda9.yml|py3torch3cuda9.yml)`) for both Python versions.
 You can export the enviroments using the following command:
 
 ```bash
-conda env create -f data/env/(py2torch3cuda9.yml|py3torch3cuda9.yml)
+conda env create -f config/env/(py2torch3cuda9.yml|py3torch3cuda9.yml)
 ```
 
 **Note** The conda enviroments are generated on a Ubuntu 16.04 machine. If you are unable to import the enviroment with error message like `cannot found package numpy=1.14.3=py36h14a74c5_0`, please try removing the sha after the version number (e.g., `=py36h14a74c5_0`), since it might be different on different platforms. We keep the detailed version number with sha to ensure reproducibility.

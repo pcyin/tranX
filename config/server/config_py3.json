@@ -1,0 +1,20 @@
+{
+  "atis": {
+    "parser": "default_parser",
+    "example_processor": "atis_example_processor",
+    "model_path": "data/pretrained_models/atis.bin",
+    "beam_size": 5
+  },
+  "geo": {
+    "parser": "default_parser",
+    "example_processor": "geo_example_processor",
+    "model_path": "data/pretrained_models/geo.bin",
+    "beam_size": 5
+  },
+  "conala": {
+    "parser": "default_parser",
+    "example_processor": "conala_example_processor",
+    "model_path": "data/pretrained_models/conala.bin",
+    "beam_size": 15
+  }
+}
