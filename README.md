@@ -80,7 +80,7 @@ Here is a list of performance results on six datasets using pretrained models in
 git clone https://github.com/pcyin/tranX
 cd tranX
 
-./pull_data.sh  # get datasets and pre-trained models
+bash ./pull_data.sh  # get datasets and pre-trained models
 
 conda env create -f config/env/tranx.yml  # create conda Python environment.
 
