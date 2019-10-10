@@ -80,7 +80,7 @@ Here is a list of performance results on six datasets using pretrained models in
 git clone https://github.com/pcyin/tranX
 cd tranX
 
-./pull_data.sh  # get datasets and pre-trained models
+bash ./pull_data.sh  # get datasets and pre-trained models
 
 conda env create -f config/env/tranx.yml  # create conda Python environment.
 
@@ -143,6 +143,11 @@ You may take a look at the examples in `asdl/lang/*`.
 
 Please refer to `datasets/<lang>/dataset.py` for code snippets that converts 
 a dataset into pickled files. 
+
+#### How to run without CUDA?
+
+Simply remove the `--cuda`` flag from the command line arguments. It is included
+by default in all scripts in the `scripts` directory.
 
 ## Reference
 
