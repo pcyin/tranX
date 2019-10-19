@@ -503,7 +503,8 @@ class Parser(nn.Module):
 
         zero_action_embed = Variable(self.new_tensor(args.action_embed_size).zero_())
 
-        hyp_scores = Variable(self.new_tensor([0.]), volatile=True)
+        with torch.no_grad():
+            hyp_scores = Variable(self.new_tensor([0.]))
 
         # For computing copy probabilities, we marginalize over tokens with the same surface form
         # `aggregated_primitive_tokens` stores the position of occurrence of each source token
@@ -525,7 +526,8 @@ class Parser(nn.Module):
             exp_src_encodings_att_linear = src_encodings_att_linear.expand(hyp_num, src_encodings_att_linear.size(1), src_encodings_att_linear.size(2))
 
             if t == 0:
-                x = Variable(self.new_tensor(1, self.decoder_lstm.input_size).zero_(), volatile=True)
+                with torch.no_grad():
+                    x = Variable(self.new_tensor(1, self.decoder_lstm.input_size).zero_())
                 if args.no_parent_field_type_embed is False:
                     offset = args.action_embed_size  # prev_action
                     offset += args.att_vec_size * (not args.no_input_feed)

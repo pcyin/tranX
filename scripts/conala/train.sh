@@ -1,10 +1,11 @@
 #!/bin/bash
 set -e
 
-seed=${1:-0}
-vocab="data/conala/vocab.var_str_sep.src_freq3.code_freq3.bin"
-train_file="data/conala/train.var_str_sep.bin"
-dev_file="data/conala/dev.var_str_sep.bin"
+seed=0
+mined_num=$1
+vocab="data/conala/vocab.var_str_sep.new_dev.src_freq3.code_freq3.mined_${mined_num}.bin"
+train_file="data/conala/train.var_str_sep.mined_${mined_num}.bin"
+dev_file="data/conala/dev.var_str_sep.mined_${mined_num}.bin"
 dropout=0.3
 hidden_size=256
 embed_size=128
@@ -17,7 +18,7 @@ lr_decay=0.5
 beam_size=15
 lstm='lstm'  # lstm
 lr_decay_after_epoch=15
-model_name=model.sup.conala.${lstm}.hidden${hidden_size}.embed${embed_size}.action${action_embed_size}.field${field_embed_size}.type${type_embed_size}.dr${dropout}.lr${lr}.lr_de${lr_decay}.lr_da${lr_decay_after_epoch}.beam${beam_size}.$(basename ${vocab}).$(basename ${train_file}).glorot.par_state.seed${seed}
+model_name=model.sup.conala.${lstm}.hidden${hidden_size}.embed${embed_size}.action${action_embed_size}.field${field_embed_size}.type${type_embed_size}.dr${dropout}.lr${lr}.lr_de${lr_decay}.lr_da${lr_decay_after_epoch}.beam${beam_size}.$(basename ${vocab}).$(basename ${train_file}).glorot.par_state.seed${seed}.mined_${mined_num}
 
 echo "**** Writing results to logs/conala/${model_name}.log ****"
 mkdir -p logs/conala

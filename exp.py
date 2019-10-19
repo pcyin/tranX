@@ -145,6 +145,7 @@ def train(args):
             model.save(model_file)
 
         # perform validation
+        is_better = False
         if args.dev_file:
             if epoch % args.valid_every_epoch == 0:
                 print('[Epoch %d] begin validation' % epoch, file=sys.stderr)
