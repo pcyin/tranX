@@ -681,7 +681,6 @@ class Parser(nn.Module):
 
                 if new_hyp_scores is None: new_hyp_scores = gen_token_new_hyp_scores
                 else: new_hyp_scores = torch.cat([new_hyp_scores, gen_token_new_hyp_scores])
-
             top_new_hyp_scores, top_new_hyp_pos = torch.topk(new_hyp_scores,
                                                              k=min(new_hyp_scores.size(0), beam_size - len(completed_hypotheses)))
 
@@ -766,6 +765,8 @@ class Parser(nn.Module):
                 new_hyp.score = new_hyp_score
 
                 if new_hyp.completed:
+                    # add length normalization
+                    new_hyp.score /= (t+1)
                     completed_hypotheses.append(new_hyp)
                 else:
                     new_hypotheses.append(new_hyp)

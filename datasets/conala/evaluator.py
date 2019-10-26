@@ -36,6 +36,7 @@ class ConalaEvaluator(Evaluator):
 
 
     def evaluate_dataset(self, dataset, decode_results, fast_mode=False, args=None):
+        csv_writer = None
         if args.save_decode_to:
             csv_writer = csv.writer(open(args.save_decode_to + '.csv', 'w'))
         examples = dataset.examples if isinstance(dataset, Dataset) else dataset
@@ -93,11 +94,6 @@ class ConalaEvaluator(Evaluator):
 
                     top_decanonical_code_tokens = hyp_list[0].decanonical_code_tokens
                     sent_bleu_score = hyp_list[0].bleu_score
-                    # write results to file
-                    if args.save_decode_to:
-                        csv_writer.writerow([" ".join(example.src_sent),
-                                             " ".join(example.reference_code_tokens),
-                                             " ".join(top_decanonical_code_tokens)])
                     best_hyp_idx = np.argmax(example_hyp_bleu_scores)
                     oracle_sent_bleu = example_hyp_bleu_scores[best_hyp_idx]
                     _best_hyp_code_tokens = hyp_list[best_hyp_idx].decanonical_code_tokens
@@ -106,6 +102,12 @@ class ConalaEvaluator(Evaluator):
                     sent_bleu_score = 0.
                     oracle_sent_bleu = 0.
                     _best_hyp_code_tokens = []
+
+                # write results to file
+                if csv_writer:
+                    csv_writer.writerow([" ".join(example.src_sent),
+                                         " ".join(example.reference_code_tokens),
+                                         " ".join(top_decanonical_code_tokens)])
 
                 oracle_exact_match.append(any(hyp.is_correct for hyp in hyp_list))
                 hyp_code_tokens.append(top_decanonical_code_tokens)

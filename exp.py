@@ -64,27 +64,32 @@ def train(args):
     transition_system = Registrable.by_name(args.transition_system)(grammar)
 
     parser_cls = Registrable.by_name(args.parser)  # TODO: add arg
-    model = parser_cls(args, vocab, transition_system)
-    model.train()
+    if args.pretrain:
+        print('Finetune with: ', args.pretrain, file=sys.stderr)
+        model = parser_cls.load(model_path=args.pretrain, cuda=args.cuda)
+    else:
+        model = parser_cls(args, vocab, transition_system)
 
+    model.train()
     evaluator = Registrable.by_name(args.evaluator)(transition_system, args=args)
     if args.cuda: model.cuda()
 
     optimizer_cls = eval('torch.optim.%s' % args.optimizer)  # FIXME: this is evil!
     optimizer = optimizer_cls(model.parameters(), lr=args.lr)
 
-    if args.uniform_init:
-        print('uniformly initialize parameters [-%f, +%f]' % (args.uniform_init, args.uniform_init), file=sys.stderr)
-        nn_utils.uniform_init(-args.uniform_init, args.uniform_init, model.parameters())
-    elif args.glorot_init:
-        print('use glorot initialization', file=sys.stderr)
-        nn_utils.glorot_init(model.parameters())
+    if not args.pretrain:
+        if args.uniform_init:
+            print('uniformly initialize parameters [-%f, +%f]' % (args.uniform_init, args.uniform_init), file=sys.stderr)
+            nn_utils.uniform_init(-args.uniform_init, args.uniform_init, model.parameters())
+        elif args.glorot_init:
+            print('use glorot initialization', file=sys.stderr)
+            nn_utils.glorot_init(model.parameters())
 
-    # load pre-trained word embedding (optional)
-    if args.glove_embed_path:
-        print('load glove embedding from: %s' % args.glove_embed_path, file=sys.stderr)
-        glove_embedding = GloveHelper(args.glove_embed_path)
-        glove_embedding.load_to(model.src_embed, vocab.source)
+        # load pre-trained word embedding (optional)
+        if args.glove_embed_path:
+            print('load glove embedding from: %s' % args.glove_embed_path, file=sys.stderr)
+            glove_embedding = GloveHelper(args.glove_embed_path)
+            glove_embedding.load_to(model.src_embed, vocab.source)
 
     print('begin training, %d training examples, %d dev examples' % (len(train_set), len(dev_set)), file=sys.stderr)
     print('vocab: %s' % repr(vocab), file=sys.stderr)

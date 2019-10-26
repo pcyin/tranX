@@ -87,6 +87,7 @@ def init_arg_parser():
 
     arg_parser.add_argument('--train_file', type=str, help='path to the training target file')
     arg_parser.add_argument('--dev_file', type=str, help='path to the dev source file')
+    arg_parser.add_argument('--pretrain', type=str, help='path to the pretrained model file')
 
     arg_parser.add_argument('--batch_size', default=10, type=int, help='Batch size')
     arg_parser.add_argument('--dropout', default=0., type=float, help='Dropout rate')
