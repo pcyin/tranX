@@ -30,7 +30,7 @@ def init_arg_parser():
     arg_parser.add_argument('--lang', choices=['python', 'lambda_dcs', 'wikisql', 'prolog', 'python3'], default='python',
                             help='[Deprecated] language to parse. Deprecated, use --transition_system and --parser instead')
     arg_parser.add_argument('--asdl_file', type=str, help='Path to ASDL grammar specification')
-    arg_parser.add_argument('--mode', choices=['train', 'test'], required=True, help='Run mode')
+    arg_parser.add_argument('--mode', choices=['train', 'test', 'interactive', 'train_paraphrase_identifier', 'train_reconstructor'], required=True, help='Run mode')
 
     #### Modularized configuration ####
     arg_parser.add_argument('--parser', type=str, default='default_parser', required=False, help='name of parser class to load')
@@ -134,6 +134,25 @@ def init_arg_parser():
     arg_parser.add_argument('--sample_size', default=5, type=int, help='Sample size')
     arg_parser.add_argument('--test_file', type=str, help='Path to the test file')
     arg_parser.add_argument('--save_decode_to', default=None, type=str, help='Save decoding results to file')
+
+    #### reranking ####
+    arg_parser.add_argument('--features', nargs='+')
+    arg_parser.add_argument('--load_reconstruction_model', type=str, help='Load reconstruction model')
+    arg_parser.add_argument('--load_paraphrase_model', type=str, help='Load paraphrase model')
+    arg_parser.add_argument('--tie_embed', action='store_true', help='tie source and target embedding in training paraphrasing model')
+    arg_parser.add_argument('--train_decode_file', default=None, type=str, help='Decoding results on training set')
+    arg_parser.add_argument('--test_decode_file', default=None, type=str, help='Decoding results on test set')
+    arg_parser.add_argument('--dev_decode_file', default=None, type=str, help='Decoding results on dev set')
+    arg_parser.add_argument('--metric', default='accuracy', choices=['bleu', 'accuracy'])
+    arg_parser.add_argument('--num_workers', default=1, type=int, help='number of multiprocess workers')
+
+    #### self-training ####
+    arg_parser.add_argument('--load_decode_results', default=None, type=str)
+    arg_parser.add_argument('--unsup_loss_weight', default=1., type=float, help='loss of unsupervised learning weight')
+    arg_parser.add_argument('--unlabeled_file', type=str, help='Path to the training source file used in semi-supervised self-training')
+
+    #### interactive mode ####
+    arg_parser.add_argument('--example_preprocessor', default=None, type=str, help='name of the class that is used to pre-process raw input examples')
 
     #### dataset specific config ####
     arg_parser.add_argument('--sql_db_file', default=None, type=str, help='path to WikiSQL database file for evaluation (SQLite)')
