@@ -37,7 +37,7 @@ class ConalaEvaluator(Evaluator):
 
     def evaluate_dataset(self, dataset, decode_results, fast_mode=False, args=None):
         csv_writer = None
-        if args.save_decode_to:
+        if args and args.save_decode_to:
             csv_writer = csv.writer(open(args.save_decode_to + '.csv', 'w'))
         examples = dataset.examples if isinstance(dataset, Dataset) else dataset
         assert len(examples) == len(decode_results)

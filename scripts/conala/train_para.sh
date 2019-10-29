@@ -2,8 +2,8 @@
 set -e
 
 seed=0
-vocab="data/conala/vocab.src_freq3.code_freq3.bin"
-train_file="data/conala/train.bin"
+vocab="data/conala/vocab.src_freq3.code_freq3.mined_0.bin"
+train_file="data/conala/train.mined_0.bin"
 dev_file="data/conala/dev.bin"
 train_decode_file="decodes/conala/conala.lstm.hidden256.embed128.action128.field64.type64.dr0.3.lr0.001.lr_de0.5.lr_da15.beam15.vocab.src_freq3.code_freq3.mined_0.bin.train.mined_0.bin.glorot.par_state.seed0.bin.train.bin.decode"
 dev_decode_file="decodes/conala/conala.lstm.hidden256.embed128.action128.field64.type64.dr0.3.lr0.001.lr_de0.5.lr_da15.beam15.vocab.src_freq3.code_freq3.mined_0.bin.train.mined_0.bin.glorot.par_state.seed0.bin.dev.bin.decode"
@@ -58,5 +58,3 @@ python -u exp.py \
     --beam_size ${beam_size} \
     --log_every 50 \
     --save_to saved_models/conala/${model_name} 2>&1 | tee logs/conala/${model_name}.log
-
-#. scripts/conala/test.sh saved_models/conala/${model_name}.bin 2>&1 | tee -a logs/conala/${model_name}.log

@@ -41,6 +41,7 @@ def preprocess_conala_dataset(train_file, test_file, grammar_file, src_freq=3, c
         print("from file: ", mined_data_file)
         mined_examples = preprocess_dataset(mined_data_file, name='mined', transition_system=transition_system,
                                             firstk=num_mined)
+        pickle.dump(mined_examples, open('data/conala/pre_{}.bin'.format(num_mined), 'wb'))
         train_examples += mined_examples
 
     print(f'{len(train_examples)} training instances', file=sys.stderr)

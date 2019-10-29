@@ -2,9 +2,8 @@
 set -e
 
 seed=0
-mined_num=$1
-vocab="data/conala/vocab.src_freq3.code_freq3.mined_${mined_num}.bin"
-train_file="data/conala/pre_${mined_num}.bin"
+vocab="data/conala/vocab.src_freq3.code_freq3.mined_0.bin"
+train_file="data/conala/train.mined_0.bin"
 dev_file="data/conala/dev.bin"
 dropout=0.3
 hidden_size=256
@@ -14,7 +13,7 @@ field_embed_size=64
 type_embed_size=64
 lr=0.001
 lr_decay=0.5
-batch_size=64
+batch_size=10
 max_epoch=80
 beam_size=15
 lstm='lstm'  # lstm

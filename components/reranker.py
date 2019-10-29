@@ -78,7 +78,7 @@ class ParserScore(RerankingFeature):
         return False
 
     def get_feat_value(self, example, hyp, **kwargs):
-        return float(hyp.score)
+        return float(hyp.score) * len(hyp.actions)
 
 
 @Registrable.register('normalized_parser_score_by_action')
@@ -471,7 +471,7 @@ class GridSearchReranker(Reranker):
         self.initialize_rerank_features(examples, decode_results)
 
         print('generating parameter list', file=sys.stderr)
-        param_space = [p for p in itertools.combinations(np.arange(0, 2.01, 0.01), self.feature_num)]
+        param_space = [p for p in itertools.combinations(np.arange(0, 3.01, 0.05), self.feature_num)]
         print('generating parameter list done', file=sys.stderr)
 
         global _examples

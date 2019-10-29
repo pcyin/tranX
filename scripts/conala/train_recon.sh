@@ -2,8 +2,8 @@
 set -e
 
 seed=0
-vocab="data/conala/vocab.src_freq3.code_freq3.bin"
-train_file="data/conala/train.bin"
+vocab="data/conala/vocab.src_freq3.code_freq3.mined_0.bin"
+train_file="data/conala/train.mined_0.bin"
 dev_file="data/conala/dev.bin"
 dropout=0.3
 hidden_size=256
@@ -54,5 +54,3 @@ python -u exp.py \
     --beam_size ${beam_size} \
     --log_every 50 \
     --save_to saved_models/conala/${model_name} 2>&1 | tee logs/conala/${model_name}.log
-
-#. scripts/conala/test.sh saved_models/conala/${model_name}.bin 2>&1 | tee -a logs/conala/${model_name}.log

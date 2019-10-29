@@ -512,8 +512,7 @@ def train_reranker_and_test(args):
         feat_cls = Registrable.by_name(feat_name)
         print('Add feature %s' % feat_name, file=sys.stderr)
         if issubclass(feat_cls, nn.Module):
-            i += 1
-            feat_path = args.features[i]
+            feat_path = os.path.join('saved_models/conala/', args.features[i] + '.bin')
             feat_inst = feat_cls.load(feat_path)
             print('Load feature %s from %s' % (feat_name, feat_path), file=sys.stderr)
         else:
