@@ -5,9 +5,14 @@ import argparse
 
 
 def docstring2conala(args):
-    snippet_file = os.path.join(args.inp, 'parallel_decl')
-    intent_file = os.path.join(args.inp, 'parallel_desc')
-    meta_file = os.path.join(args.inp, 'parallel_meta')
+    if args.classmethod:
+        snippet_file = os.path.join(args.inp, 'parallel_methods_decl')
+        intent_file = os.path.join(args.inp, 'parallel_methods_desc')
+        meta_file = os.path.join(args.inp, 'parallel_methods_meta')
+    else:
+        snippet_file = os.path.join(args.inp, 'parallel_decl')
+        intent_file = os.path.join(args.inp, 'parallel_desc')
+        meta_file = os.path.join(args.inp, 'parallel_meta')
 
     snippet_file = open(snippet_file, 'r', encoding='latin-1')
     intent_file = open(intent_file, 'r', encoding='latin-1')
@@ -46,6 +51,7 @@ if __name__ == '__main__':
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument('--inp', type=str, help='Path to v2 parallel dir')
     arg_parser.add_argument('--out', type=str, help='Output file')
+    arg_parser.add_argument('--classmethod', action='store_true')
     args = arg_parser.parse_args()
 
     docstring2conala(args)
