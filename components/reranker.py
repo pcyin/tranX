@@ -471,7 +471,7 @@ class GridSearchReranker(Reranker):
         self.initialize_rerank_features(examples, decode_results)
 
         print('generating parameter list', file=sys.stderr)
-        param_space = [p for p in itertools.combinations(np.arange(0, 3.01, 0.05), self.feature_num)]
+        param_space = [p for p in itertools.combinations(np.arange(0, 2.01, 0.02), self.feature_num)]
         print('generating parameter list done', file=sys.stderr)
 
         global _examples

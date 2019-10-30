@@ -2,13 +2,11 @@
 set -e
 
 seed=0
-vocab="data/conala/vocab.src_freq3.code_freq3.bin"
-train_file="data/conala/train.bin"
+vocab="data/conala/vocab.src_freq3.code_freq3_mined_0.bin"
 dev_file="data/conala/dev.bin"
 test_file="data/conala/test.var_str_sep.bin"
-train_decode_file="decodes/conala/conala.lstm.hidden256.embed128.action128.field64.type64.dr0.3.lr0.001.lr_de0.5.lr_da15.beam15.vocab.src_freq3.code_freq3.mined_0.bin.train.mined_0.bin.glorot.par_state.seed0.bin.train.bin.decode"
-dev_decode_file="decodes/conala/conala.lstm.hidden256.embed128.action128.field64.type64.dr0.3.lr0.001.lr_de0.5.lr_da15.beam15.vocab.src_freq3.code_freq3.mined_0.bin.train.mined_0.bin.glorot.par_state.seed0.bin.dev.bin.decode"
-test_decode_file="decodes/conala/conala.lstm.hidden256.embed128.action128.field64.type64.dr0.3.lr0.001.lr_de0.5.lr_da15.beam15.vocab.src_freq3.code_freq3.mined_0.bin.train.mined_0.bin.glorot.par_state.seed0.bin.test.decode"
+dev_decode_file="decodes/conala/finetune.conala.lstm.hidden256.embed128.action128.field64.type64.dr0.3.lr0.001.lr_de0.5.lr_da15.beam15.seed0.pre_100000.bin.dev.bin.decode"
+test_decode_file="decodes/conala/finetune.conala.lstm.hidden256.embed128.action128.field64.type64.dr0.3.lr0.001.lr_de0.5.lr_da15.beam15.seed0.pre_100000.bin.test.decode"
 dropout=0.3
 hidden_size=256
 embed_size=128
@@ -23,7 +21,7 @@ beam_size=15
 lstm='lstm'  # lstm
 lr_decay_after_epoch=15
 num_workers=16
-model_name=reranker.conala.hidden${hidden_size}.embed${embed_size}.dr${dropout}.lr${lr}.seed${seed}
+model_name=reranker.conala.$(basename ${vocab})
 
 echo "**** Writing results to logs/conala/${model_name}.log ****"
 mkdir -p logs/conala
@@ -37,14 +35,12 @@ python -u exp.py \
     --evaluator conala_evaluator \
     --asdl_file asdl/lang/py3/py3_asdl.simplified.txt \
     --transition_system python3 \
-    --train_file ${train_file} \
     --dev_file ${dev_file} \
     --test_file ${test_file} \
-    --train_decode_file ${train_decode_file} \
     --dev_decode_file ${dev_decode_file} \
     --test_decode_file ${test_decode_file} \
     --vocab ${vocab} \
-    --features reconstructor paraphrase_identifier word_cnt parser_score\
+    --features reconstructor paraphrase_identifier word_cnt parser_score \
     --lstm ${lstm} \
     --num_workers ${num_workers} \
     --no_parent_field_type_embed \

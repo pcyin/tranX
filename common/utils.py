@@ -140,6 +140,7 @@ def init_arg_parser():
     arg_parser.add_argument('--features', nargs='+')
     arg_parser.add_argument('--load_reconstruction_model', type=str, help='Load reconstruction model')
     arg_parser.add_argument('--load_paraphrase_model', type=str, help='Load paraphrase model')
+    arg_parser.add_argument('--load_reranker', type=str, help='Load reranking model')
     arg_parser.add_argument('--tie_embed', action='store_true', help='tie source and target embedding in training paraphrasing model')
     arg_parser.add_argument('--train_decode_file', default=None, type=str, help='Decoding results on training set')
     arg_parser.add_argument('--test_decode_file', default=None, type=str, help='Decoding results on test set')
