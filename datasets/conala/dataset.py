@@ -1,5 +1,6 @@
 import json
 import sys
+import os
 
 import argparse
 import numpy as np
@@ -20,7 +21,7 @@ from components.action_info import ActionInfo
 
 
 def preprocess_conala_dataset(train_file, test_file, grammar_file, src_freq=3, code_freq=3,
-                              mined_data_file=None, vocab_size=20000, num_mined=0):
+                              mined_data_file=None, vocab_size=20000, num_mined=0, out_dir='data/conala'):
     np.random.seed(1234)
 
     asdl_text = open(grammar_file).read()
@@ -41,7 +42,7 @@ def preprocess_conala_dataset(train_file, test_file, grammar_file, src_freq=3, c
         print("from file: ", mined_data_file)
         mined_examples = preprocess_dataset(mined_data_file, name='mined', transition_system=transition_system,
                                             firstk=num_mined)
-        pickle.dump(mined_examples, open('data/conala/pre_{}.bin'.format(num_mined), 'wb'))
+        pickle.dump(mined_examples, open(os.path.join(out_dir, 'pre_{}.bin'.format(num_mined)), 'wb'))
         train_examples += mined_examples
 
     print(f'{len(train_examples)} training instances', file=sys.stderr)
@@ -70,12 +71,12 @@ def preprocess_conala_dataset(train_file, test_file, grammar_file, src_freq=3, c
     print('Avg action len: %d' % np.average(action_lens), file=sys.stderr)
     print('Actions larger than 100: %d' % len(list(filter(lambda x: x > 100, action_lens))), file=sys.stderr)
 
-    pickle.dump(train_examples, open('data/conala/train.mined_{}.bin'.format(num_mined), 'wb'))
-    pickle.dump(full_train_examples, open('data/conala/train.full.bin', 'wb'))
-    pickle.dump(dev_examples, open('data/conala/dev.bin', 'wb'))
-    pickle.dump(test_examples, open('data/conala/test.bin', 'wb'))
-    pickle.dump(vocab, open('data/conala/vocab.src_freq%d.code_freq%d.mined_%s.bin'
-                            % (src_freq, code_freq, num_mined), 'wb'))
+    pickle.dump(train_examples, open(os.path.join(out_dir, 'train.mined_{}.bin'.format(num_mined)), 'wb'))
+    pickle.dump(full_train_examples, open(os.path.join(out_dir, 'train.full.bin'), 'wb'))
+    pickle.dump(dev_examples, open(os.path.join(out_dir, 'dev.bin'), 'wb'))
+    pickle.dump(test_examples, open(os.path.join(out_dir, 'test.bin'), 'wb'))
+    pickle.dump(vocab, open(os.path.join(out_dir, 'vocab.src_freq%d.code_freq%d.mined_%s.bin'
+                            % (src_freq, code_freq, num_mined)), 'wb'))
 
 
 def preprocess_dataset(file_path, transition_system, name='train', firstk=None):
@@ -201,6 +202,7 @@ if __name__ == '__main__':
 
     #### General configuration ####
     arg_parser.add_argument('--pretrain', type=str, help='Path to pretrain file')
+    arg_parser.add_argument('--out_dir', type=str, help='Path to output file', default='data/conala')
     arg_parser.add_argument('--topk', type=int, help='First k number from pretrain file')
     arg_parser.add_argument('--freq', type=int, default=3, help='First k number from pretrain file')
     arg_parser.add_argument('--vocabsize', type=int, default=20000, help='First k number from pretrain file')
@@ -213,6 +215,7 @@ if __name__ == '__main__':
                               grammar_file='asdl/lang/py3/py3_asdl.simplified.txt',
                               src_freq=args.freq, code_freq=args.freq,
                               vocab_size=args.vocabsize,
-                              num_mined=args.topk)
+                              num_mined=args.topk,
+                              out_dir=args.out_dir)
 
     # generate_vocab_for_paraphrase_model('data/conala/vocab.src_freq3.code_freq3.bin', 'data/conala/vocab.para.src_freq3.code_freq3.bin')
