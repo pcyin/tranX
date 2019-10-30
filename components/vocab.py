@@ -66,7 +66,7 @@ class VocabEntry(object):
                 else:
                     words_not_included.append(word)
 
-        print('word types not included: %s' % words_not_included)
+        # print('word types not included: %s' % words_not_included)
 
         return vocab_entry
 

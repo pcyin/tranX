@@ -93,6 +93,10 @@ def preprocess_dataset(file_path, transition_system, name='train', firstk=None):
     for i, example_json in enumerate(dataset):
         try:
             example_dict = preprocess_example(example_json)
+            # if example_json['question_id'] in (18351951, 9497290, 19641579, 32283692):
+            #     print(example_json['question_id'])
+            #     continue
+
             python_ast = ast.parse(example_dict['canonical_snippet'])
             canonical_code = astor.to_source(python_ast).strip()
             tgt_ast = python_ast_to_asdl_ast(python_ast, transition_system.grammar)
@@ -104,18 +108,19 @@ def preprocess_dataset(file_path, transition_system, name='train', firstk=None):
                 assert action.__class__ in transition_system.get_valid_continuation_types(hyp)
                 if isinstance(action, ApplyRuleAction):
                     assert action.production in transition_system.get_valid_continuating_productions(hyp)
-
-                p_t = -1
-                f_t = None
-                if hyp.frontier_node:
-                    p_t = hyp.frontier_node.created_time
-                    f_t = hyp.frontier_field.field.__repr__(plain=True)
-
-                # print('\t[%d] %s, frontier field: %s, parent: %d' % (t, action, f_t, p_t))
+                # p_t = -1
+                # f_t = None
+                # if hyp.frontier_node:
+                #     p_t = hyp.frontier_node.created_time
+                #     f_t = hyp.frontier_field.field.__repr__(plain=True)
+                #
+                # # print('\t[%d] %s, frontier field: %s, parent: %d' % (t, action, f_t, p_t))
                 hyp = hyp.clone_and_apply_action(action)
 
             assert hyp.frontier_node is None and hyp.frontier_field is None
             hyp.code = code_from_hyp = astor.to_source(asdl_ast_to_python_ast(hyp.tree, transition_system.grammar)).strip()
+            # print(code_from_hyp)
+            # print(canonical_code)
             assert code_from_hyp == canonical_code
 
             decanonicalized_code_from_hyp = decanonicalize_code(code_from_hyp, example_dict['slot_map'])
@@ -124,7 +129,7 @@ def preprocess_dataset(file_path, transition_system, name='train', firstk=None):
                                                  transition_system.surface_code_to_ast(example_json['snippet']))
 
             tgt_action_infos = get_action_infos(example_dict['intent_tokens'], tgt_actions)
-        except:
+        except Exception as e:
             skipped_list.append(example_json['question_id'])
             continue
         example = Example(idx=f'{i}-{example_json["question_id"]}',
@@ -181,22 +186,6 @@ def preprocess_example(example_json):
             'slot_map': slot_map,
             'canonical_snippet': canonical_snippet}
 
-
-def generate_vocab_for_paraphrase_model(vocab_path, save_path):
-    from components.vocab import VocabEntry, Vocab
-
-    vocab = pickle.load(open(vocab_path, 'rb'))
-    para_vocab = VocabEntry()
-    for i in range(0, 10):
-        para_vocab.add('<unk_%d>' % i)
-    for word in vocab.source.word2id:
-        para_vocab.add(word)
-    for word in vocab.code.word2id:
-        para_vocab.add(word)
-
-    pickle.dump(para_vocab, open(save_path, 'wb'))
-
-
 if __name__ == '__main__':
     arg_parser = argparse.ArgumentParser()
 
@@ -217,5 +206,3 @@ if __name__ == '__main__':
                               vocab_size=args.vocabsize,
                               num_mined=args.topk,
                               out_dir=args.out_dir)
-
-    # generate_vocab_for_paraphrase_model('data/conala/vocab.src_freq3.code_freq3.bin', 'data/conala/vocab.para.src_freq3.code_freq3.bin')
