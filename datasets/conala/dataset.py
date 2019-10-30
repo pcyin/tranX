@@ -191,9 +191,9 @@ if __name__ == '__main__':
 
     #### General configuration ####
     arg_parser.add_argument('--pretrain', type=str, help='Path to pretrain file')
-    arg_parser.add_argument('--out_dir', type=str, help='Path to output file', default='data/conala')
-    arg_parser.add_argument('--topk', type=int, help='First k number from pretrain file')
-    arg_parser.add_argument('--freq', type=int, default=3, help='First k number from pretrain file')
+    arg_parser.add_argument('--out_dir', type=str, default='data/conala', help='Path to output file')
+    arg_parser.add_argument('--topk', type=int, default=0, help='First k number from pretrain file')
+    arg_parser.add_argument('--freq', type=int, default=3, help='minimum frequency of tokens')
     arg_parser.add_argument('--vocabsize', type=int, default=20000, help='First k number from pretrain file')
     args = arg_parser.parse_args()
 
