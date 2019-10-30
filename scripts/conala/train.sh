@@ -3,7 +3,8 @@ set -e
 
 seed=0
 mined_num=$1
-vocab="data/conala/vocab.src_freq3.code_freq3.mined_${mined_num}.bin"
+freq=${2:-3}
+vocab="data/conala/vocab.src_freq${freq}.code_freq${freq}.mined_${mined_num}.bin"
 train_file="data/conala/pre_${mined_num}.bin"
 dev_file="data/conala/dev.bin"
 dropout=0.3

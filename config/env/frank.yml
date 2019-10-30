@@ -13,4 +13,5 @@ dependencies:
     - six==1.12.0
     - xgboost==0.90
     - torch==1.0.1.post2
+    - astor==0.7.1
     - tqdm
