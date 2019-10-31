@@ -1,23 +1,19 @@
-import json
-import sys
-import os
-
 import argparse
-import numpy as np
+import json
+import os
 import pickle
+import sys
 
-from components.action_info import get_action_infos
-from datasets.conala.evaluator import ConalaEvaluator
-from datasets.conala.util import *
-from asdl.lang.py3.py3_transition_system import python_ast_to_asdl_ast, asdl_ast_to_python_ast, Python3TransitionSystem
+import numpy as np
 
 from asdl.hypothesis import *
+from asdl.lang.py3.py3_transition_system import python_ast_to_asdl_ast, asdl_ast_to_python_ast, Python3TransitionSystem
 from asdl.transition_system import *
-
-from components.vocab import Vocab, VocabEntry
+from components.action_info import get_action_infos
 from components.dataset import Example
-from components.dataset import Dataset
-from components.action_info import ActionInfo
+from components.vocab import Vocab, VocabEntry
+from datasets.conala.evaluator import ConalaEvaluator
+from datasets.conala.util import *
 
 
 def preprocess_conala_dataset(train_file, test_file, grammar_file, src_freq=3, code_freq=3,
@@ -188,7 +184,6 @@ def preprocess_example(example_json):
 
 if __name__ == '__main__':
     arg_parser = argparse.ArgumentParser()
-
     #### General configuration ####
     arg_parser.add_argument('--pretrain', type=str, help='Path to pretrain file')
     arg_parser.add_argument('--out_dir', type=str, default='data/conala', help='Path to output file')
@@ -197,7 +192,7 @@ if __name__ == '__main__':
     arg_parser.add_argument('--vocabsize', type=int, default=20000, help='First k number from pretrain file')
     args = arg_parser.parse_args()
 
-    # the json files can be download from http://conala-corpus.github.io
+    # the json files can be downloaded from http://conala-corpus.github.io
     preprocess_conala_dataset(train_file='data/conala/conala-train.json',
                               test_file='data/conala/conala-test.json',
                               mined_data_file=args.pretrain,
