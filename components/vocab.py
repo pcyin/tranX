@@ -1,10 +1,10 @@
 # coding=utf-8
 
 from __future__ import print_function
-import argparse
+
 from collections import Counter
 from itertools import chain
-import torch
+
 
 class VocabEntry(object):
     def __init__(self):
@@ -46,6 +46,11 @@ class VocabEntry(object):
     def is_unk(self, word):
         return word not in self
 
+    def merge(self, other_vocab_entry):
+        for word in other_vocab_entry.word2id:
+            self.add(word)
+
+
     @staticmethod
     def from_corpus(corpus, size, freq_cutoff=0):
         vocab_entry = VocabEntry()
@@ -55,7 +60,8 @@ class VocabEntry(object):
         singletons = [w for w in word_freq if word_freq[w] == 1]
         print('number of word types: %d, number of word types w/ frequency > 1: %d' % (len(word_freq),
                                                                                        len(non_singletons)))
-        print('singletons: %s' % singletons)
+        print('number of singletons: ', len(singletons))
+        # print('singletons: %s' % singletons)
 
         top_k_words = sorted(word_freq.keys(), reverse=True, key=word_freq.get)[:size]
         words_not_included = []

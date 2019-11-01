@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-seed=0
+seed=${1:-0}
 vocab="data/conala/vocab.src_freq3.code_freq3.mined_0.bin"
 train_file="data/conala/train.mined_0.bin"
 dev_file="data/conala/dev.bin"

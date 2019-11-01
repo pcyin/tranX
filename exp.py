@@ -3,6 +3,7 @@ from __future__ import print_function
 
 import time
 
+import astor
 import six.moves.cPickle as pickle
 from six.moves import input
 from six.moves import xrange as range
@@ -21,6 +22,7 @@ from model.parser import Parser
 from model.reconstruction_model import Reconstructor
 from model.utils import GloveHelper
 
+assert astor.__version__ == "0.7.1"
 if six.PY3:
     # import additional packages for wikisql dataset (works only under Python 3)
     pass
@@ -146,7 +148,7 @@ def train(args):
                 print('[Epoch %d] begin validation' % epoch, file=sys.stderr)
                 eval_start = time.time()
                 eval_results = evaluation.evaluate(dev_set.examples, model, evaluator, args,
-                                                   verbose=True, eval_top_pred_only=args.eval_top_pred_only)
+                                                   verbose=False, eval_top_pred_only=args.eval_top_pred_only)
                 dev_score = eval_results[evaluator.default_metric]
 
                 print('[Epoch %d] evaluate details: %s, dev %s: %.5f (took %ds)' % (

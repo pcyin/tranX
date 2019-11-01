@@ -15,6 +15,7 @@ from components.vocab import Vocab, VocabEntry
 from datasets.conala.evaluator import ConalaEvaluator
 from datasets.conala.util import *
 
+assert astor.__version__ == '0.7.1'
 
 def preprocess_conala_dataset(train_file, test_file, grammar_file, src_freq=3, code_freq=3,
                               mined_data_file=None, vocab_size=20000, num_mined=0, out_dir='data/conala'):
@@ -33,11 +34,23 @@ def preprocess_conala_dataset(train_file, test_file, grammar_file, src_freq=3, c
     dev_examples = train_examples[:200]
     train_examples = train_examples[200:]
 
+    mined_examples = None
     if mined_data_file and num_mined > 0:
         print("use mined data: ", num_mined)
         print("from file: ", mined_data_file)
         mined_examples = preprocess_dataset(mined_data_file, name='mined', transition_system=transition_system,
                                             firstk=num_mined)
+        # mined_src_vocab = VocabEntry.from_corpus([e.src_sent for e in train_examples], size=vocab_size,
+        #                                    freq_cutoff=src_freq)
+        # mined_primitive_tokens = [map(lambda a: a.action.token,
+        #                         filter(lambda a: isinstance(a.action, GenTokenAction), e.tgt_actions))
+        #                     for e in train_examples]
+        # mined_primitive_vocab = VocabEntry.from_corpus(mined_primitive_tokens, size=vocab_size, freq_cutoff=code_freq)
+        #
+        # # generate vocabulary for the code tokens!
+        # mined_code_tokens = [transition_system.tokenize_code(e.tgt_code, mode='decoder') for e in train_examples]
+        # mined_code_vocab = VocabEntry.from_corpus(mined_code_tokens, size=vocab_size, freq_cutoff=code_freq)
+
         pickle.dump(mined_examples, open(os.path.join(out_dir, 'pre_{}.bin'.format(num_mined)), 'wb'))
         train_examples += mined_examples
 
@@ -57,6 +70,7 @@ def preprocess_conala_dataset(train_file, test_file, grammar_file, src_freq=3, c
 
     # generate vocabulary for the code tokens!
     code_tokens = [transition_system.tokenize_code(e.tgt_code, mode='decoder') for e in train_examples]
+
     code_vocab = VocabEntry.from_corpus(code_tokens, size=vocab_size, freq_cutoff=code_freq)
 
     vocab = Vocab(source=src_vocab, primitive=primitive_vocab, code=code_vocab)
