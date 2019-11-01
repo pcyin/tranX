@@ -13,12 +13,12 @@ field_embed_size=64
 type_embed_size=64
 lr=0.001
 lr_decay=0.5
-batch_size=16
+batch_size=10
 max_epoch=80
 beam_size=15
 lstm='lstm'  # lstm
 lr_decay_after_epoch=15
-model_name=recon.conala.hidden${hidden_size}.embed${embed_size}.dr${dropout}.lr${lr}.seed${seed}
+model_name=reconstructor
 
 echo "**** Writing results to logs/conala/${model_name}.log ****"
 mkdir -p logs/conala
