@@ -5,8 +5,8 @@ seed=0
 vocab="data/conala/vocab.src_freq3.code_freq3_mined_0.bin"
 dev_file="data/conala/dev.bin"
 test_file="data/conala/test.var_str_sep.bin"
-dev_decode_file="decodes/conala/finetune.conala.lstm.hidden256.embed128.action128.field64.type64.dr0.3.lr0.001.lr_de0.5.lr_da15.beam15.seed0.pre_100000.bin.dev.bin.decode"
-test_decode_file="decodes/conala/finetune.conala.lstm.hidden256.embed128.action128.field64.type64.dr0.3.lr0.001.lr_de0.5.lr_da15.beam15.seed0.pre_100000.bin.test.decode"
+dev_decode_file=$1".dev.bin.decode"
+test_decode_file=$1".test.decode"
 dropout=0.3
 hidden_size=256
 embed_size=128
@@ -20,7 +20,7 @@ max_epoch=80
 beam_size=15
 lstm='lstm'  # lstm
 lr_decay_after_epoch=15
-num_workers=16
+num_workers=60
 model_name=reranker.conala.$(basename ${vocab})
 
 echo "**** Writing results to logs/conala/${model_name}.log ****"

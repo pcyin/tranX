@@ -568,8 +568,6 @@ if __name__ == '__main__':
     print(args, file=sys.stderr)
     if args.mode == 'train':
         train(args)
-    # elif args.mode == 'self_train':
-    #     self_training(args)
     elif args.mode in ('train_reconstructor', 'train_paraphrase_identifier'):
         train_rerank_feature(args)
     elif args.mode == 'rerank':

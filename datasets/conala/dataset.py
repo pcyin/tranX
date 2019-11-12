@@ -18,7 +18,8 @@ from datasets.conala.util import *
 assert astor.__version__ == '0.7.1'
 
 def preprocess_conala_dataset(train_file, test_file, grammar_file, src_freq=3, code_freq=3,
-                              mined_data_file=None, vocab_size=20000, num_mined=0, out_dir='data/conala'):
+                              mined_data_file=None, api_data_file=None,
+                              vocab_size=20000, num_mined=0, out_dir='data/conala'):
     np.random.seed(1234)
 
     asdl_text = open(grammar_file).read()
@@ -40,6 +41,10 @@ def preprocess_conala_dataset(train_file, test_file, grammar_file, src_freq=3, c
         print("from file: ", mined_data_file)
         mined_examples = preprocess_dataset(mined_data_file, name='mined', transition_system=transition_system,
                                             firstk=num_mined)
+        if api_data_file:
+            print("use api docs from file: ", api_data_file)
+            mined_examples += preprocess_dataset(api_data_file, name='mined', transition_system=transition_system)
+
         # mined_src_vocab = VocabEntry.from_corpus([e.src_sent for e in train_examples], size=vocab_size,
         #                                    freq_cutoff=src_freq)
         # mined_primitive_tokens = [map(lambda a: a.action.token,
@@ -103,9 +108,6 @@ def preprocess_dataset(file_path, transition_system, name='train', firstk=None):
     for i, example_json in enumerate(dataset):
         try:
             example_dict = preprocess_example(example_json)
-            # if example_json['question_id'] in (18351951, 9497290, 19641579, 32283692):
-            #     print(example_json['question_id'])
-            #     continue
 
             python_ast = ast.parse(example_dict['canonical_snippet'])
             canonical_code = astor.to_source(python_ast).strip()
@@ -201,15 +203,17 @@ if __name__ == '__main__':
     #### General configuration ####
     arg_parser.add_argument('--pretrain', type=str, help='Path to pretrain file')
     arg_parser.add_argument('--out_dir', type=str, default='data/conala', help='Path to output file')
-    arg_parser.add_argument('--topk', type=int, default=0, help='First k number from pretrain file')
+    arg_parser.add_argument('--topk', type=int, default=0, help='First k number from mined file')
     arg_parser.add_argument('--freq', type=int, default=3, help='minimum frequency of tokens')
     arg_parser.add_argument('--vocabsize', type=int, default=20000, help='First k number from pretrain file')
+    arg_parser.add_argument('--include_api', type=str, help='Path to apidocs file')
     args = arg_parser.parse_args()
 
     # the json files can be downloaded from http://conala-corpus.github.io
     preprocess_conala_dataset(train_file='data/conala/conala-train.json',
                               test_file='data/conala/conala-test.json',
                               mined_data_file=args.pretrain,
+                              api_data_file=args.include_api,
                               grammar_file='asdl/lang/py3/py3_asdl.simplified.txt',
                               src_freq=args.freq, code_freq=args.freq,
                               vocab_size=args.vocabsize,
