@@ -35,30 +35,25 @@ def preprocess_conala_dataset(train_file, test_file, grammar_file, src_freq=3, c
     dev_examples = train_examples[:200]
     train_examples = train_examples[200:]
 
-    mined_examples = None
+    mined_examples = []
+    api_examples = []
     if mined_data_file and num_mined > 0:
         print("use mined data: ", num_mined)
         print("from file: ", mined_data_file)
         mined_examples = preprocess_dataset(mined_data_file, name='mined', transition_system=transition_system,
                                             firstk=num_mined)
-        if api_data_file:
-            print("use api docs from file: ", api_data_file)
-            mined_examples += preprocess_dataset(api_data_file, name='mined', transition_system=transition_system)
+        pickle.dump(mined_examples, open(os.path.join(out_dir, 'mined_{}.bin'.format(num_mined)), 'wb'))
 
-        # mined_src_vocab = VocabEntry.from_corpus([e.src_sent for e in train_examples], size=vocab_size,
-        #                                    freq_cutoff=src_freq)
-        # mined_primitive_tokens = [map(lambda a: a.action.token,
-        #                         filter(lambda a: isinstance(a.action, GenTokenAction), e.tgt_actions))
-        #                     for e in train_examples]
-        # mined_primitive_vocab = VocabEntry.from_corpus(mined_primitive_tokens, size=vocab_size, freq_cutoff=code_freq)
-        #
-        # # generate vocabulary for the code tokens!
-        # mined_code_tokens = [transition_system.tokenize_code(e.tgt_code, mode='decoder') for e in train_examples]
-        # mined_code_vocab = VocabEntry.from_corpus(mined_code_tokens, size=vocab_size, freq_cutoff=code_freq)
+    if api_data_file:
+        print("use api docs from file: ", api_data_file)
+        api_examples = preprocess_dataset(api_data_file, name='api', transition_system=transition_system)
+        pickle.dump(api_examples, open(os.path.join(out_dir, 'api.bin', 'wb')))
 
-        pickle.dump(mined_examples, open(os.path.join(out_dir, 'pre_{}.bin'.format(num_mined)), 'wb'))
-        train_examples += mined_examples
+    if mined_examples and api_examples:
+        pickle.dump(mined_examples + api_examples, open(os.path.join(out_dir, 'pre_{}.bin'.format(num_mined)), 'wb'))
 
+    # combine to make vocab
+    train_examples += mined_examples
     print(f'{len(train_examples)} training instances', file=sys.stderr)
     print(f'{len(dev_examples)} dev instances', file=sys.stderr)
 
@@ -86,12 +81,19 @@ def preprocess_conala_dataset(train_file, test_file, grammar_file, src_freq=3, c
     print('Avg action len: %d' % np.average(action_lens), file=sys.stderr)
     print('Actions larger than 100: %d' % len(list(filter(lambda x: x > 100, action_lens))), file=sys.stderr)
 
-    pickle.dump(train_examples, open(os.path.join(out_dir, 'train.mined_{}.bin'.format(num_mined)), 'wb'))
-    pickle.dump(full_train_examples, open(os.path.join(out_dir, 'train.full.bin'), 'wb'))
+    pickle.dump(train_examples, open(os.path.join(out_dir, 'train.all_{}.bin'.format(num_mined)), 'wb'))
+    pickle.dump(full_train_examples, open(os.path.join(out_dir, 'train.gold.full.bin'), 'wb'))
     pickle.dump(dev_examples, open(os.path.join(out_dir, 'dev.bin'), 'wb'))
     pickle.dump(test_examples, open(os.path.join(out_dir, 'test.bin'), 'wb'))
-    pickle.dump(vocab, open(os.path.join(out_dir, 'vocab.src_freq%d.code_freq%d.mined_%s.bin'
-                            % (src_freq, code_freq, num_mined)), 'wb'))
+    if mined_examples and api_examples:
+        vocab_name = 'vocab.src_freq%d.code_freq%d.mined_%s.api.bin' % (src_freq, code_freq, num_mined)
+    elif mined_examples:
+        vocab_name = 'vocab.src_freq%d.code_freq%d.mined_%s.bin' % (src_freq, code_freq, num_mined)
+    elif api_examples:
+        vocab_name = 'vocab.src_freq%d.code_freq%d.api.bin' % (src_freq, code_freq)
+    else:
+        vocab_name = 'vocab.src_freq%d.code_freq%d.bin' % (src_freq, code_freq)
+    pickle.dump(vocab, open(os.path.join(out_dir, vocab_name), 'wb'))
 
 
 def preprocess_dataset(file_path, transition_system, name='train', firstk=None):

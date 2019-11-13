@@ -38,7 +38,8 @@ class ConalaEvaluator(Evaluator):
     def evaluate_dataset(self, dataset, decode_results, fast_mode=False, args=None):
         csv_writer = None
         if args and args.save_decode_to:
-            csv_writer = csv.writer(open(args.save_decode_to + '.csv', 'w'))
+            # csv_writer = csv.writer(open(args.save_decode_to + '.csv', 'w'))
+            csv_writer = open(args.save_decode_to + '.txt', 'w', encoding='utf-8')
         examples = dataset.examples if isinstance(dataset, Dataset) else dataset
         assert len(examples) == len(decode_results)
 
@@ -105,10 +106,10 @@ class ConalaEvaluator(Evaluator):
 
                 # write results to file
                 if csv_writer:
-                    csv_writer.writerow([" ".join(example.src_sent),
-                                         " ".join(example.reference_code_tokens),
-                                         " ".join(top_decanonical_code_tokens)])
-
+                    # csv_writer.writerow([" ".join(example.src_sent),
+                    #                      " ".join(example.reference_code_tokens),
+                    #                      " ".join(top_decanonical_code_tokens)])
+                    csv_writer.write(" ".join(top_decanonical_code_tokens) + '\n')
                 oracle_exact_match.append(any(hyp.is_correct for hyp in hyp_list))
                 hyp_code_tokens.append(top_decanonical_code_tokens)
                 sent_bleu_scores.append(sent_bleu_score)
