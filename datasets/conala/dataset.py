@@ -47,13 +47,14 @@ def preprocess_conala_dataset(train_file, test_file, grammar_file, src_freq=3, c
     if api_data_file:
         print("use api docs from file: ", api_data_file)
         api_examples = preprocess_dataset(api_data_file, name='api', transition_system=transition_system)
-        pickle.dump(api_examples, open(os.path.join(out_dir, 'api.bin', 'wb')))
+        pickle.dump(api_examples, open(os.path.join(out_dir, 'api.bin'), 'wb'))
 
     if mined_examples and api_examples:
         pickle.dump(mined_examples + api_examples, open(os.path.join(out_dir, 'pre_{}.bin'.format(num_mined)), 'wb'))
 
     # combine to make vocab
     train_examples += mined_examples
+    train_examples += api_examples
     print(f'{len(train_examples)} training instances', file=sys.stderr)
     print(f'{len(dev_examples)} dev instances', file=sys.stderr)
 
