@@ -26,7 +26,7 @@ def preprocess_conala_dataset(train_file, test_file, grammar_file, src_freq=3, c
     grammar = ASDLGrammar.from_text(asdl_text)
     transition_system = Python3TransitionSystem(grammar)
 
-    print('process training data...')
+    print('process gold training data...')
     train_examples = preprocess_dataset(train_file, name='train', transition_system=transition_system)
 
     # held out 200 examples for development
@@ -46,11 +46,12 @@ def preprocess_conala_dataset(train_file, test_file, grammar_file, src_freq=3, c
 
     if api_data_file:
         print("use api docs from file: ", api_data_file)
+        name = os.path.splitext(os.path.basename(api_data_file))[0]
         api_examples = preprocess_dataset(api_data_file, name='api', transition_system=transition_system)
-        pickle.dump(api_examples, open(os.path.join(out_dir, 'api.bin'), 'wb'))
+        pickle.dump(api_examples, open(os.path.join(out_dir, name + '.bin'), 'wb'))
 
     if mined_examples and api_examples:
-        pickle.dump(mined_examples + api_examples, open(os.path.join(out_dir, 'pre_{}.bin'.format(num_mined)), 'wb'))
+        pickle.dump(mined_examples + api_examples, open(os.path.join(out_dir, 'pre_{}_{}.bin'.format(num_mined, name)), 'wb'))
 
     # combine to make vocab
     train_examples += mined_examples
@@ -87,11 +88,11 @@ def preprocess_conala_dataset(train_file, test_file, grammar_file, src_freq=3, c
     pickle.dump(dev_examples, open(os.path.join(out_dir, 'dev.bin'), 'wb'))
     pickle.dump(test_examples, open(os.path.join(out_dir, 'test.bin'), 'wb'))
     if mined_examples and api_examples:
-        vocab_name = 'vocab.src_freq%d.code_freq%d.mined_%s.api.bin' % (src_freq, code_freq, num_mined)
+        vocab_name = 'vocab.src_freq%d.code_freq%d.mined_%s.%s.bin' % (src_freq, code_freq, num_mined, name)
     elif mined_examples:
         vocab_name = 'vocab.src_freq%d.code_freq%d.mined_%s.bin' % (src_freq, code_freq, num_mined)
     elif api_examples:
-        vocab_name = 'vocab.src_freq%d.code_freq%d.api.bin' % (src_freq, code_freq)
+        vocab_name = 'vocab.src_freq%d.code_freq%d.%s.bin' % (src_freq, code_freq, name)
     else:
         vocab_name = 'vocab.src_freq%d.code_freq%d.bin' % (src_freq, code_freq)
     pickle.dump(vocab, open(os.path.join(out_dir, vocab_name), 'wb'))
@@ -144,7 +145,7 @@ def preprocess_dataset(file_path, transition_system, name='train', firstk=None):
                                                  transition_system.surface_code_to_ast(example_json['snippet']))
 
             tgt_action_infos = get_action_infos(example_dict['intent_tokens'], tgt_actions)
-        except Exception as e:
+        except (AssertionError, SyntaxError, ValueError, OverflowError) as e:
             skipped_list.append(example_json['question_id'])
             continue
         example = Example(idx=f'{i}-{example_json["question_id"]}',
