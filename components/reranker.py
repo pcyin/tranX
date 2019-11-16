@@ -96,7 +96,7 @@ class NormalizedParserScoreByAction(RerankingFeature):
 
     def get_feat_value(self, example, hyp, **kwargs):
         # return float(hyp.score) / len(kwargs['transition_system'].tokenize_code(hyp.code))
-        return float(hyp.score) / len(hyp.actions)
+        return float(hyp.score)
 
 
 @Registrable.register('normalized_parser_score')
@@ -113,7 +113,7 @@ class NormalizedParserScore(RerankingFeature):
         return False
 
     def get_feat_value(self, example, hyp, **kwargs):
-        return float(hyp.score) / HypCodeTokensCount().get_feat_value(example, hyp, **kwargs)
+        return float(hyp.score) * len(hyp.actions) / HypCodeTokensCount().get_feat_value(example, hyp, **kwargs)
 
 
 @Registrable.register('word_cnt')
@@ -471,7 +471,7 @@ class GridSearchReranker(Reranker):
         self.initialize_rerank_features(examples, decode_results)
 
         print('generating parameter list', file=sys.stderr)
-        param_space = [p for p in itertools.combinations(np.arange(0, 2.01, 0.02), self.feature_num)]
+        param_space = [p for p in itertools.combinations(np.arange(0, 2.03, 0.02), self.feature_num)]
         print('generating parameter list done', file=sys.stderr)
 
         global _examples

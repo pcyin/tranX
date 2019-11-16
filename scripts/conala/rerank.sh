@@ -2,7 +2,7 @@
 set -e
 
 seed=0
-vocab="data/conala/vocab.src_freq3.code_freq3_mined_0.bin"
+vocab="data/conala/vocab.src_freq3.code_freq3.mined_100000.snippet5.bin"
 dev_file="data/conala/dev.bin"
 test_file="data/conala/test.var_str_sep.bin"
 dev_decode_file=$1".dev.bin.decode"
@@ -20,7 +20,7 @@ max_epoch=80
 beam_size=15
 lstm='lstm'  # lstm
 lr_decay_after_epoch=15
-num_workers=60
+num_workers=70
 model_name=reranker.conala.$(basename ${vocab})
 
 echo "**** Writing results to logs/conala/${model_name}.log ****"

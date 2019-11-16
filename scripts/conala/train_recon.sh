@@ -2,8 +2,8 @@
 set -e
 
 seed=0
-vocab="data/conala/vocab.src_freq3.code_freq3.mined_0.bin"
-train_file="data/conala/train.mined_0.bin"
+vocab="data/conala/vocab.src_freq3.code_freq3.mined_100000.snippet5.bin"
+train_file="data/conala/train.var_str_sep.bin"
 dev_file="data/conala/dev.bin"
 dropout=0.3
 hidden_size=256
@@ -11,7 +11,7 @@ embed_size=128
 action_embed_size=128
 field_embed_size=64
 type_embed_size=64
-lr=0.001
+lr=0.0005
 lr_decay=0.5
 batch_size=10
 max_epoch=80
@@ -36,8 +36,6 @@ python -u exp.py \
     --dev_file ${dev_file} \
     --vocab ${vocab} \
     --lstm ${lstm} \
-    --no_parent_field_type_embed \
-    --no_parent_production_embed \
     --hidden_size ${hidden_size} \
     --embed_size ${embed_size} \
     --action_embed_size ${action_embed_size} \

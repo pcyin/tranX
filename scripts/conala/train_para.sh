@@ -2,18 +2,18 @@
 set -e
 
 seed=0
-vocab="data/conala/vocab.src_freq3.code_freq3.mined_0.bin"
-train_file="data/conala/train.mined_0.bin"
+vocab="data/conala/vocab.src_freq3.code_freq3.mined_100000.snippet5.bin"
+train_file="data/conala/train.var_str_sep.bin"
 dev_file="data/conala/dev.bin"
-train_decode_file="decodes/conala/conala.lstm.hidden256.embed128.action128.field64.type64.dr0.3.lr0.001.lr_de0.5.lr_da15.beam15.vocab.src_freq3.code_freq3.mined_0.bin.train.mined_0.bin.glorot.par_state.seed0.bin.train.mined_0.bin.decode"
-dev_decode_file="decodes/conala/conala.lstm.hidden256.embed128.action128.field64.type64.dr0.3.lr0.001.lr_de0.5.lr_da15.beam15.vocab.src_freq3.code_freq3.mined_0.bin.train.mined_0.bin.glorot.par_state.seed0.bin.dev.bin.decode"
+train_decode_file="decodes/conala/finetune.mined.retapi.dr0.3.lr0.001.lr_de0.5.lr_da15.beam15.seed0.mined_100000.snippet5.bin.train.var_str_sep.bin.decode"
+dev_decode_file="decodes/conala/finetune.mined.retapi.dr0.3.lr0.001.lr_de0.5.lr_da15.beam15.seed0.mined_100000.snippet5.bin.dev.bin.decode"
 dropout=0.3
 hidden_size=256
 embed_size=128
 action_embed_size=128
 field_embed_size=64
 type_embed_size=64
-lr=0.001
+lr=0.0005
 lr_decay=0.5
 batch_size=10
 max_epoch=80

@@ -3,10 +3,10 @@ set -e
 
 seed=0
 mined_num=$1
-pretrained_model_name=$2
-freq=${3:-3}
-vocab="data/conala/vocab.src_freq${freq}.code_freq${freq}.mined_${mined_num}.api.bin"
-finetune_file="data/conala/train.bin"
+ret_method=$2
+pretrained_model_name=$3
+vocab="data/conala/vocab.src_freq3.code_freq3.mined_${mined_num}.${ret_method}5.bin"
+finetune_file="data/conala/train.var_str_sep.bin"
 dev_file="data/conala/dev.bin"
 dropout=0.3
 hidden_size=256
@@ -19,7 +19,7 @@ lr_decay=0.5
 beam_size=15
 lstm='lstm'  # lstm
 lr_decay_after_epoch=15
-model_name=finetune.mined.api.dr${dropout}.lr${lr}.lr_de${lr_decay}.lr_da${lr_decay_after_epoch}.beam${beam_size}.seed${seed}.mined_${mined_num}
+model_name=finetune.apifirst.${ret_method}.dr${dropout}.lr${lr}.lr_de${lr_decay}.lr_da${lr_decay_after_epoch}.beam${beam_size}.seed${seed}.mined_${mined_num}
 
 echo "**** Writing results to logs/conala/${model_name}.log ****"
 mkdir -p logs/conala

@@ -4,8 +4,9 @@ set -e
 echo "****Pretraining with API docs first****"
 seed=0
 mined_num=$1
-vocab="data/conala/vocab.src_freq3.code_freq3.mined_${mined_num}.api.bin"
-train_file="data/conala/api.bin"
+ret_method=$2
+vocab="data/conala/vocab.src_freq3.code_freq3.mined_${mined_num}.${ret_method}5.bin"
+train_file="data/conala/${ret_method}5.bin"
 dev_file="data/conala/dev.bin"
 dropout=0.3
 hidden_size=256
@@ -13,14 +14,14 @@ embed_size=128
 action_embed_size=128
 field_embed_size=64
 type_embed_size=64
-lr=0.0005
+lr=0.001
 lr_decay=0.5
-batch_size=10
+batch_size=32
 max_epoch=80
 beam_size=15
 lstm='lstm'  # lstm
 lr_decay_after_epoch=15
-model_name=api.dr${dropout}.lr${lr}.lr_de${lr_decay}.lr_da${lr_decay_after_epoch}.beam${beam_size}.$(basename ${vocab}).$(basename ${train_file}).seed${seed}
+model_name=api.${ret_method}.dr${dropout}.lr${lr}.lr_de${lr_decay}.lr_da${lr_decay_after_epoch}.beam${beam_size}.$(basename ${vocab}).$(basename ${train_file}).seed${seed}
 
 echo "**** Writing results to logs/conala/${model_name}.log ****"
 mkdir -p logs/conala
@@ -62,7 +63,7 @@ python -u exp.py \
 echo "****Pretraining with mined data second****"
 
 pretrained_model_name=${model_name}
-vocab="data/conala/vocab.src_freq3.code_freq3.mined_${mined_num}.api.bin"
+vocab="data/conala/vocab.src_freq3.code_freq3.mined_${mined_num}.${ret_method}5.bin"
 finetune_file="data/conala/mined_${mined_num}.bin"
 dev_file="data/conala/dev.bin"
 dropout=0.3
@@ -78,7 +79,7 @@ batch_size=64
 max_epoch=80
 lstm='lstm'  # lstm
 lr_decay_after_epoch=15
-model_name=api.mined.dr${dropout}.lr${lr}.lr_de${lr_decay}.lr_da${lr_decay_after_epoch}.beam${beam_size}.seed${seed}.mined_${mined_num}
+model_name=api.${ret_method}.mined.dr${dropout}.lr${lr}.lr_de${lr_decay}.lr_da${lr_decay_after_epoch}.beam${beam_size}.seed${seed}.mined_${mined_num}
 
 echo "**** Writing results to logs/conala/${model_name}.log ****"
 mkdir -p logs/conala
