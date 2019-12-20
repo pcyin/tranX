@@ -555,7 +555,7 @@ def train_reranker_and_test(args):
             reranker.save(args.save_to)
 
     test_score_with_rerank = reranker.compute_rerank_performance(test_set.examples, test_decode_results, verbose=True,
-                                                                 evaluator=evaluator)
+                                                                 evaluator=evaluator, args=args)
 
     print('Test Eval Results After Reranking', file=sys.stderr)
     print(test_score_with_rerank, file=sys.stderr)

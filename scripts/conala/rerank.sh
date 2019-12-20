@@ -2,7 +2,8 @@
 set -e
 
 seed=0
-vocab="data/conala/vocab.src_freq3.code_freq3.mined_100000.snippet5.bin"
+#vocab="data/conala/vocab.src_freq3.code_freq3.mined_100000.snippet5.bin"
+vocab="data/conala/vocab.src_freq3.code_freq3.mined_100000.goldmine_intent_count100k_topk1_temp5.bin"
 dev_file="data/conala/dev.bin"
 test_file="data/conala/test.var_str_sep.bin"
 dev_decode_file=$1".dev.bin.decode"
@@ -35,6 +36,8 @@ python -u exp.py \
     --evaluator conala_evaluator \
     --asdl_file asdl/lang/py3/py3_asdl.simplified.txt \
     --transition_system python3 \
+    --load_reranker saved_models/conala/reranker.conala.vocab.src_freq3.code_freq3.mined_100000.intent_count100k_topk1_temp5.bin \
+    --save_decode_to decodes/conala/${model_name}.best \
     --dev_file ${dev_file} \
     --test_file ${test_file} \
     --dev_decode_file ${dev_decode_file} \

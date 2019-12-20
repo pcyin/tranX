@@ -219,9 +219,29 @@ class Reranker(Savable):
 
         return feat_values
 
-    def rerank_hypotheses(self, example, hypotheses):
+    def rerank_hypotheses(self, examples, decode_results, fast_mode=False):
         """rerank the hypotheses using the current model parameter"""
-        raise NotImplementedError
+        self.filter_hyps_and_initialize_features(examples, decode_results)
+
+        param = self.parameter
+
+        sorted_decode_results = []
+        for example, hyps in zip(examples, decode_results):
+            if hyps:
+                new_hyp_scores = [self.get_rerank_score(hyp, param=param) for hyp in hyps]
+                for score, hyp in zip(new_hyp_scores, hyps):
+                    hyp.rerank_score = score
+
+                if fast_mode:
+                    best_hyp_idx = np.argmax(new_hyp_scores)
+                    best_hyp = hyps[best_hyp_idx]
+                    sorted_decode_results.append([best_hyp])
+                else:
+                    sorted_decode_results.append([hyps[i] for i in np.argsort(new_hyp_scores)[::-1]])
+            else:
+                sorted_decode_results.append([])
+
+        return sorted_decode_results
 
     def initialize_rerank_features(self, examples, decode_results):
         hyp_examples = []
@@ -275,6 +295,7 @@ class Reranker(Savable):
             decode_results[i] = valid_hyps
 
     def filter_hyps_and_initialize_features(self, examples, decode_results):
+        print(decode_results[0][0].code)
         if not hasattr(decode_results[0][0], 'rerank_feature_values'):
             print('initializing rerank features for hypotheses...', file=sys.stderr)
 
@@ -293,7 +314,7 @@ class Reranker(Savable):
             self.initialize_rerank_features(examples, decode_results)
 
     def compute_rerank_performance(self, examples, decode_results, evaluator=CachedExactMatchEvaluator(),
-                                   param=None, fast_mode=False, verbose=False):
+                                   param=None, fast_mode=False, verbose=False, args=None):
         self.filter_hyps_and_initialize_features(examples, decode_results)
 
         if param is None:
@@ -327,9 +348,11 @@ class Reranker(Savable):
                               file=sys.stderr)
                         print('\t%s' % hyp.rerank_feature_values, file=sys.stderr)
 
-        metric = evaluator.evaluate_dataset(examples, sorted_decode_results, fast_mode=fast_mode)
+
+        metric = evaluator.evaluate_dataset(examples, sorted_decode_results, fast_mode=fast_mode, args=args)
 
         return metric
+
 
     def train(self, examples, decode_results, initial_performance=0., metric='accuracy'):
         raise NotImplementedError
@@ -364,6 +387,7 @@ class Reranker(Savable):
 
     @classmethod
     def load(cls, model_path, cuda=False):
+        print("loading reranker...")
         params = torch.load(model_path, map_location=lambda storage, loc: storage)
         feature_names = params['feature_names']
         features = []

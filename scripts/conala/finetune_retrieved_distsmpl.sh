@@ -20,7 +20,7 @@ lr_decay=0.5
 beam_size=15
 lstm='lstm'  # lstm
 lr_decay_after_epoch=15
-model_name=finetune.mined.retapi.distsmpl.dr${dropout}.lr${lr}.lr_de${lr_decay}.lr_da${lr_decay_after_epoch}.beam${beam_size}.seed${seed}.mined_${mined_num}.${ret_method}5
+model_name=finetune.mined.retapi.distsmpl.dr${dropout}.lr${lr}.lr_de${lr_decay}.lr_da${lr_decay_after_epoch}.beam${beam_size}.seed${seed}.mined_${mined_num}.${ret_method}
 
 echo "**** Writing results to logs/conala/${model_name}.log ****"
 mkdir -p logs/conala
