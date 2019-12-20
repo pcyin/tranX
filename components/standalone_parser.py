@@ -37,6 +37,7 @@ class StandaloneParser(object):
         utterance = utterance.strip()
         processed_utterance_tokens, utterance_meta = self.example_processor.pre_process_utterance(utterance)
         print(processed_utterance_tokens)
+        print(utterance_meta)
         examples = [Example(idx=None,
                           src_sent=processed_utterance_tokens,
                           tgt_code=None,
