@@ -2,7 +2,7 @@ from __future__ import print_function
 import six
 import argparse
 import sys
-from flask import Flask, url_for, jsonify, render_template
+from flask import Flask, url_for, jsonify, render_template, request
 import json
 
 from components.standalone_parser import StandaloneParser
@@ -28,8 +28,9 @@ def default():
     return render_template('default.html')
 
 
-@app.route('/parse/<dataset>/<utterance>', methods=['GET'])
-def parse(utterance, dataset):
+@app.route('/parse/<dataset>', methods=['GET'])
+def parse(dataset):
+    utterance = request.args['q']
 
     parser = parsers[dataset]
 
