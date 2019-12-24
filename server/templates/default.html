@@ -68,6 +68,19 @@
                 <div class="card-body">
                     <h5 class="card-title">Try some examples from each dataset!</h5>
                     <div>
+                        <div style="text-align:right; float: left; width: 80px">CoNaLa</div>
+                        <div style="float: left; margin-left: 20px; padding-left: 10px; border-left: 1px darkgray dashed">
+                                <p class="card-text"><a href="#" onclick="parse_example(this, 'conala');">Open a file `yourfile.txt` in write mode</a></p>
+                                <p class="card-text"><a href="#" onclick="parse_example(this, 'conala');">lower a string `text` and remove non-alphanumeric characters aside from space</a></p>
+				                <p class="card-text"><a href="#" onclick="parse_example(this, 'conala');">choose a random file from the directory contents of the C drive, `C:\\`</a></p>
+                        </div>
+                        <div style="clear:both; margin-bottom: 10px"></div>
+                    </div>
+                    <a class="float-right" data-toggle="collapse" href="#other-examples" role="button">[Show other examples]</a>
+
+                <div class="collapse multi-collapse" id="other-examples">
+
+                    <div>
                         <div style="text-align:right; float: left; width: 80px">ATIS</div>
                         <div style="float: left; margin-left: 20px; padding-left: 10px; border-left: 1px darkgray dashed">
                                 <p class="card-text"><a href="#" onclick="parse_example(this, 'atis');">show me monday morning flight from Pittsburgh to Seattle</a></p>
@@ -94,6 +107,7 @@
                         </div>
                         <div style="clear:both; margin-bottom: 10px"></div>
                     </div>
+                </div>
                 </div>
             </div>
             </div>
