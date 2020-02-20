@@ -1,15 +1,18 @@
 from __future__ import print_function
+
+import time
+
 import six
 import argparse
 import sys
 from flask import Flask, url_for, jsonify, render_template, request
 import json
-
+from pymongo import MongoClient
 from components.standalone_parser import StandaloneParser
 
 app = Flask(__name__)
 parsers = dict()
-
+client = MongoClient()
 
 def init_arg_parser():
     arg_parser = argparse.ArgumentParser()
@@ -64,6 +67,20 @@ def parse(dataset):
         responses['hypotheses'].append(hyp_entry)
 
     return jsonify(responses)
+
+
+@app.route("/upload", methods=['POST'])
+def upload():
+    try:
+        req_data = request.get_json()
+        db = client['tranx']
+        collection = db['events']
+        req_data['timestamp'] = int(time.time())
+        collection.insert_one(req_data)
+        return "success"
+    except Exception as e:
+        print(e)
+        return "failed"
 
 
 if __name__ == '__main__':
