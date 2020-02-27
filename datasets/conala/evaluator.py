@@ -1,3 +1,5 @@
+import csv
+
 from components.evaluator import Evaluator
 from common.registerable import Registrable
 from components.dataset import Dataset
@@ -32,7 +34,11 @@ class ConalaEvaluator(Evaluator):
                              tokenize_for_bleu_eval(hyp.decanonical_code),
                              smoothing_function=SmoothingFunction().method3)
 
-    def evaluate_dataset(self, dataset, decode_results, fast_mode=False):
+
+    def evaluate_dataset(self, dataset, decode_results, fast_mode=False, args=None):
+        output_plaintext_file = None
+        if args and args.save_decode_to:
+            output_plaintext_file = open(args.save_decode_to + '.txt', 'w', encoding='utf-8')
         examples = dataset.examples if isinstance(dataset, Dataset) else dataset
         assert len(examples) == len(decode_results)
 
@@ -88,7 +94,6 @@ class ConalaEvaluator(Evaluator):
 
                     top_decanonical_code_tokens = hyp_list[0].decanonical_code_tokens
                     sent_bleu_score = hyp_list[0].bleu_score
-
                     best_hyp_idx = np.argmax(example_hyp_bleu_scores)
                     oracle_sent_bleu = example_hyp_bleu_scores[best_hyp_idx]
                     _best_hyp_code_tokens = hyp_list[best_hyp_idx].decanonical_code_tokens
@@ -98,6 +103,9 @@ class ConalaEvaluator(Evaluator):
                     oracle_sent_bleu = 0.
                     _best_hyp_code_tokens = []
 
+                # write results to file
+                if output_plaintext_file:
+                    output_plaintext_file.write(" ".join(top_decanonical_code_tokens) + '\n')
                 oracle_exact_match.append(any(hyp.is_correct for hyp in hyp_list))
                 hyp_code_tokens.append(top_decanonical_code_tokens)
                 sent_bleu_scores.append(sent_bleu_score)

@@ -3,9 +3,7 @@
 import torch
 import torch.nn.functional as F
 import torch.nn.init as init
-import numpy as np
 
-import torch
 import torch.nn as nn
 from torch.autograd import Variable
 import numpy as np
@@ -87,8 +85,11 @@ def to_input_variable(sequences, vocab, cuda=False, training=True, append_bounda
 
     word_ids = word2id(sequences, vocab)
     sents_t = input_transpose(word_ids, vocab['<pad>'])
-
-    sents_var = Variable(torch.LongTensor(sents_t), volatile=(not training), requires_grad=False)
+    if training:
+        sents_var = Variable(torch.LongTensor(sents_t), requires_grad=False)
+    else:
+        with torch.no_grad():
+            sents_var = Variable(torch.LongTensor(sents_t), requires_grad=False)
     if cuda:
         sents_var = sents_var.cuda()
 

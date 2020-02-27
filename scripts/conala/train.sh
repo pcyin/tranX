@@ -1,23 +1,26 @@
 #!/bin/bash
 set -e
 
-seed=${1:-0}
-vocab="data/conala/vocab.var_str_sep.src_freq3.code_freq3.bin"
-train_file="data/conala/train.var_str_sep.bin"
-dev_file="data/conala/dev.var_str_sep.bin"
+seed=0
+mined_num=$1
+freq=${2:-3}
+vocab="data/conala/vocab.src_freq${freq}.code_freq${freq}.mined_${mined_num}.bin"
+train_file="data/conala/pre_${mined_num}.bin"
+dev_file="data/conala/dev.bin"
 dropout=0.3
 hidden_size=256
 embed_size=128
 action_embed_size=128
 field_embed_size=64
 type_embed_size=64
-ptrnet_hidden_dim=32
 lr=0.001
 lr_decay=0.5
+batch_size=64
+max_epoch=80
 beam_size=15
 lstm='lstm'  # lstm
 lr_decay_after_epoch=15
-model_name=model.sup.conala.${lstm}.hidden${hidden_size}.embed${embed_size}.action${action_embed_size}.field${field_embed_size}.type${type_embed_size}.dr${dropout}.lr${lr}.lr_de${lr_decay}.lr_da${lr_decay_after_epoch}.beam${beam_size}.$(basename ${vocab}).$(basename ${train_file}).glorot.par_state.seed${seed}
+model_name=conala.${lstm}.hidden${hidden_size}.embed${embed_size}.action${action_embed_size}.field${field_embed_size}.type${type_embed_size}.dr${dropout}.lr${lr}.lr_de${lr_decay}.lr_da${lr_decay_after_epoch}.beam${beam_size}.$(basename ${vocab}).$(basename ${train_file}).glorot.par_state.seed${seed}
 
 echo "**** Writing results to logs/conala/${model_name}.log ****"
 mkdir -p logs/conala
@@ -27,7 +30,7 @@ python -u exp.py \
     --cuda \
     --seed ${seed} \
     --mode train \
-    --batch_size 10 \
+    --batch_size ${batch_size} \
     --evaluator conala_evaluator \
     --asdl_file asdl/lang/py3/py3_asdl.simplified.txt \
     --transition_system python3 \
@@ -49,7 +52,7 @@ python -u exp.py \
     --lr ${lr} \
     --lr_decay ${lr_decay} \
     --lr_decay_after_epoch ${lr_decay_after_epoch} \
-    --max_epoch 50 \
+    --max_epoch ${max_epoch} \
     --beam_size ${beam_size} \
     --log_every 50 \
     --save_to saved_models/conala/${model_name} 2>&1 | tee logs/conala/${model_name}.log

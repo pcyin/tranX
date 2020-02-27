@@ -68,6 +68,19 @@
                 <div class="card-body">
                     <h5 class="card-title">Try some examples from each dataset!</h5>
                     <div>
+                        <div style="text-align:right; float: left; width: 80px">CoNaLa</div>
+                        <div style="float: left; margin-left: 20px; padding-left: 10px; border-left: 1px darkgray dashed">
+                                <p class="card-text"><a href="#" onclick="parse_example(this, 'conala');">Open a file `yourfile.txt` in write mode</a></p>
+                                <p class="card-text"><a href="#" onclick="parse_example(this, 'conala');">lower a string `text` and remove non-alphanumeric characters aside from space</a></p>
+				                <p class="card-text"><a href="#" onclick="parse_example(this, 'conala');">choose a random file from the directory contents of the C drive, `C:\\`</a></p>
+                        </div>
+                        <div style="clear:both; margin-bottom: 10px"></div>
+                    </div>
+                    <a class="float-right" data-toggle="collapse" href="#other-examples" role="button">[Show other examples]</a>
+
+                <div class="collapse multi-collapse" id="other-examples">
+
+                    <div>
                         <div style="text-align:right; float: left; width: 80px">ATIS</div>
                         <div style="float: left; margin-left: 20px; padding-left: 10px; border-left: 1px darkgray dashed">
                                 <p class="card-text"><a href="#" onclick="parse_example(this, 'atis');">show me monday morning flight from Pittsburgh to Seattle</a></p>
@@ -95,6 +108,7 @@
                         <div style="clear:both; margin-bottom: 10px"></div>
                     </div>
                 </div>
+                </div>
             </div>
             </div>
         </div>
@@ -102,10 +116,10 @@
             <div class="col">
             <div class="input-group">
                 <select class="form-control" id="sel_dataset">
+                    <option value="conala">CoNaLa</option>
                     <option value="atis">ATIS</option>
                     <option value="geo">GeoQuery</option>
                     <option value="django">Django</option>
-                    <option value="conala">CoNaLa</option>
                 </select>
                 <input type="text" class="form-control" id="inputUtterance" placeholder="Enter query" style="width:70%;">
                 <button type="button" class="btn btn-primary" id="btn_parse">Parse</button>
@@ -113,32 +127,6 @@
             </div>
         </div>
         <div class="hypotheses">
-            <!-- <div class="row">
-                <div class="col">
-                    <div class="card text-left">
-                        <div class="card-header">
-                            Hypothesis 1 [Score=0.00]
-                            <a class="float-right" data-toggle="collapse" href="#hyp_m1_detail" role="button">[Show]</a>
-                        </div>
-                        <div class="card-body">
-                            <pre class="hyp-code">asdfasd.sadf.asdf
-
-asdfsda</pre>
-                        </div>
-                        <div id="tree-container"></div>
-                        <div class="collapse multi-collapse card-body" id="hyp_m1_detail">
-                            <h3>Action Sequence</h3>
-                            <ul class="list-group">
-                                    <li class="list-group-item">Cras justo odio</li>
-                                    <li class="list-group-item">Dapibus ac facilisis in</li>
-                                    <li class="list-group-item">Morbi leo risus</li>
-                                    <li class="list-group-item">Porta ac consectetur ac</li>
-                                    <li class="list-group-item">Vestibulum at eros</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>    
-            </div> -->
         </div>
     </div>
 
@@ -157,32 +145,29 @@ asdfsda</pre>
 
         var parse_example = function(e_ref, dataset) {
             //alert($(e_ref).html());
-            utterance = $(e_ref).html()
-            $(`#sel_dataset option[value="${dataset}"]`).prop('selected', 'true')
-            $('#inputUtterance').val(utterance)
-            $('#btn_parse').click()
+            utterance = $(e_ref).html();
+            $(`#sel_dataset option[value="${dataset}"]`).prop('selected', 'true');
+            $('#inputUtterance').val(utterance);
+            $('#btn_parse').click();
             return false;
-        }
+        };
 
         var on_parse = function(){
-            $('.hypotheses').empty()
-            $('#btn_parse').prop('disabled', true)
-            $('#btn_parse').html(loadingText)
-            input_utterance = $('#inputUtterance').val()
-            //alert(input_utterance)
-            dataset = $('#sel_dataset option:selected').val()
-            //alert(dataset)
-            post_url = '/parse/' + dataset + '/' + encodeURIComponent(input_utterance)
+            $('.hypotheses').empty();
+            $('#btn_parse').prop('disabled', true);
+            $('#btn_parse').html(loadingText);
+            input_utterance = $('#inputUtterance').val();
+            dataset = $('#sel_dataset option:selected').val();
+            post_url = '/parse/' + dataset;
 
-            $.get(post_url, function(data){
-                //alert(data[0]['value'])
-                hypotheses = data['hypotheses']
+            $.get(post_url, {q: input_utterance}, function(data){
+                hypotheses = data['hypotheses'];
                 for (i = 0; i < hypotheses.length; i++) { 
-                    hyp = hypotheses[i]
+                    hyp = hypotheses[i];
                     
-                    action_seq_html = ''
+                    action_seq_html = '';
                     for (t = 0; t < hyp['actions'].length; t++) {
-                        action_t = hyp['actions'][t]
+                        action_t = hyp['actions'][t];
                         action_seq_html += `<li class="list-group-item">${action_t}</li>` + '\n'
                     }
 
@@ -207,19 +192,19 @@ asdfsda</pre>
                         
                     </div>
                 </div>    
-            </div>`
+            </div>`;
 
-                    $('.hypotheses').append(hyp_html)
+                    $('.hypotheses').append(hyp_html);
 
                     // draw AST
-                    var tree_json_data = parse(hyp['tree_repr'].replace(/\\/g, "\\\\"))
+                    var tree_json_data = parse(hyp['tree_repr'].replace(/\\/g, "\\\\"));
                     d3Tree(tree_json_data, hyp['id']);
                 }
                 
-                $('#btn_parse').prop('disabled', false)
+                $('#btn_parse').prop('disabled', false);
                 $('#btn_parse').html('Parse')
             })
-        }
+        };
 
         $('#btn_parse').click(on_parse)
     </script>

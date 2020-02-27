@@ -1,0 +1,9 @@
+{
+  "conala": {
+    "parser": "default_parser",
+    "example_processor": "conala_example_processor",
+    "model_path": "best_pretrained_models/finetune.mined.retapi.distsmpl.dr0.3.lr0.001.lr_de0.5.lr_da15.beam15.seed0.mined_100000.intent_count100k_topk1_temp5.bin",
+    "beam_size": 15,
+    "reranker_path": "best_pretrained_models/reranker.conala.vocab.src_freq3.code_freq3.mined_100000.intent_count100k_topk1_temp5.bin"
+  }
+}
