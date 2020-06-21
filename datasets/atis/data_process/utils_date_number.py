@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import re
+import codecs
 
 
 word_am_pm_re = re.compile(r'\d{1,4}[ap]m$')
@@ -33,7 +34,7 @@ def norm_q_time(_w_list):
   is_pm = True
 
   w_list = []
-  for i in xrange(len(_w_list)):
+  for i in range(len(_w_list)):
     w = _w_list[i]
     if w in ('noon', 'noontime', 'dinnertime'):
       w_list.append('1200pm')
@@ -46,7 +47,7 @@ def norm_q_time(_w_list):
 
   _w_list = w_list
   w_list = []
-  for i in xrange(len(_w_list)):
+  for i in range(len(_w_list)):
     w = _w_list[i]
     if (w in ('12', '12pm', '1200pm')) and (i + 1 < len(_w_list)) and _w_list[i + 1] == '1200pm':
       pass
@@ -74,14 +75,14 @@ def norm_q_time(_w_list):
           is_pm = _w_list[i + 2].endswith('pm') or no_am_indicator(_w_list, i)
         w_list.append(w + ('pm' if is_pm else 'am'))
       else:
-        print '>> between_and:', ' '.join(_w_list)
+        print('>> between_and:', ' '.join(_w_list))
         w_list.append(w)
 
       if not (_w_list[i + 2].endswith('am') or _w_list[i + 2].endswith('pm')):
         if is_time_digit(_w_list[i + 2]) and (w_list[len(w_list) - 1][-2:] in ('am', 'pm')):
           _w_list[i + 2] = _w_list[i + 2] + w_list[len(w_list) - 1][-2:]
         else:
-          print '>> between_and:', ' '.join(_w_list)
+          print('>> between_and:', ' '.join(_w_list))
     else:
       w_list.append(w)
 
@@ -95,7 +96,7 @@ def norm_q_time(_w_list):
         digit_str += '00'
       # \d\d\d\d[ap]m
       digit_str = ''.join(
-          ['0' for i in xrange(4 - len(digit_str))]) + digit_str
+          ['0' for i in range(4 - len(digit_str))]) + digit_str
       if w[-2:] == 'pm':
         h = int(digit_str[:2])
         if h < 12:
@@ -131,7 +132,7 @@ def norm_dollar(_w_list):
 def norm_time_mention_str(e_name):
   if len(e_name) < 4:
     e_name = ''.join(
-        ['0' for i in xrange(4 - len(e_name))]) + e_name
+        ['0' for i in range(4 - len(e_name))]) + e_name
   e_name += ('pm' if int(e_name[:2]) >= 12 else 'am')
   return e_name
 
@@ -151,8 +152,8 @@ week_set = set(('wednesday', 'sunday', 'friday', 'monday',
 
 def read_daynumber_word_mapping(fn='data/atis/number_word_mapping.txt'):
   word2num = {}
-  with open(fn, 'r') as f_in:
-    for l in filter(lambda x: len(x) > 0, map(lambda x: x.strip().lower(), f_in.read().decode('utf-8').split('\n'))):
+  with codecs.open(fn, encoding='utf-8') as f_in:
+    for l in filter(lambda x: len(x) > 0, map(lambda x: x.strip().lower(), f_in.read().split('\n'))):
       l_list = l.split('\t')
       for w in l_list[1:]:
         word2num[w] = l_list[0]
@@ -166,7 +167,7 @@ def norm_daynumber(_w_list):
   i = 0
   while i < len(_w_list):
     w = _w_list[i]
-    if (w == 'the') and (i + 1 < len(_w_list)) and ((_w_list[i + 1] in month_set) or (word2num.has_key(_w_list[i + 1]))):
+    if (w == 'the') and (i + 1 < len(_w_list)) and ((_w_list[i + 1] in month_set) or ((_w_list[i + 1]) in word2num)):
       pass
     else:
       w_list.append(w)
@@ -180,18 +181,18 @@ def norm_daynumber(_w_list):
     if (i - 1 >= 0) and ((_w_list[i - 1] in month_set) or (_w_list[i - 1] in week_set) or (_w_list[i - 1] in ('on', 'and', 'for', 'early', 'late'))):
       if (i + 1 < len(_w_list)) and (_w_list[i + 1] == 'class'):
         w_list.append(w)
-      elif (i + 1 < len(_w_list)) and word2num.has_key(''.join((w, _w_list[i + 1]))):
+      elif (i + 1 < len(_w_list)) and (''.join((w, _w_list[i + 1]))) in word2num:
         w_list.append('_dn_' + word2num[''.join((w, _w_list[i + 1]))])
         i += 1
-      elif word2num.has_key(w):
+      elif w in word2num:
         w_list.append('_dn_' + word2num[w])
       else:
         w_list.append(w)
     elif ((i + 2 < len(_w_list)) and (_w_list[i + 1] == 'of') and (_w_list[i + 2] in month_set)):
-      if (i - 1 >= 0) and word2num.has_key(''.join((_w_list[i - 1], w))):
+      if (i - 1 >= 0) and ''.join((_w_list[i - 1], w)) in word2num:
         w_list[len(w_list) - 1] = '_dn_' + \
             word2num[''.join((_w_list[i - 1], w))]
-      elif word2num.has_key(w):
+      elif w in word2num:
         w_list.append('_dn_' + word2num[w])
       else:
         w_list.append(w)

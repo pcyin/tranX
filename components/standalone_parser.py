@@ -1,10 +1,14 @@
 from __future__ import print_function
 import argparse
 import sys
-
+import six
 import torch
+from model import parser
 
 from common.registerable import Registrable
+
+if six.PY3:
+    from datasets.conala.example_processor import ConalaExampleProcessor
 
 
 class StandaloneParser(object):
@@ -15,6 +19,11 @@ class StandaloneParser(object):
     """
 
     def __init__(self, parser_name, model_path, example_processor_name, beam_size=5, cuda=False):
+        # lazy loading
+        from datasets.geo.example_processor import GeoQueryExampleProcessor
+        from datasets.atis.example_processor import ATISExampleProcessor
+        from datasets.django.example_processor import DjangoExampleProcessor
+
         print('load parser from [%s]' % model_path, file=sys.stderr)
 
         self.parser = parser = Registrable.by_name(parser_name).load(model_path, cuda=cuda).eval()

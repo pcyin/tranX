@@ -241,7 +241,7 @@ def is_equal_ast(this_ast, other_ast):
 @Registrable.register('prolog')
 class PrologTransitionSystem(TransitionSystem):
     def compare_ast(self, hyp_ast, ref_ast):
-        raise NotImplementedError
+        return is_equal_ast(hyp_ast, ref_ast)
 
     def ast_to_surface_code(self, asdl_ast):
         return ast_to_prolog_expr(asdl_ast)

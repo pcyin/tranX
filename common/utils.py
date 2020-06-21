@@ -154,7 +154,7 @@ def init_arg_parser():
     arg_parser.add_argument('--example_preprocessor', default=None, type=str, help='name of the class that is used to pre-process raw input examples')
 
     #### dataset specific config ####
-    arg_parser.add_argument('--sql_db_file', default=None, type=str, help='path to WikiSQL database file (SQLite)')
+    arg_parser.add_argument('--sql_db_file', default=None, type=str, help='path to WikiSQL database file for evaluation (SQLite)')
 
     return arg_parser
 
