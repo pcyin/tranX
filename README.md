@@ -134,7 +134,14 @@ conda env create -f data/env/(py2torch3cuda9.yml|py3torch3cuda9.yml)
 
 ## Re-ranking Model
 
-This branch contains the code for training a reranker. Before training a reranker, we need to first train 
+This branch contains the code for training a reranker. 
+
+Install additional dependent libraries. 
+```shell script
+pip install xgboost
+``` 
+
+Before training a reranker, we need to first train 
 a tranX semantic parser. For instance, the following script trains a parser on the `ATIS` dataset:
 
 ```shell script
@@ -206,9 +213,9 @@ python -u exp.py \
 
 ### Tune the reranker
 
-Finally, with the pre-trained reconstruction and paraphrase identification models,
- we could tune the weights of the reranker. First, we generate the input n-best files 
- used by Travatar
+Finally, with the pre-trained reconstruction and paraphrase identification models, 
+we could tune the weights of the reranker. First, we generate the input n-best files 
+used by Travatar.
  
 ```python
 from exp import *
@@ -221,11 +228,13 @@ LinearReranker.prepare_travatar_inputs_for_lambda_dcs_dataset(
     dev_decode_results_path='decodes/atis/dev.decode', 
     test_decode_results_path='decodes/atis/test.decode',
     nbest_output_path='travatar_files/atis/', 
-    nbest_output_file_suffix = '.seed0'
+    nbest_output_file_suffix = '.seed0' # suffix is used to mark the generated n-best file with extra flags; useful when you have multiple n-best files for the same dataset 
 )
 ```
 
-Next, evoke the Travatar to perform MERT training:
+Next, call the Travatar to perform MERT training. Before running the following command, make sure you have 
+Travatar properly installed and change the `TDIR` variable in `travatar_rerank.sh` to the 
+correct installation path.
 
 ```shell script
 ./scripts/rerank/travatar_rerank.sh \
@@ -236,6 +245,10 @@ Next, evoke the Travatar to perform MERT training:
 This would generate two fodlers inside `nbest_output_path`: a `model` folder with trained feature weights and a `log` folder
 with tuning and evaluation logs. `ZEROONE` in the log files denote exact match accuracy.
 
+### Trained Reranking Models
+
+You may find a list of trained reraking models used in our paper 
+at [this shared folder](https://www.dropbox.com/sh/nj3ec1z5j96gnvn/AADBwTB2uv07Opw260ZYqKC5a?dl=0)
 
 ## FAQs
 
