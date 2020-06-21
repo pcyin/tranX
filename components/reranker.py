@@ -6,6 +6,7 @@ import itertools
 import re
 import sys, os
 import six
+import pickle
 import torch
 import torch.nn as nn
 from collections import OrderedDict
@@ -18,7 +19,7 @@ from common.savable import Savable
 from datasets.conala.conala_eval import tokenize_for_bleu_eval
 from datasets.conala import evaluator as conala_evaluator
 from model import utils
-from components.dataset import Example
+from components.dataset import Example, Dataset
 
 if six.PY3:
     from asdl import Python3TransitionSystem
@@ -432,6 +433,95 @@ class LinearReranker(Reranker):
         f_src.close()
         f_tgt.close()
         f_hyp.close()
+
+    @staticmethod
+    def prepare_travatar_inputs_for_lambda_dcs_dataset(
+        reconstructor_path, paraphrase_identifier_path,
+        dev_set_path, test_set_path,
+        dev_decode_results_path, test_decode_results_path,
+        nbest_output_path, nbest_output_file_suffix = ''
+    ):
+        """
+        Args:
+            reconstructor_path: Path to the trained reconstruction model
+            paraphrase_identifier_path: Path to the trained paraphrase identification model
+            dev_decode_results_path: Path to the saved n-best predictions by the semantic parser using beam search
+            test_decode_results_path: Same as above, for the test set,
+            nbest_output_path: Path to output folder that will contain the generated n-best files for travatar training
+            nbest_output_file_suffix: Add certain suffix to generated files (e.g., `{file_name}.seed0`)
+        """
+        # TODO: that's ugly but we need to avoid cyclic imports
+        from asdl.lang.lambda_dcs.logical_form import get_canonical_order_of_logical_form, ast_to_logical_form
+        from model.paraphrase import ParaphraseIdentificationModel
+        from model.reconstruction_model import Reconstructor
+
+        dev_set = Dataset.from_bin_file(dev_set_path)
+        test_set = Dataset.from_bin_file(test_set_path)
+
+        dev_decode_results = pickle.load(open(dev_decode_results_path, 'rb'))
+        test_decode_results = pickle.load(open(test_decode_results_path, 'rb'))
+
+        features = [
+            ParserScore(),
+            Reconstructor.load(reconstructor_path).eval(),
+            ParaphraseIdentificationModel.load(paraphrase_identifier_path).eval(),
+            NormalizedParserScore(),
+            HypCodeTokensCount()
+        ]
+
+        reranker = LinearReranker(
+            features=features,
+            # the actual parameter weights listed here are not important, since we just need to create an
+            # instance of `LinearReranker`. I used Graham's `travatar` for feature weight tuning instead of
+            # the different `Reranker`'s (e.g., `GridSearchReranker`) implemented here,
+            parameter=OrderedDict([
+                    ('parser_score', 1.),
+                    ('reconstructor', 0.),
+                    ('paraphrase_identifier', 0.),
+                    ('normalized_parser_score', 0.),
+                    ('word_cnt', 0.),
+            ]),
+            transition_system=features[1].transition_system
+        )
+
+        # tokenize code while canonicalizing the order of sub-trees for conjunctions/disjunctions
+        def _get_order(name):
+            if name == 'flight':
+                return -200
+            elif name == 'from':
+                return -199
+            elif name == 'to':
+                return -198
+
+            return sum(ord(x) for x in name)
+
+        def target_tokenizer(example):
+            lf = ast_to_logical_form(example.tgt_ast)
+            ordered_lf = get_canonical_order_of_logical_form(lf, _get_order=_get_order)
+
+            return reranker.transition_system.tokenize_code(ordered_lf.to_string())
+
+        def hyp_tokenizer(hyp):
+            lf = ast_to_logical_form(hyp.tree)
+            ordered_lf = get_canonical_order_of_logical_form(lf, _get_order=_get_order)
+
+            return reranker.transition_system.tokenize_code(ordered_lf.to_string())
+
+        os.makedirs(nbest_output_path, exist_ok=True)
+
+        reranker.generate_nbest_list(
+            dev_set.examples, dev_decode_results,
+            os.path.join(nbest_output_path, 'dev' + nbest_output_file_suffix),
+            target_tokenizer=target_tokenizer,
+            hyp_tokenizer=hyp_tokenizer
+        )
+
+        reranker.generate_nbest_list(
+            test_set.examples, test_decode_results,
+            os.path.join(nbest_output_path, 'test' + nbest_output_file_suffix),
+            target_tokenizer=target_tokenizer,
+            hyp_tokenizer=hyp_tokenizer
+        )
 
     def train(self, examples, decode_results, initial_performance=0., metric='accuracy'):
         raise NotImplementedError

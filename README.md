@@ -71,6 +71,104 @@ The `scripts` folder contains scripts to train TranX on example datasets. For ex
 ```
 Using the provided conda environment, it achieves 73.9% test accuracy on a ubuntu 16.04 machine with GTX1080 GPU.
 
+## Re-ranking Model
+
+This branch contains the code for training a reranker. Before training a reranker, we need to first train 
+a tranX semantic parser. For instance, the following script trains a parser on the `ATIS` dataset:
+
+```shell script
+./scripts/atis/train.sh 0
+```
+
+Once we have the trained parsing model, we could then train the reconstruction model and the paraphrase identification model:
+
+### Reconstruction Model
+
+The following example command trains a reconstruction model on `ATIS`:
+```shell script
+ python -u exp.py \
+     --cuda \
+     --lang lambda_dcs \
+     --asdl_file asdl/lang/lambda_dcs/lambda_asdl.txt \
+     --mode train_reconstructor \
+     --batch_size 10 \
+     --train_file data/atis/train.bin \
+     --dev_file data/atis/dev.bin \
+     --vocab data/atis/vocab.freq2.bin \
+     --lstm lstm \
+     --hidden_size 256 \
+     --embed_size 128 \                                                                                                                                                                                                                                                    --dropout ${dropout} \                                                                                                                                                                                                                                                          --patience 5 \                                                                                                                                                                                                                                                                  --max_num_trial 5 \                                                                                                                                                                                                                                                             --lr_decay ${lr_decay} \                                                                                                                                                                                                                                                        --log_every 50 \
+     --save_to saved_models/atis/reranker.reconstructor.bin
+``` 
+### Paraphrase Model
+
+The following example command trains a paraphrase model on `ATIS`. Note that it needs the decoded hypotheses on train/dev sets:
+```shell script
+# Perform inference over trained semantic parsing models on training and development set, dump the n-best decoding results``
+python exp.py \
+    --cuda \
+    --mode test \
+    --load_model saved_models/atis/path_to_trained_semantic_parsing_model.bin \
+    --beam_size 5 \
+    --test_file data/atis/(train.bin|dev.bin) \
+    --evaluator default_evaluator \
+    --save_decode_to decodes/atis/(train.decode|dev.decode) \
+    --decode_max_time_step 110
+
+python -u exp.py \
+    --cuda \
+    --lang lambda_dcs \
+    --asdl_file asdl/lang/lambda/lambda_asdl.txt \
+    --mode train_paraphrase_identifier \
+    --batch_size 10 \
+    --train_file data/atis/train.bin \
+    --dev_file data/atis/train.bin \
+    --vocab data/atis/vocab.freq2.bin \
+    --hidden_size 256 \
+    --embed_size 128 \
+    --train_decode_file decodes/atis/train.decode \
+    --dev_decode_file decodes/atis/dev.decode \
+    --dropout 0.2 \
+    --patience 5 \
+    --max_num_trial 5 \
+    --lr_decay 0.5 \
+    --log_every 50 \
+    --save_to saved_models/atis/reranker.paraphrase_identifier.bin
+```
+
+### Tune the reranker
+
+Finally, with the pre-trained reconstruction and paraphrase identification models,
+ we could tune the weights of the reranker. First, we generate the input n-best files 
+ used by Travatar
+ 
+```python
+from exp import *
+
+LinearReranker.prepare_travatar_inputs_for_lambda_dcs_dataset(
+    reconstructor_path='saved_models/atis/reranker.reconstructor.bin', 
+    paraphrase_identifier_path='saved_models/atis/reranker.paraphrase_identifier.bin',
+    dev_set_path='data/atis/dev.bin', 
+    test_set_path='data/atis/test.bin',
+    dev_decode_results_path='decodes/atis/dev.decode', 
+    test_decode_results_path='decodes/atis/test.decode',
+    nbest_output_path='travatar_files/atis/', 
+    nbest_output_file_suffix = '.seed0'
+)
+```
+
+Next, evoke the Travatar to perform MERT training:
+
+```shell script
+./scripts/rerank/travatar_rerank.sh \
+  travatar_files/atis/ \
+  ".seed0"  # the second argument is the suffix as defined above
+```
+
+This would generate two fodlers inside `nbest_output_path`: a `model` folder with trained feature weights and a `log` folder
+with tuning and evaluation logs. `ZEROONE` in the log files denote exact match accuracy.
+
+
 ## FAQs
 
 #### How to adapt to a new programming language or logical form?
