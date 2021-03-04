@@ -15,7 +15,7 @@ class VocabEntry(object):
         self.word2id['</s>'] = 2
         self.word2id['<unk>'] = 3
 
-        self.id2word = {v: k for k, v in self.word2id.items()}
+        self.id2word_ = {v: k for k, v in self.word2id.items()}
 
     def __getitem__(self, word):
         return self.word2id.get(word, self.unk_id)
@@ -33,12 +33,12 @@ class VocabEntry(object):
         return 'Vocabulary[size=%d]' % len(self)
 
     def id2word(self, wid):
-        return self.id2word[wid]
+        return self.id2word_[wid]
 
     def add(self, word):
         if word not in self:
             wid = self.word2id[word] = len(self)
-            self.id2word[wid] = word
+            self.id2word_[wid] = word
             return wid
         else:
             return self[word]
