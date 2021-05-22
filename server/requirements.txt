@@ -1,0 +1,8 @@
+flask
+astor==0.7.1
+records
+pymongo
+numpy
+nltk
+xgboost
+python-rex

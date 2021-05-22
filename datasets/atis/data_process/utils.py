@@ -43,7 +43,7 @@ def sort_entity_list(e_list):
   return sorted([e.split('\t') for e in set(['\t'.join((n, t)) for n, t in e_list])], key=lambda x: x[1])
 
 
-def read_iata_mapping(e2m_dict, e2type_dict, fn='data/atis/iata.txt'):
+def read_iata_mapping(e2m_dict, e2type_dict, fn='data/atis/ci_ap_mapping.txt'):
   # IATA code crawled from wikipedia
   with codecs.open(fn, encoding='utf-8') as f_in:
     for l in filter(lambda x: len(x) > 0, map(lambda x: x.strip().lower(), f_in.read().split('\n'))):

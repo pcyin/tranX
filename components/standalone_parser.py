@@ -11,6 +11,9 @@ from model.parser import Parser
 from model.reconstruction_model import Reconstructor
 from model.paraphrase import ParaphraseIdentificationModel
 from datasets.conala import example_processor
+from datasets.atis import example_processor
+from datasets.geo import example_processor
+from datasets.django import example_processor
 
 if six.PY3:
     pass

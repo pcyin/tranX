@@ -3,18 +3,28 @@
     "parser": "default_parser",
     "example_processor": "atis_example_processor",
     "model_path": "data/pretrained_models/atis.bin",
+    "reranker_path": "best_pretrained_models/reranker.conala.vocab.src_freq3.code_freq3.mined_100000.intent_count100k_topk1_temp5.bin",
     "beam_size": 5
   },
   "geo": {
     "parser": "default_parser",
     "example_processor": "geo_example_processor",
     "model_path": "data/pretrained_models/geo.bin",
+    "reranker_path": "best_pretrained_models/reranker.conala.vocab.src_freq3.code_freq3.mined_100000.intent_count100k_topk1_temp5.bin",
     "beam_size": 5
   },
   "conala": {
     "parser": "default_parser",
     "example_processor": "conala_example_processor",
     "model_path": "data/pretrained_models/conala.bin",
+    "reranker_path": "best_pretrained_models/reranker.conala.vocab.src_freq3.code_freq3.mined_100000.intent_count100k_topk1_temp5.bin",
+    "beam_size": 15
+  },
+  "django": {
+    "parser": "default_parser",
+    "example_processor": "django_example_processor",
+    "model_path": "data/pretrained_models/django.bin",
+    "reranker_path": "best_pretrained_models/reranker.conala.vocab.src_freq3.code_freq3.mined_100000.intent_count100k_topk1_temp5.bin",
     "beam_size": 15
   }
 }
