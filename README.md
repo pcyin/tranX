@@ -100,7 +100,7 @@ To start the web server, simply run:
 
 ```
 source activate tranx
-PYTHONPATH=../ python app.py --config_file config/server/config_py3.json
+PYTHONPATH=. python server/app.py --config_file config/server/config_py3.json
 ```
 
 This will start a web server at port 8081 with ATIS/GEO/CoNaLa datasets.
