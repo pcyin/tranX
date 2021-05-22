@@ -29,6 +29,14 @@ p_decorator = re.compile(r'^@.*')
 QUOTED_STRING_RE = re.compile(r"(?P<quote>['\"])(?P<string>.*?)(?<!\\)(?P=quote)")
 
 
+# From: https://stackoverflow.com/questions/14820429/how-do-i-decodestring-escape-in-python3
+def string_escape(s, encoding='utf-8'):
+    return (s.encode('latin1')         # To bytes, required by 'unicode-escape'
+             .decode('unicode-escape') # Perform the actual octal-escaping decode
+             .encode('latin1')         # 1:1 mapping back to bytes
+             .decode(encoding))        # Decode original encoding
+
+
 def replace_string_ast_nodes(py_ast, str_map):
     for node in ast.walk(py_ast):
         if isinstance(node, ast.Str):
@@ -39,7 +47,7 @@ def replace_string_ast_nodes(py_ast, str_map):
             else:
                 # handle cases like `\n\t` in string literals
                 for key, val in str_map.items():
-                    str_literal_decoded = key.decode('string_escape')
+                    str_literal_decoded = string_escape(key)
                     if str_literal_decoded == str_val:
                         node.s = val
 
