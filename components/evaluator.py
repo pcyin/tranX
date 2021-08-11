@@ -14,7 +14,7 @@ class Evaluator(object):
     def is_hyp_correct(self, example, hyp):
         return self.transition_system.compare_ast(hyp.tree, example.tgt_ast)
 
-    def evaluate_dataset(self, examples, decode_results, fast_mode=False):
+    def evaluate_dataset(self, examples, decode_results, fast_mode=False, args=None):
         correct_array = []
         oracle_array = []
         for example, hyp_list in zip(examples, decode_results):
@@ -58,7 +58,7 @@ class CachedExactMatchEvaluator(Evaluator):
     def is_hyp_correct(self, example, hyp):
         raise hyp.is_correct
 
-    def evaluate_dataset(self, examples, decode_results, fast_mode=False):
+    def evaluate_dataset(self, examples, decode_results, fast_mode=False, args=None):
         if fast_mode:
             acc = sum(hyps[0].is_correct for hyps in decode_results if len(hyps) > 0) / float(len(examples))
             return acc
