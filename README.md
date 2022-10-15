@@ -136,7 +136,7 @@ conda env create -f config/env/(tranx.yml,tranx-py2.yml)
 You need to implement the 
 `TransitionSystem` class with a bunch of custom functions which (1) convert between 
 domain-specific logical forms and intermediate ASTs used by TranX, (2) predictors which 
-check if a hypothesis parse if correct during beam search decoding.
+check if a hypothesis parse is correct during beam search decoding.
 You may take a look at the examples in `asdl/lang/*`.
 
 #### How to generate those pickled datasets (.bin files)?
@@ -146,7 +146,7 @@ a dataset into pickled files.
 
 #### How to run without CUDA?
 
-Simply remove the `--cuda`` flag from the command line arguments. It is included
+Simply remove the `--cuda` flag from the command line arguments. It is included
 by default in all scripts in the `scripts` directory.
 
 ## Reference
