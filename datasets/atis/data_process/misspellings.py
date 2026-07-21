@@ -252,7 +252,7 @@ _misspelling_dict = {
 'alomst': ['almost'],
 'alot': ['a lot', 'allot'],
 'alotted': ['allotted'],
-'alowed': ['allowed'],
+'allowed': ['allowed'],
 'alowing': ['allowing'],
 'alreayd': ['already'],
 'alse': ['else'],
